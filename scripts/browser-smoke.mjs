@@ -39,7 +39,17 @@ try {
   await page.getByRole('button', { name: 'Next chapter →', exact: true }).click();
   await page.waitForFunction(() => window.__isg.journey.lastChapter === 5);
   await page.getByRole('button', { name: 'Begin surface mission →' }).click();
-  await page.waitForFunction(() => window.__isg.journey.done && window.__isg.mission.state !== 'brief');
+  await page.getByRole('button', { name: 'Enter habitat' }).click();
+  await page.getByRole('button', { name: /Review route/ }).click();
+  await page.getByRole('button', { name: /Plan leg to S1/ }).click();
+  await page.getByRole('button', { name: /Longer/ }).click();
+  await page.getByRole('button', { name: /Go outside/ }).click();
+  await page.waitForFunction(() => window.__isg.journey.done && window.__isg.mission?.state === 'drive');
+  assert.equal(await page.evaluate(() => window.__isg.route.planName), 'Delta Front · Longer to S1');
+  await page.keyboard.press('p');
+  await page.getByRole('button', { name: 'Route', exact: true }).click();
+  assert.equal(await page.locator('#planningBoard [data-route-name]').textContent(), 'Delta Front · Longer to S1');
+  await page.keyboard.press('Escape');
   assert.equal(await page.locator('#hud').isVisible(), true);
   await page.screenshot({ path: 'test-results/06-surface.png' });
   const before = await page.evaluate(() => window.__isg.mission.s);
@@ -57,7 +67,25 @@ try {
   assert.equal(await mobile.evaluate(() => window.__isg.journey.reduced), true);
   await mobile.screenshot({ path: 'test-results/07-mobile.png' });
   await mobile.getByRole('button', { name: /Skip to surface/ }).click();
-  await mobile.waitForFunction(() => window.__isg.mission.state !== 'brief');
+  await mobile.getByRole('button', { name: 'Enter habitat' }).click();
+  await mobile.getByRole('button', { name: /Review route/ }).click();
+  await mobile.getByLabel('Mission site').selectOption('gale');
+  await mobile.getByRole('button', { name: /Shortest/ }).click();
+  await mobile.getByLabel('Simulation conditions').selectOption('dust');
+  await mobile.getByRole('button', { name: /Go outside/ }).click();
+  await mobile.waitForFunction(() => window.__isg.mission?.state === 'drive');
+  assert.equal(await mobile.evaluate(() => window.__isg.route.planName), 'Shortest route');
+  await mobile.evaluate(() => {
+    const { mission, route, simulate } = window.__isg;
+    for (let i = 0; i < 300 && mission.s < route.length * 0.29; i++) {
+      if (mission.state === 'gate') mission.acknowledge();
+      if (mission.state !== 'drive') throw new Error('Unexpected stop before the dust front: ' + mission.state);
+      simulate(1, { boost: true });
+    }
+    if (mission.s < route.length * 0.29) throw new Error('Rover did not reach the dust front');
+  });
+  await mobile.getByRole('button', { name: /Turn around and return/ }).click();
+  assert.equal(await mobile.evaluate(() => window.__isg.mission.aborted), true);
   assert.deepEqual(errors, [], 'No runtime errors');
-  console.log('Browser checks passed: desktop journey, pause, all six chapters, sources, surface handoff, driving, mobile skip and reduced motion.');
+  console.log('Browser checks passed: desktop journey, pause, all six chapters, sources, Delta route selection, wrist navigator, driving, mobile skip, Gale dust return and reduced motion.');
 } finally { await browser.close(); }

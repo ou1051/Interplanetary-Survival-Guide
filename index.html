@@ -77,6 +77,9 @@
           <div class="legend" id="legend"></div>
         </div>
 
+        <button type="button" id="boardBtn" class="ghost field-wrist">Wrist navigator [P]</button>
+        <p id="fieldAlert" class="field-alert hidden" role="status">Dust front ahead. Open your wrist navigator to return.</p>
+
         <div id="touch" class="touch">
           <button data-v="left" aria-label="steer left">◀</button>
           <button data-v="right" aria-label="steer right">▶</button>
@@ -114,6 +117,8 @@
         </div>
       </section>
 
+      <section id="habitat" class="hidden" aria-label="Habitat mission control"></section>
+
       <section id="brief" class="launch-screen">
         <header class="launch-header"><a class="wordmark" href="./"><span class="brand-orbit">◒</span> INTERPLANETARY<span class="brand-sub">SURVIVAL GUIDE</span></a><nav aria-label="Main navigation"><a href="./map.html">Explore Mars ↗</a><button id="sourcesBtn">Mission &amp; sources</button></nav><span class="edition">SPACE APPS / 2026</span></header>
         <div class="launch-copy">
@@ -125,8 +130,6 @@
         </div>
         <div class="launch-coordinate"><span class="live-dot"></span> CREW ACCESS ARM <b>EARTH / LAUNCH COMPLEX</b><small>ILLUSTRATIVE MISSION · ARES 01</small></div>
         <footer class="launch-footer"><div class="launch-route"><span class="active"><i>01</i> EARTH</span><div></div><span><i>02</i> TRANSFER</span><div></div><span><i>03</i> MARS</span></div><div class="launch-footnote">A journey to get there.<br>A survival guide to get home.</div></footer>
-        <div id="briefGrid" hidden></div><span id="briefEva" hidden></span>
-        <button id="boardBtn" hidden>Planning board</button>
       </section>
 
       <section id="journey" class="journey-overlay hidden" aria-label="Earth to Mars journey">
@@ -141,7 +144,7 @@
         <div class="launch-kicker">THE MISSION / THE EVIDENCE</div>
         <h2>Explore with curiosity.<br>Navigate with context.</h2>
         <p>This experience connects an astronaut’s journey to a Mars survival map. After landing, follow the 3D rover route, inspect four terrain layers, stop at hazard gates and complete science tasks while monitoring oxygen, energy and your return margin.</p>
-        <div class="source-cards"><article><b>01 · JOURNEY</b><h3>Imagine the arrival</h3><p>The rocket, cockpit, Mars and landing are original illustrative reconstructions. Earth uses a credited Three.js example texture. The 84-second journey compresses a trip that would take months.</p></article><article><b>02 · SURFACE</b><h3>Rehearse the decisions</h3><p>The local rover terrain, hazards and environmental readings are synthetic. They demonstrate planning trade-offs and are not surveyed terrain or current Mars weather.</p></article><article><b>03 · ORBITAL MAP</b><h3>Follow the evidence</h3><p>The separate 3D Mars globe streams NASA/USGS imagery and elevation. Coverage and resolution depend on each source and network availability.</p><a href="./map.html">Open the Mars globe ↗</a></article></div>
+        <div class="source-cards"><article><b>01 · JOURNEY</b><h3>Imagine the arrival</h3><p>The rocket, cockpit, Mars and landing are original illustrative reconstructions. Earth uses a credited Three.js example texture. The 84-second journey compresses a trip that would take months.</p></article><article><b>02 · SURFACE</b><h3>Rehearse the decisions</h3><p>Plan a rover route in the habitat after landing. The Delta traverse uses fictional terrain. Gale Crater uses archived HiRISE elevation and imagery with a Curiosity field reference. Hazards, weather and life support are simulated.</p></article><article><b>03 · ORBITAL MAP</b><h3>Follow the evidence</h3><p>The separate 3D Mars globe streams NASA/USGS imagery and elevation. Coverage and resolution depend on each source and network availability.</p><a href="./map.html">Open the Mars globe ↗</a></article></div>
         <h3>Science sources</h3><ul><li><a href="https://science.nasa.gov/mars/facts/" target="_blank" rel="noopener">NASA · Mars facts ↗</a> — planetary context</li><li><a href="https://science.nasa.gov/mission/mars-2020-perseverance/" target="_blank" rel="noopener">NASA · Perseverance ↗</a> — ancient delta and exploration context</li><li><a href="https://trek.nasa.gov/mars/" target="_blank" rel="noopener">NASA · Mars Trek ↗</a> — orbital map sources</li></ul>
         <h3>Open-source inspiration</h3><p>We studied <a href="https://github.com/sohaib1083/gale-marswalk-planner" target="_blank" rel="noopener">Gale Marswalk Planner</a> for terrain-aware route planning, <a href="https://github.com/PhewwcCoder/nasa-space-app-challenge" target="_blank" rel="noopener">Sol-3</a> for first-person exploration and source-linked learning, and <a href="https://github.com/NASA-AMMOS/3DTilesRendererJS" target="_blank" rel="noopener">NASA AMMOS 3D Tiles Renderer</a> for multiscale 3D terrain architecture. Their application code and assets are not copied into this journey. The Earth texture is from the Three.js examples (MIT); see repository asset credits.</p>
         <p class="source-note">Built with Three.js and CesiumJS. Independent Space Apps project; no NASA endorsement. Concept demonstrator, not operational astronaut navigation.</p>
@@ -152,7 +155,7 @@
           <div class="eyebrow">EVA DEBRIEF</div>
           <h1>TRAVERSE COMPLETE<span id="debriefSub"></span></h1>
           <div class="brief-grid" id="debriefGrid"></div>
-          <button id="restartBtn" class="primary">RUN AGAIN</button>
+          <button id="restartBtn" class="primary">RETURN TO MISSION MAP</button>
         </div>
       </section>
     </div>

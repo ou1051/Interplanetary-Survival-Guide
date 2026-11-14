@@ -13,23 +13,21 @@ import { RoverAudio } from './sim/audio.js';
 import { MapRenderer, bearingTo } from './ui/mapRenderer.js';
 import { Hud } from './ui/hud.js';
 import { PlanningBoard } from './ui/planningBoard.js';
+import { mountHabitat } from './ui/habitat.js';
+import { heightGrid, missionHeight, outcrop, worldPosition, sampleMinutes, imagery, observationSource } from './data/galeSite.js';
 import { clamp, damp, DEG } from './core/math.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
-// Mode 1 · Planning Board (2D overlay; independent of the 3D engine)
 const planningBoard = new PlanningBoard();
-document.getElementById('boardBtn')?.addEventListener('click', () => planningBoard.toggle(true));
+document.getElementById('boardBtn').addEventListener('click', () => planningBoard.toggle(true));
+
 const sourcesDialog = document.getElementById('sourcesDialog');
 document.getElementById('sourcesBtn').addEventListener('click', () => sourcesDialog.showModal());
 sourcesDialog.addEventListener('click', e => { if (e.target === sourcesDialog) sourcesDialog.close(); });
 
-async function init() {
-  const T0 = performance.now();
+function init() {
   const viewport = document.getElementById('viewport');
-  const beginBtn = document.getElementById('beginBtn');
-  const status = (t) => (beginBtn.textContent = t);
-
   // ---------------------------------------------------------------- renderer
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -41,6 +39,51 @@ async function init() {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   viewport.appendChild(renderer.domElement);
 
+  const input = new Input(viewport);
+  window.addEventListener('resize', () => renderer.setSize(innerWidth, innerHeight));
+  const enterHabitat = () => {
+    document.getElementById('brief').classList.add('hidden');
+    document.body.classList.remove('at-launch');
+    const habitat = document.getElementById('habitat');
+    habitat.classList.remove('hidden');
+    mountHabitat(habitat, (plan, scenario, status) => initSurface(plan, scenario, status, renderer, input));
+    habitat.querySelector('[data-intro-enter]').focus();
+  };
+  window.__isg = { renderer, input };
+  if (location.hash === '#habitat') {
+    enterHabitat();
+    return;
+  }
+
+  const timer = new THREE.Timer();
+  timer.connect(document);
+  const journey = new Journey({ renderer, input, onComplete: () => {
+    timer.dispose();
+    enterHabitat();
+  } });
+  window.__isg.journey = journey;
+  const beginBtn = document.getElementById('beginBtn');
+  beginBtn.disabled = false;
+  beginBtn.textContent = 'BOARD THE ROCKET  →';
+  beginBtn.addEventListener('click', () => journey.start(), { once: true });
+  const surfaceBtn = document.getElementById('surfaceBtn');
+  surfaceBtn.disabled = false;
+  surfaceBtn.addEventListener('click', () => journey.finish(), { once: true });
+  function flightFrame() {
+    if (journey.done) return;
+    timer.update();
+    if (!sourcesDialog.open) {
+      if (!journey.active && input.hit('enter') && document.activeElement === document.body) beginBtn.click();
+      journey.render(Math.min(timer.getDelta(), 0.05));
+    }
+    input.endFrame();
+    if (!journey.done) requestAnimationFrame(flightFrame);
+  }
+  requestAnimationFrame(flightFrame);
+}
+
+async function initSurface(plan, scenario, status, renderer, input) {
+  const T0 = performance.now();
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(HORIZON.clone(), 0.00042);
   const env = createEnvironment(renderer);
@@ -64,12 +107,21 @@ async function init() {
   // ---------------------------------------------------------------- world
   status('GENERATING TERRAIN…');
   await nextFrame();
-  const terrain = new Terrain();
+  const terrain = plan.traverse?.terrain ?? new Terrain({ height: missionHeight, inner: heightGrid });
   scene.add(terrain.group);
 
   status('PLANNING ROUTE…');
   await nextFrame();
-  const route = new Route(terrain);
+  const route = plan.traverse?.route ?? new Route(terrain, { points: plan.points, exact: true, areaHazards: [], stations: [{
+    id: 'S1', name: 'Layered outcrop', at: worldPosition(outcrop),
+    objective: 'Use the Curiosity field reference to identify two beds and collect a sample from each.',
+    why: ['Compare rock textures above and below the visible contact.'],
+    observation: { image: imagery.mastcam, source: observationSource },
+    tasks: [{ label: 'Collect paired samples', minutes: sampleMinutes, sampleCount: 2, result: 'Two samples bagged for comparison · simulation' }],
+  }] });
+  route.planName = plan.name;
+  route.retracesOutbound = !plan.traverse;
+  route.site = plan.site;
   const visuals = new RouteVisuals(route, terrain);
   scene.add(visuals.group);
 
@@ -93,7 +145,6 @@ async function init() {
 
   const map = new MapRenderer(terrain, route);
   const mission = new Mission(route, terrain, hab.userData.antennaTop);
-  const input = new Input(viewport);
   const audio = new RoverAudio();
   const hud = new Hud({ route, mission, mapRenderer: map, layers: LAYERS, input });
   document.querySelectorAll('#touch button').forEach((b) => input.bindButton(b, b.dataset.v));
@@ -128,14 +179,16 @@ async function init() {
       hud.log(p.text, p.tone);
       audio.beep(p.tone === 'danger' ? 'danger' : p.tone === 'warn' ? 'warn' : p.tone === 'ok' ? 'ok' : 'info');
     }
-    if (type === 'state' && p.state === 'complete') setTimeout(() => hud.showDebrief(() => location.reload()), 1400);
+    if (type === 'state' && p.state === 'complete') setTimeout(() => hud.showDebrief(() => {
+      location.hash = 'habitat';
+      location.reload();
+    }), 1400);
   });
 
   // ---------------------------------------------------------------- resize
   const resize = () => {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    renderer.setSize(w, h);
     camera.aspect = w / h;
     camera.fov = w / h < 1 ? 88 : 72;
     camera.updateProjectionMatrix();
@@ -159,25 +212,17 @@ async function init() {
   timer.connect(document);
 
   console.info(`[ISG] world ready in ${Math.round(performance.now() - T0)} ms · rocks ${rocks.userData.count}`);
-  hud.fillBriefing();
-  const startSurface = () => {
-    audio.start();
-    hud.showHud();
-    mission.start();
-    input.resetLook();
-    input.keys.clear();
-    input.pressed.clear();
-    hud.log('Touchdown confirmed. Follow the cyan route. W to drive, C for cruise, E for science tasks.', 'ok');
-  };
-  status('PREPARING EARTH DEPARTURE…');
-  await nextFrame();
-  const journey = new Journey({ renderer, input, onComplete: startSurface });
-  hud.ready(() => journey.start());
-  beginBtn.textContent = 'BOARD THE ROCKET  →';
-  const surfaceBtn = document.getElementById('surfaceBtn');
-  surfaceBtn.disabled = false;
-  surfaceBtn.addEventListener('click', () => journey.finish(), { once: true });
-
+  document.getElementById('habitat').classList.add('hidden');
+  audio.start();
+  hud.showHud();
+  document.getElementById('boardBtn').focus({ preventScroll: true });
+  mission.start();
+  input.resetLook();
+  input.keys.clear();
+  input.pressed.clear();
+  const fieldAlert = document.getElementById('fieldAlert');
+  const dustAt = route.length * 0.29;
+  let dustActive = false;
 
   // debug / automated testing hook: advance the simulation with a fixed step
   const simulate = (seconds, o = {}) => {
@@ -185,28 +230,15 @@ async function init() {
     for (let t = 0; t < seconds; t += 1 / 30) mission.update(1 / 30, fake, view.pitch);
     return { s: +mission.s.toFixed(1), v: +mission.speed.toFixed(2), state: mission.state };
   };
-  window.__isg = { journey, renderer, mission, route, rover, terrain, input, setLayer, hud, simulate };
+  Object.assign(window.__isg, { mission, route, rover, terrain, setLayer, hud, simulate });
 
   function frame() {
     timer.update();
     const dt = Math.min(timer.getDelta(), 0.05);
     time += dt;
-    if (!journey.done) {
-      if (document.getElementById('sourcesDialog').open) {
-        input.endFrame();
-        requestAnimationFrame(frame);
-        return;
-      }
-      if (!journey.active && input.hit('enter') && !beginBtn.disabled) beginBtn.click();
-      journey.render(dt);
-      input.endFrame();
-      requestAnimationFrame(frame);
-      return;
-    }
 
     // ---- discrete inputs
-    if (mission.state === 'brief' && input.hit('enter') && !beginBtn.disabled) beginBtn.click();
-    if (mission.state !== 'brief') {
+    if (!planningBoard.open && mission.state !== 'brief') {
       for (const l of LAYERS) if (input.hit(l.key)) setLayer(l.id);
       if (input.hit('m')) hud.toggleMap();
       if (input.hit('escape')) hud.toggleMap(false);
@@ -226,8 +258,24 @@ async function init() {
     }
 
     // ---- simulation
-    mission.update(dt, input, view.pitch);
-    if (planningBoard.open) planningBoard.updateReadouts();
+    if (!planningBoard.open) mission.update(dt, input, view.pitch);
+    if (route.retracesOutbound && scenario === 'dust' && !mission.aborted && !mission.dustWarning &&
+        mission.state === 'drive' && mission.s >= dustAt && mission.s < route.length / 2) {
+      mission.dustWarning = true;
+      mission.speed = 0;
+      mission.cruise = false;
+      scene.fog.density = 0.008;
+      dustActive = true;
+      hud.log('Simulated dust front ahead. Open wrist navigation [P].', 'danger');
+      planningBoard.toggle(true);
+    }
+    if (dustActive && mission.aborted) {
+      scene.fog.density = 0.00042;
+      dustActive = false;
+    }
+    if (planningBoard.open) planningBoard.updateField();
+    const showAlert = mission.dustWarning && !mission.aborted && mission.state !== 'complete';
+    fieldAlert.classList.toggle('hidden', !showAlert);
 
     route.sample(mission.s, p);
     const x = p.x + p.rx * mission.lateral;
@@ -322,7 +370,9 @@ async function init() {
   requestAnimationFrame(frame);
 }
 
-init().catch((err) => {
+try {
+  init();
+} catch (err) {
   console.error(err);
   const b = document.getElementById('beginBtn');
   if (b) {
@@ -331,5 +381,4 @@ init().catch((err) => {
     b.onclick = () => location.reload();
   }
   document.querySelector('.launch-copy > p').textContent = 'The 3D scene could not start. Try reloading in a WebGL-enabled browser. You can still read Mission & sources or open Explore Mars.';
-});
-
+}
