@@ -414,9 +414,12 @@ export class Rover {
       knee.position.set(x, 1.0, -0.22);
       parent.add(thigh, shin, boot, knee);
     };
-    // Driver's own legs (seen when looking down).
-    leg(body, -0.52);
-    leg(body, -0.3);
+    // Driver's own legs (seen when looking down). Hidden when the driver is
+    // out of the rover or drawn whole for the third-person view.
+    this.driverLegs = new THREE.Group();
+    body.add(this.driverLegs);
+    leg(this.driverLegs, -0.52);
+    leg(this.driverLegs, -0.3);
 
     // Co-pilot astronaut in the right seat.
     const crew = new THREE.Group();

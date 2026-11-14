@@ -40,6 +40,7 @@ export function mountHabitat(root, launch) {
           <header class="hab-header"><h1>Mission briefing</h1><span class="hab-eva"><i></i> EVA-01</span><nav class="hab-nav" aria-label="Mission navigation">
             <a href="./map.html">Explore Mars</a>
             <button type="button" id="sourcesBtn">Mission &amp; sources</button>
+            <button type="button" id="collectionBtn">Collection</button>
             <button type="button" data-review-close>← Habitat view</button>
           </nav></header>
           <div class="hab-console-grid">

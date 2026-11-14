@@ -41,21 +41,31 @@ Run `npm run api` to plan a route or recalculate the remaining leg after a hazar
 
 ## Controls
 
-| Key | Action |
-| --- | --- |
-| `W` / `↑` (hold) | drive along the survival route |
-| `S` / `↓` / `Space` | brake |
-| `A` `D` / `←` `→` | steer inside the route corridor (±5 m) |
-| `C` | cruise control |
-| `Shift` (hold) | time ×3 |
-| `E` (hold) | run the active science task |
-| `Enter` | acknowledge a hazard briefing / resume traverse |
-| `1`–`4` | data layer: optical · slope · thermal inertia · mineralogy |
-| `M` | full route map + elevation profile |
-| `L` | headlights · `H` hide HUD · `V` recentre view · `N` mute |
-| drag | look around the cabin (double-click to recentre) |
+The planned route is a guide, not a rail: drive and walk anywhere. Stop at a science station, get out and collect its artifacts on foot. Rarer finds hide away from the route. Return to the habitat and press Enter to end the EVA.
 
-Touch devices get on-screen DRIVE / BRAKE / steer / TASK buttons.
+| Key | Driving | On foot |
+| --- | --- | --- |
+| `W` / `↑` | drive | walk forward |
+| `S` / `↓` / `Space` | brake (hold at a standstill to reverse) | walk back (`S` / `↓`) |
+| `A` `D` / `←` `→` | steer | step sideways |
+| `Shift` (hold) | time ×3 | run |
+| `F` | get out (rover stopped) | board the rover (within 3 m) |
+| `E` (hold) | | collect the find in reach |
+| `T` | view: first person → third person → overhead | same |
+| `I` | artifact collection | same |
+| `C` | cruise control | |
+| `Enter` | end the EVA at the habitat | same |
+| `1`–`4` | data layer: optical · slope · thermal inertia · mineralogy | same |
+| `M` | full route map + elevation profile | same |
+| `L` | headlights · `H` hide HUD · `V` recentre view · `N` mute | same |
+| drag · `Z` `X` · `B` | look around a full 360° · look back | look around; orbit the camera in the outside views |
+| wheel | zoom the third-person and overhead views | same |
+
+Touch devices get on-screen DRIVE / BRAKE / steer / TASK buttons, plus Get out / Board, Hold to collect, View and Collection buttons.
+
+### Artifacts
+
+Each station has three finds tied to its science (for example olivine at the crater floor, mudstone at the delta front, an iron meteorite at the fresh crater). Off-route finds such as a pallasite or opaline silica sit away from the planned route. Light beams in the rarity colour show where they are. Hold `E` next to one to collect it. The collection (`I`, or **Collection** on the habitat console) keeps every find in this browser, with a short description of the real Mars science behind it. Finds are simulated.
 
 ## What the screen shows
 
