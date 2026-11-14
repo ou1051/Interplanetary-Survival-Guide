@@ -62,11 +62,12 @@
 }
 
 /* ---- job card ---- */
-.mm-job { position: absolute; top: 20px; left: 20px; width: 300px; padding: 14px 18px 18px; }
+.mm-job { position: absolute; top: calc(var(--mm-top, 0px) + 20px); left: 20px; width: 300px; padding: 14px 18px 18px; }
 .mm-job.collapsed { padding-bottom: 14px; width: auto; }
 .mm-job-toggle {
   display: flex; align-items: center; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; text-align: left;
 }
+.mm-job-toggle .mm-kicker { white-space: nowrap; }
 .mm-job-toggle svg { margin-left: auto; color: var(--faint); transform: rotate(90deg); transition: transform 0.2s; }
 .mm-job.collapsed .mm-job-toggle svg { transform: rotate(0deg); margin-left: 10px; }
 .mm-job h1 { margin: 10px 0 6px; font-size: 19px; line-height: 1.25; font-weight: 650; letter-spacing: -0.01em; }
@@ -91,7 +92,7 @@
 
 /* ---- clock ---- */
 .mm-clock {
-  position: absolute; top: 20px; right: 380px;
+  position: absolute; top: calc(var(--mm-top, 0px) + 20px); right: 380px;
   display: flex; align-items: center; gap: 14px; padding: 8px 10px 8px 16px; border-radius: 999px;
 }
 .mm-turn { display: flex; align-items: baseline; gap: 8px; }
@@ -103,6 +104,7 @@
   font-size: 12px; font-weight: 700; border: 1.5px solid var(--ok); color: var(--ok);
 }
 .mm-wins li.soon { border-color: var(--warn); color: var(--warn); }
+.mm.no-clock .mm-clock { display: none; }
 .mm-wins li.closed { border-color: var(--line); color: var(--faint); text-decoration: line-through; }
 
 /* ---- layer rail ---- */
@@ -140,7 +142,7 @@
 
 /* ---- side panel ---- */
 .mm-panel {
-  position: absolute; top: 20px; right: 20px; bottom: 20px; width: 340px;
+  position: absolute; top: calc(var(--mm-top, 0px) + 20px); right: 20px; bottom: 20px; width: 340px;
   display: flex; flex-direction: column; overflow: hidden;
 }
 .mm-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 6px; margin: 12px 12px 0; border-radius: 12px; background: rgba(0, 0, 0, 0.25); }
@@ -289,7 +291,7 @@
 
 /* ---- narrow screens: panel becomes a bottom sheet ---- */
 @media (max-width: 900px) {
-  .mm-job { top: 12px; left: 12px; right: 12px; width: auto; padding: 12px 14px 14px; }
+  .mm-job { top: calc(var(--mm-top, 0px) + 12px); left: 12px; right: 12px; width: auto; padding: 12px 14px 14px; }
   .mm-job h1 { font-size: 16px; }
   .mm-clock { top: auto; right: 12px; bottom: calc(46vh + 24px); }
   .mm-layers { top: auto; bottom: calc(46vh + 24px); left: 12px; transform: none; flex-direction: row; }

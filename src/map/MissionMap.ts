@@ -1,9 +1,10 @@
 import type { Cell, MapAction, MapInput, Observation, Site } from './contracts';
 import { cellKey, clampCell, elevationAt, inBounds, isMapped, sameCell, slopeGrid, unreachableStops, type Connectivity, type Stop } from './grid';
 import { observationThatChanged, planKey, planStops, routeCards, formatDistance, formatSlope, moveItem, replaceAt } from './compare';
-import { previewScout, sourceFor, sourceKind, KIND_LABEL, openWindows } from './scouting';
+import { previewScout, sourceFor, sourceKind, KIND_LABEL } from './scouting';
 import { cellAt, computeView, render, ROUTE_COLORS, type Layers, type Mode, type View } from './render';
 import { ICON } from './icons';
+import { clockMarkup } from './clock';
 
 // ---------------------------------------------------------------------------
 // Mission map & scouting screen (Person 3).
@@ -24,6 +25,10 @@ export interface MissionMapOptions {
   maxWaypoints?: number;
   /** Neighbour rule used to explain unreachable stops; match the planner (default 8). */
   connectivity?: Connectivity;
+  /** Show the turn/window clock (false when a host app bar already shows it). */
+  showClock?: boolean;
+  /** Pixels reserved at the top by a host app bar. */
+  topInset?: number;
 }
 
 type Tab = 'scout' | 'plan';
@@ -67,7 +72,7 @@ export class MissionMap {
   constructor(container: HTMLElement, options: MissionMapOptions) {
     this.site = options.site;
     this.slopes = slopeGrid(this.site);
-    this.opts = { draw: options.draw ?? true, initialTab: options.initialTab ?? 'scout', maxWaypoints: options.maxWaypoints ?? 6, connectivity: options.connectivity ?? 8, onAction: options.onAction };
+    this.opts = { draw: options.draw ?? true, initialTab: options.initialTab ?? 'scout', maxWaypoints: options.maxWaypoints ?? 6, connectivity: options.connectivity ?? 8, showClock: options.showClock ?? true, topInset: options.topInset ?? 0, onAction: options.onAction };
     this.tab = this.opts.initialTab;
     // small screens: start with the assignment folded so the map stays visible
     this.jobCollapsed = typeof window !== 'undefined' && window.innerWidth <= 900 && window.innerWidth > 0 && this.opts.draw;
@@ -88,6 +93,8 @@ export class MissionMap {
       <div class="mm-modal" hidden></div>
       <div class="mm-toast" role="status" aria-live="polite"></div>
       <div class="mm-sr" aria-live="polite"></div>`;
+    this.root.style.setProperty('--mm-top', `${this.opts.topInset}px`);
+    if (!this.opts.showClock) this.root.classList.add('no-clock');
     container.appendChild(this.root);
     const q = (s: string) => this.root.querySelector(s) as HTMLElement;
     this.el = {
@@ -600,21 +607,8 @@ export class MissionMap {
   }
 
   private renderClock() {
-    if (!this.input) return;
-    const { run, windows } = this.input;
-    const open = openWindows(run.turn, windows);
-    this.el.clock.innerHTML = `
-      <div class="mm-turn"><span>Turn</span><b>${run.turn}</b></div>
-      <ul class="mm-wins">${windows
-        .map((w) => {
-          const isOpen = run.turn <= w.lastOpenTurn;
-          const soon = isOpen && run.turn === w.lastOpenTurn;
-          const state = !isOpen ? 'closed' : soon ? 'soon' : 'open';
-          const tip = `${w.label} · ${isOpen ? `open through turn ${w.lastOpenTurn}` : 'closed'}`;
-          return `<li class="${state}" title="${esc(tip)}" aria-label="${esc(tip)}">${esc(w.label.replace(/^Window\s*/i, ''))}</li>`;
-        })
-        .join('')}</ul>
-      <span class="mm-sr-only">${open.length} of ${windows.length} departure windows open</span>`;
+    if (!this.input || !this.opts.showClock) return;
+    this.el.clock.innerHTML = clockMarkup(this.input.run, this.input.windows);
   }
 
   private renderLayers() {

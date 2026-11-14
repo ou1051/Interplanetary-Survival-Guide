@@ -15,5 +15,8 @@ export const ICON = {
   chevron: svg('<path d="M9 6l6 6-6 6"/>'),
   external: svg('<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/>'),
   play: svg('<path d="M8 5l11 7-11 7z"/>'),
+  globe: svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18"/>'),
+  grid: svg('<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M4 15h16M10 4v16M15 4v16"/>'),
+  minus: svg('<path d="M5 12h14"/>'),
   swap: svg('<path d="M7 7h11l-3-3M17 17H6l3 3"/>'),
 };

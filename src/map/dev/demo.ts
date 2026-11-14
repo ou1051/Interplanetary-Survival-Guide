@@ -1,4 +1,4 @@
-import { MissionMap } from '../index';
+import { MissionScreen } from '../index';
 import type { MapAction, RoutePlan, Run, Site } from '../contracts';
 import { standInClock } from '../scouting';
 import { SYNTHETIC_SITE, SYNTHETIC_SITE_BARRIER, SYNTHETIC_WINDOWS, initialRun } from './fixture';
@@ -20,7 +20,8 @@ let run: Run = initialRun(site);
 let routes: RoutePlan[] = [];
 
 const host = document.getElementById('map')!;
-const map = new MissionMap(host, { site, onAction });
+const screen = new MissionScreen(host, { site, onAction, initialView: location.hash === '#site' || wantsGap() ? 'site' : 'globe' });
+const map = screen.map;
 
 function replan() {
   routes = standInPlanRoutes(site, run.waypoints, run.stationOrder, run.revealedObservationIds);
@@ -71,11 +72,13 @@ function onAction(a: MapAction) {
 }
 
 function push() {
-  map.update({ run, routes, windows: SYNTHETIC_WINDOWS, clock: standInClock(run.turn, SYNTHETIC_WINDOWS) });
+  screen.update({ run, routes, windows: SYNTHETIC_WINDOWS, clock: standInClock(run.turn, SYNTHETIC_WINDOWS) });
 }
 
 // tiny dev switch: fixture variant + reset
 const dev = document.getElementById('dev')!;
+// developer switch only when asked for: map.html#dev (or #gap)
+if (/dev|gap/.test(location.hash)) dev.style.display = 'flex';
 dev.addEventListener('click', (e) => {
   const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
   if (!b) return;
@@ -104,4 +107,4 @@ window.addEventListener('hashchange', () => {
 
 replan();
 push();
-(window as unknown as { __map: unknown }).__map = { map, get run() { return run; }, get routes() { return routes; }, onAction };
+(window as unknown as { __map: unknown }).__map = { map, screen, get run() { return run; }, get routes() { return routes; }, onAction };
