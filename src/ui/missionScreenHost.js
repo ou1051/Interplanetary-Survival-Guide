@@ -26,6 +26,8 @@ export class MissionMapScreen {
     this.screen = new MissionScreen(this.container, {
       site: this.site,
       onAction: (a) => this.onAction(a),
+      spatialPlanning: true,
+      onSiteView: () => this.overlay?.flyToSite(1.6),
       planEditing: false, // the flow's route options fix waypoints and station order
       planLabel: 'Plan the traverse',
       onGlobeReady: (globe) => this.attachOverlay(globe),
@@ -41,7 +43,7 @@ export class MissionMapScreen {
     this.container.classList.remove('hidden');
     if (!this.screen) this.build();
     this.render();
-    this.screen.globe?.setActive(this.screen.root.dataset.view === 'globe');
+    this.screen.globe?.setActive(true);
   }
 
   hide() {
@@ -83,6 +85,7 @@ export class MissionMapScreen {
       },
     });
     this.drawOverlay();
+    if (this.screen.root.dataset.view === 'site') this.overlay.flyToSite(1.6);
   }
 
   drawOverlay() {

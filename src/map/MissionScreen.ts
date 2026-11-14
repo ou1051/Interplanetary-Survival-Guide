@@ -30,6 +30,9 @@ export interface MissionScreenOptions {
   planLabel?: string;
   /** Passed to MissionMap: false when the host cannot route through player waypoints. */
   planEditing?: boolean;
+  /** Keep the globe under planning controls when the host supplies 3D overlays. */
+  spatialPlanning?: boolean;
+  onSiteView?: () => void;
 }
 
 const BAR_H = 52;
@@ -57,6 +60,7 @@ export class MissionScreen {
     this.view = opts.initialView ?? 'globe';
     this.root = document.createElement('div');
     this.root.className = 'ms';
+    this.root.classList.toggle('spatial-planning', !!opts.spatialPlanning);
     this.root.style.setProperty('--bar-h', `${BAR_H}px`);
     this.root.innerHTML = `
       <header class="ms-bar">
@@ -147,10 +151,14 @@ export class MissionScreen {
       b.setAttribute('aria-selected', String(on));
       b.classList.toggle('on', on);
     });
-    (this.q('.ms-globe') as HTMLElement).inert = view !== 'globe';
+    (this.q('.ms-globe') as HTMLElement).inert = view !== 'globe' && !this.opts.spatialPlanning;
     (this.q('.ms-site') as HTMLElement).inert = view !== 'site';
-    if (view === 'globe' && this.opts.globe !== false) void this.ensureGlobe();
-    this.globe?.setActive(view === 'globe');
+    if ((view === 'globe' || this.opts.spatialPlanning) && this.opts.globe !== false) void this.ensureGlobe();
+    this.globe?.setActive(view === 'globe' || !!this.opts.spatialPlanning);
+    if (view === 'site' && this.opts.spatialPlanning) {
+      if (this.opts.onSiteView) this.opts.onSiteView();
+      else this.globe?.flyToPlace('vrr');
+    }
     if (view === 'site') {
       this.map.prefetchBackdrop();
       window.dispatchEvent(new Event('resize')); // let the map re-measure
@@ -187,9 +195,10 @@ export class MissionScreen {
             if (s.imageryErrors > 25) this.banner('Some imagery tiles could not be loaded. Check your connection.');
           },
         });
-        this.globe.setActive(this.view === 'globe');
+        this.globe.setActive(this.view === 'globe' || !!this.opts.spatialPlanning);
         this.root.classList.add('globe-ready');
         this.opts.onGlobeReady?.(this.globe);
+        if (this.view === 'site' && this.opts.spatialPlanning && !this.opts.onSiteView) this.globe.flyToPlace('vrr');
       } catch (err) {
         console.error('[globe]', err);
         this.root.classList.add('globe-failed');
