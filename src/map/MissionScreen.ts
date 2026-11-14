@@ -32,6 +32,7 @@ export interface MissionScreenOptions {
   planEditing?: boolean;
   /** Keep the globe under planning controls when the host supplies 3D overlays. */
   spatialPlanning?: boolean;
+  onSiteView?: () => void;
 }
 
 const BAR_H = 52;
@@ -154,7 +155,10 @@ export class MissionScreen {
     (this.q('.ms-site') as HTMLElement).inert = view !== 'site';
     if ((view === 'globe' || this.opts.spatialPlanning) && this.opts.globe !== false) void this.ensureGlobe();
     this.globe?.setActive(view === 'globe' || !!this.opts.spatialPlanning);
-    if (view === 'site' && this.opts.spatialPlanning) this.globe?.flyToPlace('vrr');
+    if (view === 'site' && this.opts.spatialPlanning) {
+      if (this.opts.onSiteView) this.opts.onSiteView();
+      else this.globe?.flyToPlace('vrr');
+    }
     if (view === 'site') {
       this.map.prefetchBackdrop();
       window.dispatchEvent(new Event('resize')); // let the map re-measure
@@ -194,7 +198,7 @@ export class MissionScreen {
         this.globe.setActive(this.view === 'globe' || !!this.opts.spatialPlanning);
         this.root.classList.add('globe-ready');
         this.opts.onGlobeReady?.(this.globe);
-        if (this.view === 'site' && this.opts.spatialPlanning) this.globe.flyToPlace('vrr');
+        if (this.view === 'site' && this.opts.spatialPlanning && !this.opts.onSiteView) this.globe.flyToPlace('vrr');
       } catch (err) {
         console.error('[globe]', err);
         this.root.classList.add('globe-failed');

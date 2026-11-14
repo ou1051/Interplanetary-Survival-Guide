@@ -172,6 +172,14 @@ export function startJourney({ onComplete, renderer, introduction = true }) {
   }
   const dashboard = new THREE.Mesh(new THREE.BoxGeometry(2.7,.35,.5),cabinMaterial);
   dashboard.position.set(0,-.8,-1.5);cabinFrame.add(dashboard);
+  for (const x of [-.5,0,.5]) {
+    const display = new THREE.Mesh(new THREE.PlaneGeometry(.37,.18),new THREE.MeshBasicMaterial({color:0x174961}));
+    display.position.set(x,-.63,-1.23);cabinFrame.add(display);
+    for (let row=0;row<3;row++) {
+      const trace = new THREE.Mesh(new THREE.PlaneGeometry(.25-row*.04,.008),new THREE.MeshBasicMaterial({color:0x8fddf3}));
+      trace.position.set(x,-.58-row*.045,-1.22);cabinFrame.add(trace);
+    }
+  }
   camera.add(cabinFrame);scene.add(camera);
   const path = new THREE.CatmullRomCurve3([
     new THREE.Vector3(-5.4,2.7,2.3),new THREE.Vector3(-3,5,3),
@@ -196,11 +204,12 @@ export function startJourney({ onComplete, renderer, introduction = true }) {
       camera.position.copy(ship.position).add(new THREE.Vector3(0,.1,.1));
       target.copy(ship.position).addScaledVector(tangent,4);
     } else if (!running) {
-      camera.position.set(-1.5,3.5,12);target.set(-6,.4,0);
+      camera.position.set(-1.5,3.5,12);target.set(-11,.4,0);
     } else {
       desired.copy(ship.position).add(new THREE.Vector3(3.5,2.2,7));
       camera.position.lerp(desired,reduced?1:1-Math.exp(-dt*3));
       target.copy(ship.position).addScaledVector(tangent,1.6);
+      target.x -= 3;
     }
     camera.lookAt(target);
     if (!paused && !reduced) earth.rotation.y+=dt*.022;

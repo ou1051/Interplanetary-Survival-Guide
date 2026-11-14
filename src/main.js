@@ -287,11 +287,25 @@ async function init() {
       .map((t, i) => `<span><kbd>${i + 1}</kbd> ${t}</span>`)
       .join('');
     $('briefBack').classList.add('hidden');
+    let replayFlight = $('replayFlight');
+    if (!replayFlight) {
+      replayFlight = document.createElement('button');
+      replayFlight.id = 'replayFlight';
+      replayFlight.className = 'ghost';
+      replayFlight.textContent = 'REPLAY EARTH–MARS FLIGHT';
+      $('briefBack').parentElement.append(replayFlight);
+    }
+    replayFlight.hidden = false;
+    replayFlight.onclick = () => {
+      hideAll(); mode = 'journey';
+      startJourney({ renderer, onComplete: showAssignmentBrief });
+    };
     $('brief').classList.remove('hidden');
     hud.ready(() => openPlanner(), game.run.turn || game.run.decisions.length ? 'CONTINUE MISSION ▸' : 'OPEN MISSION MAP ▸');
   }
 
   function showRehearsalBrief() {
+    if ($('replayFlight')) $('replayFlight').hidden = true;
     hideAll();
     mode = 'brief';
     const w = game.windowById(game.run.rehearsalWindowId);

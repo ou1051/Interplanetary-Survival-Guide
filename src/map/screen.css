@@ -304,3 +304,10 @@
 .ms.spatial-planning.globe-ready .ms-site .mm-modal {pointer-events:auto}
 .ms.spatial-planning.globe-ready[data-view='site'] .ms-help {display:none}
 @media(max-width:600px){.ms.spatial-planning.globe-ready[data-view='site'] .mm-side{max-height:55vh;overflow:auto}}
+@media(max-width:600px) {
+  .ms.spatial-planning.globe-ready[data-view='site'] .ms-tools { top:64px; bottom:auto; left:auto; right:8px; }
+  .ms.spatial-planning.globe-ready[data-view='site'] .ms-nav { top:120px; bottom:auto; }
+  .ms.spatial-planning.globe-ready[data-view='site'] .ms-status { top:64px; bottom:auto; right:auto; max-width:170px; }
+  .ms.spatial-planning.globe-ready[data-view='site'] .ms-status .ms-coord { display:none; }
+  .ms.spatial-planning.globe-ready .mm-rehearsal { flex-wrap:wrap; }
+}
