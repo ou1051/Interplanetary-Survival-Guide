@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { consumptionEstimate } from '../physics/traverse.js';
 import { SITE, ROVER, LIFE_SUPPORT, SLOPE_CLASSES } from '../config/mission.js';
 import { formatHMS, formatHM, formatDist, clamp } from '../core/math.js';
 import { ZONE_COLORS, bearingTo } from './mapRenderer.js';
@@ -131,7 +132,7 @@ export class Hud {
     this._vital('v-walk', `${(wb.distance / 1000).toFixed(2)}/${(wb.limit / 1000).toFixed(1)} km`, clamp(wb.distance / Math.max(1, wb.limit), 0, 1), wb.distance > wb.limit ? 'danger' : wb.distance > wb.limit * 0.7 ? 'warn' : '');
 
     // navigation
-    const next = M.nextStop;
+    const next = M.nextKnownStop;
     const station = M.nextStation;
     if (next) {
       const name = next.kind === 'gate' ? `⚠ ${next.ref.type}` : next.ref.final ? 'HABITAT' : `${next.ref.id} · ${next.ref.name}`;
@@ -403,9 +404,10 @@ export class Hud {
       else if (M.boosting) html = 'TIME ×3';
     } else if (M.state === 'gate') html = `<span class="pulse">HAZARD BRIEFING — PRESS <kbd>ENTER</kbd> TO ACKNOWLEDGE</span>`;
     else if (M.state === 'station') {
-      const t = M.nextStop.ref.tasks.find((x) => !x.done);
+      const t = M.nextStop.ref.tasks.find((x) => !x.done && !x.skipped);
       html = t ? `HOLD <kbd>E</kbd> — ${t.label.toUpperCase()}` : '';
-    } else if (M.state === 'stationDone') html = `<span class="pulse">PRESS <kbd>ENTER</kbd> TO ${M.nextStop.ref.final ? 'END THE EVA' : 'RESUME THE TRAVERSE'}</span>`;
+    } else if (M.state === 'stationDone') html = `<span class="pulse">PRESS <kbd>ENTER</kbd> TO ${M.nextStop.ref.final ? 'END THE EVA' : M.legCheck && M.nextStation && !M.nextStation.final ? 'PLAN THE NEXT LEG' : 'RESUME THE TRAVERSE'}</span>`;
+    else if (M.state === 'legcheck') html = `<span class="pulse">ROVER PARKED · CHOOSE THE NEXT LEG ON YOUR WRIST NAVIGATOR <kbd>P</kbd></span>`;
     if (el.innerHTML !== html) el.innerHTML = html;
   }
 
@@ -426,10 +428,11 @@ export class Hud {
     }
     if (showing && M.state !== 'gate') {
       const st = stop.ref;
-      const active = st.tasks.find((t) => !t.done);
+      const active = st.tasks.find((t) => !t.done && !t.skipped);
       card.querySelectorAll('.task').forEach((el, i) => {
         const t = st.tasks[i];
         el.classList.toggle('done', t.done);
+        el.classList.toggle('skipped', !!t.skipped);
         el.classList.toggle('active', t === active);
         el.classList.toggle('locked', !t.done && t !== active);
         el.querySelector('.fill').style.width = `${(t.done ? 1 : t.progress) * 100}%`;
@@ -437,27 +440,30 @@ export class Hud {
         if (t.done && res.textContent === '') res.textContent = `→ ${t.result}`;
       });
       const cta = card.querySelector('.cta');
-      const done = st.tasks.every((t) => t.done);
+      const done = st.tasks.every((t) => t.done || t.skipped);
+      const legAhead = M.legCheck && M.route.stations.some((x) => !x.final && !x.done && !x.skipped && x !== st);
       cta.disabled = !done;
-      cta.textContent = done ? (st.final ? 'END EVA [ENTER]' : 'RESUME TRAVERSE [ENTER]') : 'HOLD [E] ON EACH TASK';
+      cta.textContent = done ? (st.final ? 'END EVA [ENTER]' : legAhead ? 'PLAN NEXT LEG [ENTER]' : 'RESUME TRAVERSE [ENTER]') : 'HOLD [E] ON EACH TASK';
     }
   }
 
   _gateCard(card, z) {
-    card.className = 'card gate';
+    card.className = `card gate${z.surprise ? ' surprise' : ''}`;
     const len = Math.round(z.s1 - z.s0);
     card.innerHTML = `
-      <div class="kicker">HAZARD GATE · ROVER STOPPED</div>
+      <div class="kicker">${z.surprise ? 'NOT ON THE MAP · ROVER STOPPED' : 'HAZARD GATE · ROVER STOPPED'}</div>
       <h2>${z.type}</h2>
       <div class="facts">
-        <div class="fact"><span>LENGTH</span><b>${len} m</b></div>
+        ${z.surprise ? `<div class="fact"><span>DELAY</span><b>+${z.delayMinutes} min</b></div>
+        <div class="fact"><span>O₂ COST</span><b>+${consumptionEstimate(z.delayMinutes * 60, { work: true }).oxygenMinutes.toFixed(1)} min</b></div>`
+          : `<div class="fact"><span>LENGTH</span><b>${len} m</b></div>`}
         <div class="fact"><span>MAX TILT</span><b>${z.maxTilt.toFixed(1)}°</b></div>
         <div class="fact"><span>LIMIT</span><b>${Math.round(kmh(z.limit))} km/h</b></div>
       </div>
       <h3>PROCEDURE</h3>
       <ul>${z.procedure.map((p) => `<li>${p}</li>`).join('')}</ul>
       <div class="basis">DATA BASIS · ${z.basis}</div>
-      <button class="cta">ACKNOWLEDGE &amp; PROCEED [ENTER]</button>`;
+      <button class="cta">${z.surprise ? 'DEAL WITH IT &amp; PROCEED [ENTER]' : 'ACKNOWLEDGE &amp; PROCEED [ENTER]'}</button>`;
     card.querySelector('.cta').addEventListener('click', () => this.mission.acknowledge());
   }
 

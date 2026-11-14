@@ -7,7 +7,7 @@ const returnCost = (metres) => metres / ROVER.dangerSlopeSpeed / 60 +
   consumptionEstimate(ingressMinutes * 60, { work: true }).oxygenMinutes;
 
 export function fieldGuidance(mission) {
-  const { route, s, nextStop, state, o2Remaining } = mission;
+  const { route, s, nextKnownStop: nextStop, state, o2Remaining } = mission;
   const turn = route.length / 2;
   const retraces = route.retracesOutbound !== false;
   const outbound = retraces && s < turn && !mission.aborted;

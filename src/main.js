@@ -137,6 +137,8 @@ async function initSurface(plan, scenario, status) {
       audio.beep(p.tone === 'danger' ? 'danger' : p.tone === 'warn' ? 'warn' : p.tone === 'ok' ? 'ok' : 'info');
     }
     if (type === 'state' && p.state === 'complete') setTimeout(() => hud.showDebrief(() => location.reload()), 1400);
+    // finished a station with more ahead: the wrist navigator opens on the leg check
+    if (type === 'state' && p.state === 'legcheck') planningBoard.toggle(true);
   });
 
   // ---------------------------------------------------------------- resize
@@ -209,7 +211,10 @@ async function initSurface(plan, scenario, status) {
         mission.cruise = !mission.cruise;
         hud.log(`Cruise ${mission.cruise ? 'ON' : 'OFF'}`, 'info');
       }
-      if (input.hit('enter')) mission.acknowledge();
+      if (input.hit('enter')) {
+        if (mission.state === 'legcheck') planningBoard.toggle(true);
+        else mission.acknowledge();
+      }
     }
 
     // ---- simulation

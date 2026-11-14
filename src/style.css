@@ -412,6 +412,7 @@ kbd {
 .task.done .chk { border-color: var(--ok); background: var(--ok); }
 .task.active { border-color: var(--hud); }
 .task.locked { opacity: 0.45; cursor: default; }
+.task.skipped { opacity: 0.35; cursor: default; text-decoration: line-through; } /* dropped by a quick-stop leg choice */
 .card .cta {
   margin-top: 16px;
   width: 100%;

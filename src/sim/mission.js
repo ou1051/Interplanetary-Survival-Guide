@@ -1,4 +1,4 @@
-import { ROVER, LIFE_SUPPORT, HAB, SITE } from '../config/mission.js';
+import { ROVER, LIFE_SUPPORT, HAB, SITE, SURPRISES } from '../config/mission.js';
 import { clamp, DEG } from '../core/math.js';
 import { consumptionEstimate } from '../physics/traverse.js';
 
@@ -6,16 +6,43 @@ import { consumptionEstimate } from '../physics/traverse.js';
 // Traverse state machine + consumables.
 //
 //   brief ─▶ drive ─▶ gate (acknowledge hazard briefing) ─▶ drive
-//                 └─▶ station (hold to run tasks) ─▶ stationDone ─▶ drive
+//                 └─▶ station (hold to run tasks) ─▶ stationDone ─▶ legcheck (choose next leg) ─▶ drive
 //                                                       └─(HAB)─▶ complete
 // ---------------------------------------------------------------------------
 
 const TASK_HOLD_SECONDS = 2.0;
+
+// One hidden obstacle per unsurveyed zone on the route, somewhere in its middle part.
+function hiddenSurprises(route, random) {
+  return (route.zones ?? []).filter((zone) => zone.unsurveyed).map((zone) => {
+    const kind = SURPRISES[Math.floor(random() * SURPRISES.length) % SURPRISES.length];
+    const s = zone.s0 + (zone.s1 - zone.s0) * (0.3 + random() * 0.4);
+    const i = Math.min(route.count - 1, Math.round(s / route.step));
+    return {
+      kind: 'gate',
+      s,
+      ref: {
+        ...kind,
+        id: `${kind.id}-${zone.id}`,
+        surprise: true,
+        severity: 'danger',
+        s0: s,
+        s1: s + 6,
+        maxTilt: route.tilt[i],
+        limit: zone.limit,
+        basis: 'Found on site; too small for the orbital map that covers this ground',
+      },
+    };
+  });
+}
 const BOOST = 3;
 
 export class Mission {
-  constructor(route, terrain, habAntenna) {
+  constructor(route, terrain, habAntenna, { random = Math.random, surprises = true, legCheck = true } = {}) {
     this.route = route;
+    this.legCheck = legCheck;
+    // This drive's stops: the planned ones plus whatever the unsurveyed ground hides (not on any map).
+    this.stops = [...(route.stops ?? []), ...(surprises ? hiddenSurprises(route, random) : [])].sort((a, b) => a.s - b.s);
     this.terrain = terrain;
     this.habAntenna = habAntenna;
     this.state = 'brief';
@@ -50,10 +77,18 @@ export class Mission {
   }
 
   get nextStop() {
-    return this.route.stops[this.stopIndex] || null;
+    return this.stops[this.stopIndex] || null;
+  }
+  // Next stop the crew knows about: hidden obstacles stay off the displays until the rover reaches one.
+  get nextKnownStop() {
+    for (let i = this.stopIndex; i < this.stops.length; i++) {
+      const stop = this.stops[i];
+      if (!stop.ref.surprise || (i === this.stopIndex && this.state === 'gate')) return stop;
+    }
+    return null;
   }
   get nextStation() {
-    return this.route.stations.find((station) => !station.done && (!this.aborted || station.final)) || null;
+    return this.route.stations.find((station) => !station.done && !station.skipped && (!this.aborted || station.final)) || null;
   }
   get currentStation() {
     const st = this.nextStop;
@@ -78,8 +113,8 @@ export class Mission {
   returnToHabitat() {
     if (this.route.retracesOutbound === false || !['drive', 'gate'].includes(this.state) || this.aborted || this.s <= 1 || this.s >= this.route.length / 2) return false;
     this.s = this.route.length - this.s;
-    this.stopIndex = this.route.stops.findIndex(stop => stop.s >= this.s);
-    if (this.stopIndex < 0) this.stopIndex = this.route.stops.length;
+    this.stopIndex = this.stops.findIndex(stop => stop.s >= this.s);
+    if (this.stopIndex < 0) this.stopIndex = this.stops.length;
     this.speed = 0;
     this.cruise = false;
     this.lateral = -this.lateral;
@@ -96,7 +131,11 @@ export class Mission {
     if (this.state === 'gate') {
       const z = this.nextStop.ref;
       z.acknowledged = true;
-      this.emit('log', { text: `Hazard briefing acknowledged: ${z.type}`, tone: 'warn' });
+      if (z.surprise) {
+        // dealing with it takes time on site, and the suits keep breathing meanwhile
+        this._consume(z.delayMinutes * 60, { work: true });
+        this.emit('log', { text: `${z.type} cleared · +${z.delayMinutes} min`, tone: 'warn' });
+      } else this.emit('log', { text: `Hazard briefing acknowledged: ${z.type}`, tone: 'warn' });
       this.stopIndex++;
       this.state = 'drive';
       this.emit('state', { state: this.state });
@@ -104,6 +143,14 @@ export class Mission {
     }
     if (this.state === 'stationDone') {
       const st = this.nextStop.ref;
+      // more science stops ahead: the crew must pick the next leg on the wrist navigator first
+      const ahead = this.route.stations.some((station) => !station.final && !station.done && !station.skipped && station !== st);
+      if (!st.final && ahead && this.legCheck) {
+        this.state = 'legcheck';
+        this.emit('log', { text: `${st.id} complete · choose the next leg on your wrist navigator [P]`, tone: 'info' });
+        this.emit('state', { state: this.state, stop: this.nextStop });
+        return true;
+      }
       this.stopIndex++;
       if (st.final) {
         this.state = 'complete';
@@ -116,6 +163,27 @@ export class Mission {
       return true;
     }
     return false;
+  }
+
+  // Apply the leg the crew picked at a station (see sim/legCheck.js), then drive on.
+  //   continue: full tasks at the next station · quick: first task only
+  //   skip: drive past the next station · home: no more stations
+  chooseLeg(option) {
+    if (this.state !== 'legcheck' || !option?.allowed) return false;
+    const here = this.nextStop.ref;
+    const ahead = this.route.stations.filter((station) => !station.final && !station.done && !station.skipped && station !== here);
+    if (option.id === 'quick') ahead[0].tasks.slice(1).forEach((task) => { task.skipped = true; });
+    if (option.id === 'skip') ahead[0].skipped = true;
+    if (option.id === 'home') ahead.forEach((station) => { station.skipped = true; });
+    // skipped stations no longer stop the rover
+    this.stops = this.stops.filter((stop, i) => i <= this.stopIndex || !stop.ref.skipped);
+    this.lastLeg = option.id;
+    this.stopIndex++;
+    this.state = 'drive';
+    const next = this.nextStation;
+    this.emit('log', { text: `Leg confirmed: ${option.label} · next: ${next && !next.final ? `${next.id} · ${next.name}` : 'HAB'}`, tone: 'ok' });
+    this.emit('state', { state: this.state });
+    return true;
   }
 
   _consume(seconds, options = {}) {
@@ -169,7 +237,7 @@ export class Mission {
     const approach = Math.sqrt(2 * 0.9 * toStop) + 0.08;
     if (approach < limit) {
       limit = approach;
-      reason = stop && stop.kind === 'gate' ? 'HAZARD GATE AHEAD' : 'STATION AHEAD';
+      if (!stop?.ref.surprise) reason = stop && stop.kind === 'gate' ? 'HAZARD GATE AHEAD' : 'STATION AHEAD';
     }
 
     let v = this.speed;
@@ -215,7 +283,7 @@ export class Mission {
       this.cruise = false;
       if (stop.kind === 'gate') {
         this.state = 'gate';
-        this.emit('log', { text: `HAZARD GATE — ${stop.ref.type}. Briefing required.`, tone: 'danger' });
+        this.emit('log', { text: stop.ref.surprise ? `NOT ON THE MAP — ${stop.ref.type}` : `HAZARD GATE — ${stop.ref.type}. Briefing required.`, tone: 'danger' });
       } else {
         this.state = 'station';
         this.lateral *= 0.5;
@@ -227,7 +295,7 @@ export class Mission {
 
   _station(dt, input) {
     const st = this.nextStop.ref;
-    const task = st.tasks.find((t) => !t.done);
+    const task = st.tasks.find((t) => !t.done && !t.skipped);
     if (!task) return;
     if (input.action) {
       task.progress = Math.min(1, task.progress + dt / TASK_HOLD_SECONDS);
@@ -237,7 +305,7 @@ export class Mission {
         if (/^collect/i.test(task.label)) this.samples += task.sampleCount ?? 1;
         this.emit('log', { text: `${st.id} ✓ ${task.label} — ${task.result}`, tone: 'ok' });
         this.emit('task', { station: st, task });
-        if (st.tasks.every((t) => t.done)) {
+        if (st.tasks.every((t) => t.done || t.skipped)) {
           st.done = true;
           this.state = 'stationDone';
           this.emit('state', { state: this.state, stop: this.nextStop });

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createStationPost } from './stationPost.js';
 import { ROUTE_POINTS, STATIONS, AREA_HAZARDS, HAB, ROVER, SLOPE_CLASSES } from '../config/mission.js';
 import { clamp, DEG } from '../core/math.js';
 
@@ -545,25 +546,10 @@ export class RouteVisuals {
         new THREE.MeshBasicMaterial({ color: 0x56e0ff, transparent: true, opacity: 0.85, depthWrite: false, fog: true }),
       );
       ring.position.y = 0.15;
-      // science marker tripod
-      const tri = new THREE.Group();
-      const legMat = new THREE.MeshStandardMaterial({ color: 0xd8d8d8, metalness: 0.6, roughness: 0.35 });
-      for (let i = 0; i < 3; i++) {
-        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.6, 6), legMat);
-        const a = (i / 3) * Math.PI * 2;
-        leg.position.set(Math.cos(a) * 0.3, 0.75, Math.sin(a) * 0.3);
-        leg.rotation.set(Math.sin(a) * 0.35, 0, -Math.cos(a) * 0.35);
-        tri.add(leg);
-      }
-      const lamp = new THREE.Mesh(
-        new THREE.SphereGeometry(0.12, 16, 12),
-        new THREE.MeshStandardMaterial({ color: 0x9ff0ff, emissive: 0x56e0ff, emissiveIntensity: 3 }),
-      );
-      lamp.position.y = 1.6;
-      tri.add(lamp);
-      tri.position.set(4.5, 0, 0);
-      tri.traverse((o) => (o.castShadow = true));
-      g.add(beam, ring, tri);
+      // the station checkpoint itself: pad, mast and sign, instruments, cache, flags
+      const { group: post, lamp } = createStationPost(st, this.route, this.terrain);
+      post.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      g.add(beam, ring, post);
       this.group.add(g);
       this.beacons.push({ station: st, group: g, beam, ring, lamp });
     }
@@ -610,9 +596,9 @@ export class RouteVisuals {
     for (const b of this.beacons) {
       const st = b.station;
       const isNext = st.id === nextStationId;
-      const col = st.done ? 0x5cff9a : isNext ? 0x56e0ff : 0xbfd6e0;
+      const col = st.done ? 0x5cff9a : st.skipped ? 0x6b7680 : isNext ? 0x56e0ff : 0xbfd6e0;
       b.beam.material.uniforms.uColor.value.setHex(col);
-      b.beam.material.uniforms.uIntensity.value = st.done ? 0.35 : isNext ? 1.0 : 0.45;
+      b.beam.material.uniforms.uIntensity.value = st.done ? 0.35 : st.skipped ? 0.12 : isNext ? 1.0 : 0.45;
       b.ring.material.color.setHex(col);
       b.lamp.material.emissive.setHex(col);
     }

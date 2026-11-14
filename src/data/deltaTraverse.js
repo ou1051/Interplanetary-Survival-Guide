@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Terrain } from '../world/terrain.js';
 import { Route } from '../world/route.js';
 import { SITE, AREA_HAZARDS } from '../config/mission.js';
+import { estimateLeg } from '../sim/legEstimate.js';
 
 export const deltaPlan = {
   id: 'delta-loop',
@@ -51,7 +52,8 @@ export function buildDeltaApproaches(original) {
     });
     const lastIndex = Math.floor(distance / built.step);
     const unknowns = built.zones.filter(zone => zone.unsurveyed && zone.s0 < distance);
-    return { ...deltaPlan, ...variant, distance, s1: distance, unknowns, name: `Delta Front · ${variant.label} to S1`,
+    const estimate = estimateLeg(built, terrain, distance);
+    return { ...deltaPlan, ...variant, distance, s1: distance, unknowns, estimate, name: `Delta Front · ${variant.label} to S1`,
       maxTilt: Math.max(...built.tilt.subarray(0, lastIndex + 1)),
       traverse: { terrain, route: built } };
   });

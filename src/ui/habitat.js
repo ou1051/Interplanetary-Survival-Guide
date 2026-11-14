@@ -230,8 +230,8 @@ export function mountHabitat(root, launch) {
       approaches = buildDeltaApproaches(original.traverse);
       deltaMap = makeDeltaOverview(route, canvas.width, canvas.height, approaches);
       query('[data-approaches]').innerHTML = approaches.map(option => `<button type="button" data-approach="${option.id}" style="--route-color:${option.color}">
-        <b>${option.label}</b><span>${fmt(option.distance)} m</span><small>${option.detail} · ${option.maxTilt.toFixed(1)}° max tilt</small>
-        <i class="hab-risk${option.unknowns.length ? ' is-unknown' : ''}">${option.unknowns.length ? '⚠ ' : ''}${option.risk}</i>
+        <b>${option.label}</b><span>${fmt(option.distance)} m · ≈ ${option.estimate.minutes.toFixed(1)} min</span><small>${option.detail} · ${option.maxTilt.toFixed(1)}° max tilt</small>
+        <i class="hab-risk${option.unknowns.length ? ' is-unknown' : ''}">${option.unknowns.length ? '⚠ ' : ''}${option.risk}${option.estimate.extraMinutes ? ` · +${option.estimate.extraMinutes.join('–')} min` : ''}</i>
       </button>`).join('');
       const stations = route.stations.filter(stop => !stop.final);
       const gates = route.stops.filter(stop => stop.kind === 'gate').length;
@@ -270,7 +270,8 @@ export function mountHabitat(root, launch) {
       query('[data-unknowns]').innerHTML = unknowns.map(zone => `<b>⚠ ${zone.type.toLowerCase().replace(/^./, c => c.toUpperCase())} · ${fmt(zone.s1 - zone.s0)} m</b>
         <p>No high-resolution map covers this stretch. It may hide:</p>
         <ul>${zone.obstacles.map(item => `<li>${item}</li>`).join('')}</ul>
-        <small>Rover stops for a briefing, then creeps through at ≤ ${(zone.limit * 3.6).toFixed(0)} km/h.</small>`).join('');
+        <small>Rover stops for a briefing, then creeps through at ≤ ${(zone.limit * 3.6).toFixed(0)} km/h.
+        Planned ≈ ${approachChoice.estimate.minutes.toFixed(1)} min to S1; if something is hiding there, add ${approachChoice.estimate.extraMinutes.join('–')} min (and the oxygen to match).</small>`).join('');
       for (const button of root.querySelectorAll('[data-approach]')) {
         button.setAttribute('aria-pressed', String(button.dataset.approach === approachChoice?.id));
       }
