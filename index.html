@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Interplanetary Survival Guide — Martian Map</title>
+    <title>Freelance Astronaut — Martian Map</title>
     <meta name="description" content="First-person rover traverse planner for a Mars EVA: survival route, hazards and science stations in 3D." />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23c1673d'/%3E%3Cpath d='M6 20 Q16 14 26 19' stroke='%239af4ff' stroke-width='2.5' fill='none'/%3E%3C/svg%3E" />
-    <script type="module" crossorigin src="./assets/main-BwXexjYN.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/traverse-CbpllPob.js">
-    <link rel="stylesheet" crossorigin href="./assets/main-B0iRwqaR.css">
+    <script type="module" crossorigin src="./assets/main-CxS9WV1F.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/preload-helper-CLkrc2bY.js">
+    <link rel="stylesheet" crossorigin href="./assets/main-DVbc7j8G.css">
   </head>
   <body>
     <div id="app">
@@ -68,6 +68,7 @@
             <span><kbd>C</kbd> cruise</span><span><kbd>⇧</kbd> time ×3</span><span><kbd>E</kbd> task</span>
             <span><kbd>↵</kbd> confirm</span><span><kbd>M</kbd> map</span><span><kbd>L</kbd> lights</span>
             <span><kbd>H</kbd> HUD</span><span><kbd>V</kbd> recentre view</span>
+            <button id="abortBtn" class="ghost abort">END REHEARSAL [X]</button>
           </div>
         </div>
 
@@ -118,33 +119,106 @@
 
       <section id="brief" class="screen">
         <div class="screen-inner">
-          <div class="eyebrow">NASA SPACE APPS · INTERPLANETARY SURVIVAL GUIDE</div>
-          <h1>MARTIAN MAP<span>Rover traverse · first-person</span></h1>
-          <p class="lede">
-            You are driving the pressurised-suit rover on <b id="briefEva">EVA-03</b>. Follow the survival route,
-            stop at hazard gates for a safety briefing, and complete the science tasks at each station before your
-            consumables run low.
-          </p>
+          <div class="eyebrow" id="briefEyebrow">NASA SPACE APPS · INTERPLANETARY SURVIVAL GUIDE</div>
+          <h1 id="briefTitle">FREELANCE ASTRONAUT<span>First assignment · Martian Map</span></h1>
+          <p class="lede" id="briefLede"></p>
           <div class="brief-grid" id="briefGrid"></div>
-          <div class="brief-controls">
-            <span><kbd>W</kbd> / <kbd>↑</kbd> drive</span>
-            <span><kbd>A</kbd><kbd>D</kbd> steer in corridor</span>
-            <span><kbd>E</kbd> hold for tasks</span>
-            <span><kbd>Enter</kbd> confirm</span>
-            <span><kbd>1–4</kbd> data layers</span>
-            <span>drag to look around</span>
+          <div class="brief-controls" id="briefSteps"></div>
+          <div class="btn-row">
+            <button id="beginBtn" class="primary" disabled>PREPARING TERRAIN…</button>
+            <button id="briefBack" class="ghost hidden">◂ BACK TO MISSION MAP</button>
           </div>
-          <button id="beginBtn" class="primary" disabled>PREPARING TERRAIN…</button>
-          <div class="mock-note">⚠ No NASA data connected yet — terrain and layers are procedural placeholders.</div>
+          <div class="mock-note">Mission map: real NASA orbital imagery and Mars elevation (Viking, MRO CTX &amp; HiRISE, MOLA/HRSC). ⚠ The 3D rehearsal terrain, ground views and weather are still simulated.</div>
+        </div>
+      </section>
+
+      <section id="planner" class="overlay planner hidden">
+        <div class="overlay-inner">
+          <div class="overlay-head">
+            <div>
+              <div class="overlay-title">MISSION MAP · <span id="plannerSite"></span></div>
+              <div class="overlay-sub" id="plannerSub"></div>
+            </div>
+            <div class="turn-strip" id="turnStrip"></div>
+          </div>
+          <div class="overlay-body">
+            <div class="map-wrap">
+              <div id="plannerGlobe" class="planner-globe"></div>
+              <canvas id="plannerCanvas"></canvas>
+              <div class="map-toolbar">
+                <div class="map-views" id="mapViews">
+                  <button data-view="globe">◍ GLOBE</button><button data-view="plan">▦ SITE PLAN</button>
+                </div>
+                <div class="map-layers" id="plannerLayers"></div>
+              </div>
+              <div class="globe-actions" id="globeActions">
+                <button class="ghost" data-globe="site">◎ FLY TO SITE</button>
+                <button class="ghost" data-globe="home">◍ WHOLE PLANET</button>
+              </div>
+              <div class="globe-status" id="globeStatus"></div>
+              <div class="scout-view hidden" id="scoutView"></div>
+            </div>
+            <div class="overlay-side planner-side">
+              <div class="panel-title">YOUR JOB</div>
+              <div class="assignment" id="assignment"></div>
+              <div class="panel-title">1 · SCOUT <small>optional</small></div>
+              <div class="pin-list" id="pinList"></div>
+              <div class="panel-title">2 · PICK A ROUTE</div>
+              <div class="route-options" id="routeOptions"></div>
+              <div class="panel-title">3 · REHEARSE &amp; LAUNCH</div>
+              <div class="readiness" id="readiness"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="desk" class="overlay desk hidden">
+        <div class="overlay-inner desk-inner">
+          <div class="overlay-head">
+            <div>
+              <div class="overlay-title">LAUNCH DESK · <span id="deskTurn"></span></div>
+              <div class="overlay-sub" id="deskSub"></div>
+            </div>
+            <button id="deskBack" class="ghost">◂ MISSION MAP</button>
+          </div>
+          <div class="approval-banner" id="deskApproval"></div>
+          <div class="windows" id="deskWindows"></div>
+          <div class="desk-foot">
+            <div class="disclaimer" id="deskNote"></div>
+            <div class="btn-row">
+              <button id="deferBtn" class="ghost">DEFER MISSION</button>
+              <button id="holdBtn" class="ghost hold"></button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="liftoff" class="liftoff hidden">
+        <canvas id="liftoffCanvas"></canvas>
+        <div class="liftoff-caption" id="liftoffCaption"></div>
+      </section>
+
+      <section id="outcome" class="screen hidden">
+        <div class="screen-inner wide">
+          <div class="eyebrow" id="outcomeEyebrow">MISSION DECISION</div>
+          <h1 id="outcomeTitle"></h1>
+          <div class="brief-grid" id="outcomeGrid"></div>
+          <div class="panel-title">DECISION LOG</div>
+          <ol class="decision-log" id="decisionLog"></ol>
+          <div class="btn-row">
+            <button id="retryBtn" class="primary">RETRY SAME WEATHER</button>
+            <button id="newWxBtn" class="ghost">NEW WEATHER ▸</button>
+          </div>
         </div>
       </section>
 
       <section id="debrief" class="screen hidden">
         <div class="screen-inner">
-          <div class="eyebrow">EVA DEBRIEF</div>
-          <h1>TRAVERSE COMPLETE<span id="debriefSub"></span></h1>
+          <div class="eyebrow">REHEARSAL DEBRIEF</div>
+          <h1 id="debriefTitle">TRAVERSE COMPLETE<span id="debriefSub"></span></h1>
+          <div class="approval-banner" id="debriefApproval"></div>
           <div class="brief-grid" id="debriefGrid"></div>
-          <button id="restartBtn" class="primary">RUN AGAIN</button>
+          <button id="restartBtn" class="primary">MISSION MAP ▸</button>
         </div>
       </section>
     </div>
