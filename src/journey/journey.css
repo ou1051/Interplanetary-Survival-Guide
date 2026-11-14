@@ -1,0 +1,78 @@
+.launch-screen { position: absolute; inset: 0; color: #f1f2e8; font-family: var(--sans); background: linear-gradient(90deg, rgba(4, 16, 23, .93), rgba(5, 17, 23, .7) 30%, transparent 72%), linear-gradient(0deg, rgba(4, 13, 19, .9), transparent 25%, transparent 80%, rgba(4, 13, 19, .3)); }
+.launch-header { position: absolute; top: 34px; left: 4.4%; right: 4.4%; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.wordmark { display: grid; position: relative; grid-template-columns: 32px auto; column-gap: 11px; text-decoration: none; color: inherit; font-size: 13px; font-weight: 650; letter-spacing: .13em; }
+.brand-orbit { grid-row: span 2; font-size: 35px; line-height: .95; color: #d6e4db; }
+.brand-sub { grid-column: 2; font-size: 8px; font-weight: 400; letter-spacing: .39em; margin-top: 5px; opacity: .62; }
+.launch-header nav { display: flex; gap: 28px; align-items: center; margin-left: auto; }
+.launch-header nav a, .launch-header nav button { font: 12px var(--sans); background: none; color: #f1f2e8; text-decoration: none; border: 0; padding: 10px 0; cursor: pointer; }
+.launch-header nav a:hover, .launch-header nav button:hover { color: #d0edab; }
+.edition { font: 9px var(--mono); letter-spacing: .15em; border-left: 1px solid #ffffff30; padding-left: 25px; }
+.launch-copy { position: absolute; top: 25%; left: 8%; width: min(600px, 55%); }
+.launch-kicker { font: 9px var(--mono); letter-spacing: .2em; color: #c7d4ce; display: flex; align-items: center; gap: 10px; }
+.launch-kicker > span, .live-dot, .flight-indicator { display: inline-block; width: 5px; height: 5px; background: #c9e9a4; border-radius: 50%; box-shadow: 0 0 12px #c9e9a455; }
+.launch-copy h1 { font-family: var(--sans); font-size: clamp(66px, 7.9vw, 132px); line-height: .92; font-weight: 450; letter-spacing: -.065em; margin: 25px 0 24px; color: #f4f4ec; }
+.launch-copy h1 em { font-style: normal; color: #d0e4bc; }
+.launch-copy > p { font-size: clamp(14px, 1.25vw, 18px); line-height: 1.65; color: #c0cbc9; font-weight: 350; margin: 0 0 28px; }
+.launch-actions { display: flex; gap: 23px; align-items: center; flex-wrap: wrap; }
+.launch-primary { border: 1px solid #d0e4bc; background: #d0e4bc; color: #14251b; padding: 19px 25px; min-width: 215px; font: 600 10px var(--mono); letter-spacing: .08em; cursor: pointer; border-radius: 2px; transition: background .2s, transform .2s; }
+.launch-primary:hover:not(:disabled) { background: #e8f4d8; transform: translateY(-2px); }
+.launch-primary:disabled, .launch-secondary:disabled { opacity: .55; cursor: wait; }
+.launch-secondary { color: #e3e9e3; font: 12px var(--sans); background: none; border: 0; padding: 15px 0; cursor: pointer; }
+.launch-secondary span { padding-left: 8px; color: #d0e4bc; }
+.launch-meta { font: 7px var(--mono); letter-spacing: .09em; color: #859695; margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+.launch-coordinate { position: absolute; right: 8%; bottom: 25%; display: grid; grid-template-columns: 8px auto; gap: 7px; font: 8px var(--mono); letter-spacing: .1em; text-shadow: 0 1px 8px #000; }
+.launch-coordinate .live-dot { margin-top: 2px; }
+.launch-coordinate b, .launch-coordinate small { grid-column: 2; font-weight: 400; }
+.launch-coordinate b { font-size: 11px; }.launch-coordinate small { font-size: 7px; opacity: .6; }
+.launch-footer { position: absolute; bottom: 6%; left: 8%; right: 8%; padding-top: 24px; border-top: 1px solid #ffffff22; display: flex; align-items: center; justify-content: space-between; }
+.launch-route { display: flex; align-items: center; gap: 20px; }
+.launch-route span { font: 9px var(--mono); color: #9ba9a7; letter-spacing: .14em; white-space: nowrap; }
+.launch-route span.active { color: #d0e4bc; }.launch-route i { font-style: normal; opacity: .45; margin-right: 8px; }
+.launch-route > div { width: clamp(30px, 6vw, 90px); height: 1px; background: #afc0ba36; position: relative; }
+.launch-route > div::after { content: ''; position: absolute; right: 0; top: -2px; width: 4px; height: 4px; border: 1px solid #9eada4; border-radius: 50%; }
+.launch-footnote { font-size: 11px; font-weight: 350; line-height: 1.6; color: #9facaa; }
+.at-launch #visor { opacity: .4; }.in-flight #visor { opacity: 1; }
+.journey-overlay { position: absolute; inset: 0; color: #e4f0e9; pointer-events: none; background: linear-gradient(0deg, #061015ed, transparent 28%, transparent 80%, #06101599); font-family: var(--sans); }
+.journey-overlay button { pointer-events: auto; font: 10px var(--mono); background: #0b1b20aa; border: 1px solid #c6dfcf35; color: #dce9df; border-radius: 3px; padding: 10px 14px; cursor: pointer; }
+.journey-overlay button:hover { background: #cce2b9; color: #14251b; }
+.journey-top { position: absolute; top: 30px; left: 4%; right: 4%; display: flex; justify-content: space-between; align-items: start; }
+.journey-top > div { display: grid; grid-template-columns: 10px auto; gap: 8px; font: 10px var(--mono); letter-spacing: .12em; }
+.flight-indicator { margin-top: 3px; }.journey-top small { grid-column: 2; font: 8px var(--mono); opacity: .6; }
+.journey-reticle { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); font-size: 15px; color: #e5f5df66; font-weight: 200; }
+.journey-story { position: absolute; left: 4%; bottom: 165px; text-shadow: 0 2px 12px #000; }
+.journey-tag { font: 8px var(--mono); color: #bbd7bc; letter-spacing: .16em; }
+.journey-story h2 { font-size: clamp(22px, 2.6vw, 40px); letter-spacing: -.04em; font-weight: 400; margin: 10px 0; }
+.journey-story p { font-size: 12px; color: #b9c9c7; margin: 0; }
+.journey-controls { position: absolute; bottom: 18px; left: 4%; right: 4%; }
+.journey-control-row { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
+.journey-look { font: 8px var(--mono); letter-spacing: .12em; color: #9bada8; margin-right: auto; }
+#journeyTime { font: 8px var(--mono); color: #9bada8; margin-right: 14px; }
+#journeyNext { background: #cce2b9; color: #14251b; }
+.journey-progress-track { height: 1px; background: #d0e4bc25; margin: 18px 0 14px; }
+#journeyProgress { height: 2px; width: 0; background: #cce2b9; }
+#journeyChapters { display: flex; justify-content: space-between; gap: 10px; }
+#journeyChapters span { font: 9px var(--mono); color: #8c9a97; }#journeyChapters i { font-style: normal; opacity: .5; margin-right: 9px; }
+#journeyChapters .current { color: #d3edb9; }#journeyChapters .passed { color: #c6d1cc; }
+.journey-disclaimer { font: 8px var(--mono); color: #758784; margin: 17px 0 0; text-align: center; }
+.sources-dialog { color: #dce5df; border: 1px solid #52635c; background: #101b1d; padding: 46px; width: min(900px, 92vw); max-height: 86vh; font-family: var(--sans); border-radius: 6px; box-shadow: 0 30px 120px #000a; user-select: text; }
+.sources-dialog::backdrop { background: #020b10c9; backdrop-filter: blur(8px); }
+.sources-dialog h2 { font-size: clamp(26px, 3vw, 40px); letter-spacing: -.04em; line-height: 1.15; font-weight: 400; margin: 24px 0; }
+.sources-dialog p, .sources-dialog li { font-size: 12px; line-height: 1.8; color: #afc1bb; }.sources-dialog h3 { font-size: 14px; font-weight: 500; }
+.sources-dialog a { color: #d0e4bc; text-underline-offset: 4px; }.sources-dialog .source-close { position: absolute; top: 12px; right: 18px; border: 0; background: none; color: #dce5df; font-size: 26px; cursor: pointer; }
+.source-cards { display: grid; grid-template-columns: repeat(3, 1fr); margin: 24px 0; border-top: 1px solid #ffffff20; border-bottom: 1px solid #ffffff20; }
+.source-cards article { padding: 23px 18px 23px 0; }.source-cards b { font: 9px var(--mono); color: #d0e4bc; letter-spacing: .12em; }.source-cards a { font-size: 11px; }.source-note { border-top: 1px solid #ffffff20; padding-top: 14px; font-size: 10px !important; }
+button:focus-visible, a:focus-visible { outline: 2px solid #d3edb9; outline-offset: 5px; }
+@media (min-width: 1800px) { .launch-copy { top: 27%; }.launch-copy h1 { font-size: 145px; } }
+@media (max-height: 720px) and (min-width: 761px) { .launch-copy { top: 22%; }.launch-copy h1 { font-size: 75px; margin: 18px 0; }.launch-copy > p { margin-bottom: 18px; }.launch-footer { bottom: 4%; }.launch-primary { padding: 16px 24px; }.launch-coordinate { bottom: 25%; } }
+@media (max-width: 760px) {
+  .launch-header { top: 22px; left: 6%; right: 6%; }.wordmark { font-size: 10px; grid-template-columns: 24px auto; gap: 7px; }.brand-orbit { font-size: 28px; }.brand-sub { font-size: 6px; }.edition { display: none; }
+  .launch-header nav { gap: 15px; }.launch-header nav a, .launch-header nav button { font-size: 10px; }.launch-header nav a { display: none; }
+  .launch-screen { background: linear-gradient(90deg, #041017e8, #05111777 60%, #05111722), linear-gradient(0deg, #040d13ee, transparent 50%); }
+  .launch-copy { top: 25%; left: 8%; width: 86%; }.launch-kicker { font-size: 7px; }.launch-copy h1 { font-size: clamp(65px, 15vw, 100px); }.launch-copy > p { font-size: 14px; }.launch-meta { max-width: 300px; font-size: 6px; }.launch-actions { gap: 18px; }.launch-primary { min-width: 190px; padding: 18px; }
+  .launch-coordinate, .launch-footnote { display: none; }.launch-route { gap: 12px; width: 100%; }.launch-route > div { flex: 1; min-width: 10px; }.launch-route span { font-size: 7px; }.launch-route i { margin-right: 5px; }
+  .journey-top { top: 18px; }.journey-top b { font-size: 8px; }.journey-overlay button { font-size: 8px; padding: 9px 10px; }.journey-story { bottom: 215px; right: 4%; }.journey-story p { font-size: 11px; line-height: 1.5; }
+  .journey-control-row { flex-wrap: wrap; gap: 6px; }.journey-look { flex-basis: 60%; }#journeyTime { margin-left: auto; margin-right: 0; }#journeyChapters span { font-size: 7px; }#journeyChapters i { display: block; margin-bottom: 5px; }.journey-disclaimer { font-size: 7px; line-height: 1.5; }
+  .sources-dialog { padding: 30px 23px; }.source-cards { grid-template-columns: 1fr; }.source-cards article { padding: 14px 0; }.source-cards h3 { margin: 10px 0; }
+}
+@media (max-height: 550px) { .launch-copy { top: 23%; }.launch-copy h1 { font-size: 58px; margin: 12px 0; }.launch-copy > p, .launch-meta, .launch-coordinate { display: none; }.launch-primary { padding: 14px 18px; }.launch-footer { bottom: 4%; padding-top: 12px; }.journey-story { bottom: 140px; }.journey-story h2 { font-size: 20px; }.journey-story p { font-size: 10px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }

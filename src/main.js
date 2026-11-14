@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Journey } from './journey/journey.js';
 import { Terrain, featureMasks, sampleContext } from './world/terrain.js';
 import { Route, RouteVisuals } from './world/route.js';
 import { createRocks, createHabitat } from './world/scenery.js';
@@ -28,13 +29,13 @@ async function init() {
 
   // ---------------------------------------------------------------- renderer
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   viewport.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
@@ -156,12 +157,26 @@ async function init() {
 
   console.info(`[ISG] world ready in ${Math.round(performance.now() - T0)} ms · rocks ${rocks.userData.count}`);
   hud.fillBriefing();
-  hud.ready(() => {
+  const startSurface = () => {
     audio.start();
     hud.showHud();
     mission.start();
     input.resetLook();
-  });
+    input.keys.clear();
+    input.pressed.clear();
+    hud.log('Touchdown confirmed. Follow the cyan route. W to drive, C for cruise, E for science tasks.', 'ok');
+  };
+  status('PREPARING EARTH DEPARTURE…');
+  await nextFrame();
+  const journey = new Journey({ renderer, input, onComplete: startSurface });
+  hud.ready(() => journey.start());
+  beginBtn.textContent = 'BOARD THE ROCKET  →';
+  const surfaceBtn = document.getElementById('surfaceBtn');
+  surfaceBtn.disabled = false;
+  surfaceBtn.addEventListener('click', () => journey.finish(), { once: true });
+  const sources = document.getElementById('sourcesDialog');
+  document.getElementById('sourcesBtn').addEventListener('click', () => sources.showModal());
+  sources.addEventListener('click', e => { if (e.target === sources) sources.close(); });
 
   // debug / automated testing hook: advance the simulation with a fixed step
   const simulate = (seconds, o = {}) => {
@@ -169,12 +184,24 @@ async function init() {
     for (let t = 0; t < seconds; t += 1 / 30) mission.update(1 / 30, fake, view.pitch);
     return { s: +mission.s.toFixed(1), v: +mission.speed.toFixed(2), state: mission.state };
   };
-  window.__isg = { mission, route, rover, terrain, input, setLayer, hud, simulate };
+  window.__isg = { journey, renderer, mission, route, rover, terrain, input, setLayer, hud, simulate };
 
   function frame() {
     timer.update();
     const dt = Math.min(timer.getDelta(), 0.05);
     time += dt;
+    if (!journey.done) {
+      if (document.getElementById('sourcesDialog').open) {
+        input.endFrame();
+        requestAnimationFrame(frame);
+        return;
+      }
+      if (!journey.active && input.hit('enter') && !beginBtn.disabled) beginBtn.click();
+      journey.render(dt);
+      input.endFrame();
+      requestAnimationFrame(frame);
+      return;
+    }
 
     // ---- discrete inputs
     if (mission.state === 'brief' && input.hit('enter') && !beginBtn.disabled) beginBtn.click();
@@ -299,3 +326,4 @@ init().catch((err) => {
   const b = document.getElementById('beginBtn');
   if (b) b.textContent = `ERROR: ${err.message}`;
 });
+

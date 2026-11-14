@@ -4,11 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Interplanetary Survival Guide — Martian Map</title>
-    <meta name="description" content="First-person rover traverse planner for a Mars EVA: survival route, hazards and science stations in 3D." />
+    <meta name="description" content="Board a rocket on Earth. Journey to Mars in first person. Explore a 3D survival route with terrain, hazards and science stations." />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23c1673d'/%3E%3Cpath d='M6 20 Q16 14 26 19' stroke='%239af4ff' stroke-width='2.5' fill='none'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="./src/style.css" />
   </head>
-  <body>
+  <body class="at-launch">
     <div id="app">
       <div id="viewport"></div>
       <div id="visor" aria-hidden="true"></div>
@@ -114,31 +114,38 @@
         </div>
       </section>
 
-      <section id="brief" class="screen">
-        <div class="screen-inner">
-          <div class="eyebrow">NASA SPACE APPS · INTERPLANETARY SURVIVAL GUIDE</div>
-          <h1>MARTIAN MAP<span>Rover traverse · first-person</span></h1>
-          <p class="lede">
-            You are driving the pressurised-suit rover on <b id="briefEva">EVA-03</b>. Follow the survival route,
-            stop at hazard gates for a safety briefing, and complete the science tasks at each station before your
-            consumables run low.
-          </p>
-          <div class="brief-grid" id="briefGrid"></div>
-          <div class="brief-controls">
-            <span><kbd>W</kbd> / <kbd>↑</kbd> drive</span>
-            <span><kbd>A</kbd><kbd>D</kbd> steer in corridor</span>
-            <span><kbd>E</kbd> hold for tasks</span>
-            <span><kbd>Enter</kbd> confirm</span>
-            <span><kbd>1–4</kbd> data layers</span>
-            <span>drag to look around</span>
-          </div>
-          <div class="pb-launch-row">
-            <button id="beginBtn" class="primary" disabled>PREPARING TERRAIN…</button>
-            <button id="boardBtn" class="ghost">PLANNING BOARD [P]</button>
-          </div>
-          <div class="mock-note">⚠ No NASA data connected yet — terrain and layers are procedural placeholders.</div>
+      <section id="brief" class="launch-screen">
+        <header class="launch-header"><a class="wordmark" href="./"><span class="brand-orbit">◒</span> INTERPLANETARY<span class="brand-sub">SURVIVAL GUIDE</span></a><nav aria-label="Main navigation"><a href="./map.html">Explore Mars ↗</a><button id="sourcesBtn">Mission &amp; sources</button></nav><span class="edition">SPACE APPS / 2026</span></header>
+        <div class="launch-copy">
+          <div class="launch-kicker"><span></span> EARTH TO MARS · AN ASTRONAUT’S JOURNEY</div>
+          <h1>A WORLD<br><em>AWAY.</em></h1>
+          <p>Leave the familiar behind.<br>Find your way on another world.</p>
+          <div class="launch-actions"><button id="beginBtn" class="launch-primary" disabled>PREPARING FLIGHT…</button><button id="surfaceBtn" class="launch-secondary" disabled>Skip to surface <span>↗</span></button></div>
+          <div class="launch-meta">84 SECOND JOURNEY <span>·</span> FIRST-PERSON 3D <span>·</span> INTERACTIVE EXPLORATION</div>
         </div>
+        <div class="launch-coordinate"><span class="live-dot"></span> CREW ACCESS ARM <b>EARTH / LAUNCH COMPLEX</b><small>ILLUSTRATIVE MISSION · ARES 01</small></div>
+        <footer class="launch-footer"><div class="launch-route"><span class="active"><i>01</i> EARTH</span><div></div><span><i>02</i> TRANSFER</span><div></div><span><i>03</i> MARS</span></div><div class="launch-footnote">A journey to get there.<br>A survival guide to get home.</div></footer>
+        <div id="briefGrid" hidden></div><span id="briefEva" hidden></span>
+        <button id="boardBtn" hidden>Planning board</button>
       </section>
+
+      <section id="journey" class="journey-overlay hidden" aria-label="Earth to Mars journey">
+        <header class="journey-top"><div><span class="flight-indicator"></span><b id="journeyStatus">EARTH · CREW ACCESS</b><small id="journeyDetail">T − 00:12</small></div><button id="journeySkip">Skip to surface ↗</button></header>
+        <div class="journey-reticle" aria-hidden="true">+</div>
+        <div class="journey-story" aria-live="polite"><div class="journey-tag">ARES 01 / CREW LOG</div><h2 id="journeyTitle"></h2><p id="journeyCaption"></p></div>
+        <div class="journey-controls"><div class="journey-control-row"><span class="journey-look">DRAG TO LOOK AROUND</span><span id="journeyTime"></span><button id="journeyPause" aria-pressed="false">Pause</button><button id="journeySpeed">1× speed</button><button id="journeySound" aria-pressed="false">Sound: off</button><button id="journeyMotion" aria-pressed="false">Motion: full</button><button id="journeyNext">Next chapter →</button></div><div class="journey-progress-track"><div id="journeyProgress"></div></div><div id="journeyChapters"></div><p class="journey-disclaimer">Cinematic reconstruction · journey time compressed · illustrative planets and vehicle · not a flight simulation</p></div>
+      </section>
+
+      <dialog id="sourcesDialog" class="sources-dialog">
+        <form method="dialog"><button class="source-close" aria-label="Close mission information">×</button></form>
+        <div class="launch-kicker">THE MISSION / THE EVIDENCE</div>
+        <h2>Explore with curiosity.<br>Navigate with context.</h2>
+        <p>This experience connects an astronaut’s journey to a Mars survival map. After landing, follow the 3D rover route, inspect four terrain layers, stop at hazard gates and complete science tasks while monitoring oxygen, energy and your return margin.</p>
+        <div class="source-cards"><article><b>01 · JOURNEY</b><h3>Imagine the arrival</h3><p>The rocket, cockpit, planets and landing are original illustrative reconstructions. The 84-second journey compresses a trip that would take months.</p></article><article><b>02 · SURFACE</b><h3>Rehearse the decisions</h3><p>The local rover terrain, hazards and environmental readings are synthetic. They demonstrate planning trade-offs and are not surveyed terrain or current Mars weather.</p></article><article><b>03 · ORBITAL MAP</b><h3>Follow the evidence</h3><p>The separate 3D Mars globe streams NASA/USGS imagery and elevation. Coverage and resolution depend on each source and network availability.</p><a href="./map.html">Open the Mars globe ↗</a></article></div>
+        <h3>Science sources</h3><ul><li><a href="https://science.nasa.gov/mars/facts/" target="_blank" rel="noopener">NASA · Mars facts ↗</a> — planetary context</li><li><a href="https://science.nasa.gov/mission/mars-2020-perseverance/" target="_blank" rel="noopener">NASA · Perseverance ↗</a> — ancient delta and exploration context</li><li><a href="https://trek.nasa.gov/mars/" target="_blank" rel="noopener">NASA · Mars Trek ↗</a> — orbital map sources</li></ul>
+        <h3>Open-source inspiration</h3><p>We studied <a href="https://github.com/sohaib1083/gale-marswalk-planner" target="_blank" rel="noopener">Gale Marswalk Planner</a> for terrain-aware route planning, <a href="https://github.com/PhewwcCoder/nasa-space-app-challenge" target="_blank" rel="noopener">Sol-3</a> for first-person exploration and source-linked learning, and <a href="https://github.com/NASA-AMMOS/3DTilesRendererJS" target="_blank" rel="noopener">NASA AMMOS 3D Tiles Renderer</a> for multiscale 3D terrain architecture. Their application code and assets are not copied into this journey.</p>
+        <p class="source-note">Built with Three.js and CesiumJS. Independent Space Apps project; no NASA endorsement. Concept demonstrator, not operational astronaut navigation.</p>
+      </dialog>
 
       <section id="debrief" class="screen hidden">
         <div class="screen-inner">
@@ -152,3 +159,4 @@
     <script type="module" src="./src/main.js"></script>
   </body>
 </html>
+
