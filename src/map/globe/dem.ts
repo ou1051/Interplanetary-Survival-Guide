@@ -41,17 +41,25 @@ export interface SourceRaster {
   /** 1 = valid, 0 = no data (optional). */
   mask?: ArrayLike<number> | null;
   rect: DegRect;
+  /**
+   * Grid registration. Esri's LERC elevation tiles are 513 × 513 *posts*: the
+   * first and last samples sit exactly on the tile edges (adjacent tiles share
+   * them). Without this flag samples are treated as pixel centres.
+   */
+  posts?: boolean;
 }
 
 /**
- * Bilinear sample of the raster at lon/lat. Pixel centres sit half a pixel in
- * from the edges; outside the centres we clamp. No-data neighbours are ignored;
+ * Bilinear sample of the raster at lon/lat (posts on the edges, or pixel
+ * centres half a pixel in; outside the samples we clamp). No-data neighbours are ignored;
  * if all four are missing the result is `fallback`.
  */
 export function sampleRaster(src: SourceRaster, lon: number, lat: number, fallback = 0): number {
   const { width: w, height: h, rect } = src;
-  const fx = ((lon - rect.west) / (rect.east - rect.west)) * w - 0.5;
-  const fy = ((rect.north - lat) / (rect.north - rect.south)) * h - 0.5;
+  const u = (lon - rect.west) / (rect.east - rect.west);
+  const v = (rect.north - lat) / (rect.north - rect.south);
+  const fx = src.posts ? u * (w - 1) : u * w - 0.5;
+  const fy = src.posts ? v * (h - 1) : v * h - 0.5;
   const x0 = Math.min(w - 1, Math.max(0, Math.floor(fx)));
   const y0 = Math.min(h - 1, Math.max(0, Math.floor(fy)));
   const x1 = Math.min(w - 1, x0 + 1);

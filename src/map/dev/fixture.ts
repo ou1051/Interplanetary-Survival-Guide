@@ -72,6 +72,9 @@ export const SYNTHETIC_SITE: Site = {
   height: H,
   cellSizeM: 10,
   elevationM: elevation(),
+  // Real place for the backdrop imagery only: the ridge–bedrock contact on Vera
+  // Rubin Ridge, Gale crater. Elevations, pins and stations stay synthetic.
+  geo: { lat: -4.714, lon: 137.357 },
   base: { col: 1, row: 3 },
   textureUrl: TEXTURE,
   walkBudgetSeconds: 300,
