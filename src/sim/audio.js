@@ -76,6 +76,23 @@ export class RoverAudio {
     });
   }
 
+  // Short single tone for instrument cues (pings, shutter, drill grind).
+  tone(freq, duration = 0.05, level = 0.04, type = 'sine') {
+    if (!this.ctx || this.muted) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type;
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(level, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    o.connect(g).connect(this.master);
+    o.start(t);
+    o.stop(t + duration + 0.02);
+  }
+
   toggleMute() {
     this.muted = !this.muted;
     return this.muted;

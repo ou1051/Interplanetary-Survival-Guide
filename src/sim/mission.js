@@ -6,8 +6,13 @@ import { consumptionEstimate } from '../physics/traverse.js';
 // Traverse state machine + consumables.
 //
 //   brief ─▶ drive ─▶ gate (acknowledge hazard briefing) ─▶ drive
-//                 └─▶ station (hold to run tasks) ─▶ stationDone ─▶ drive
+//                 └─▶ station (run tasks) ─▶ stationDone ─▶ drive
 //                                                       └─(HAB)─▶ complete
+//
+// With `interactiveTasks` the first-person task controller reports progress and
+// completion through setTaskProgress / completeTask, with a grade per task.
+// Otherwise holding the action input runs the tasks (automated tests and the
+// simulate() hook).
 // ---------------------------------------------------------------------------
 
 const TASK_HOLD_SECONDS = 2.0;
@@ -39,6 +44,9 @@ export class Mission {
     this.boosting = false;
     this.offRoute = false;
     this.taskFlash = null;
+    this.interactiveTasks = false;
+    this.score = 0;
+    this.grades = []; // { station, task, grade, points }
     this._zoneIds = new Set();
   }
 
@@ -71,7 +79,8 @@ export class Mission {
 
   start() {
     this.state = 'drive';
-    this.emit('log', { text: `${SITE.eva} started · traverse ${Math.round(this.route.length)} m · ${this.route.stations.length - 1} stations`, tone: 'info' });
+    const science = this.route.stations.filter((station) => !station.final).length;
+    this.emit('log', { text: `${this.route.site?.eva ?? SITE.eva} started · traverse ${Math.round(this.route.length)} m · ${science} station${science === 1 ? '' : 's'}`, tone: 'info' });
     this.emit('state', { state: this.state });
   }
 
@@ -225,24 +234,45 @@ export class Mission {
     }
   }
 
-  _station(dt, input) {
+  get activeTask() {
+    if (this.state !== 'station') return null;
+    return this.nextStop.ref.tasks.find((t) => !t.done) ?? null;
+  }
+
+  setTaskProgress(task, progress) {
+    if (task === this.activeTask) task.progress = clamp(progress, 0, 1);
+  }
+
+  // Finish the active task. grade/points come from the first-person task, if any.
+  completeTask(task, { result = task.result, grade = null, points = 0 } = {}) {
+    if (!task || task !== this.activeTask) return false;
     const st = this.nextStop.ref;
-    const task = st.tasks.find((t) => !t.done);
-    if (!task) return;
+    task.progress = 1;
+    task.done = true;
+    task.outcome = result;
+    task.grade = grade;
+    this._consume(task.minutes * 60, { work: true });
+    if (/^collect/i.test(task.label)) this.samples += task.sampleCount ?? 1;
+    if (grade) {
+      this.score += points;
+      this.grades.push({ station: st.id, task: task.label, grade, points });
+    }
+    this.emit('log', { text: `${st.id} ✓ ${task.label}${grade ? ` · ${grade}` : ''} — ${result}`, tone: 'ok' });
+    this.emit('task', { station: st, task });
+    if (st.tasks.every((t) => t.done)) {
+      st.done = true;
+      this.state = 'stationDone';
+      this.emit('state', { state: this.state, stop: this.nextStop });
+    }
+    return true;
+  }
+
+  _station(dt, input) {
+    const task = this.activeTask;
+    if (!task || this.interactiveTasks) return;
     if (input.action) {
       task.progress = Math.min(1, task.progress + dt / TASK_HOLD_SECONDS);
-      if (task.progress >= 1) {
-        task.done = true;
-        this._consume(task.minutes * 60, { work: true });
-        if (/^collect/i.test(task.label)) this.samples += task.sampleCount ?? 1;
-        this.emit('log', { text: `${st.id} ✓ ${task.label} — ${task.result}`, tone: 'ok' });
-        this.emit('task', { station: st, task });
-        if (st.tasks.every((t) => t.done)) {
-          st.done = true;
-          this.state = 'stationDone';
-          this.emit('state', { state: this.state, stop: this.nextStop });
-        }
-      }
+      if (task.progress >= 1) this.completeTask(task);
     } else {
       task.progress = Math.max(0, task.progress - dt * 1.5);
     }

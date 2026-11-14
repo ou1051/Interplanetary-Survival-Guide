@@ -48,14 +48,29 @@ Run `npm run api` to plan a route or recalculate the remaining leg after a hazar
 | `A` `D` / `←` `→` | steer inside the route corridor (±5 m) |
 | `C` | cruise control |
 | `Shift` (hold) | time ×3 |
-| `E` (hold) | run the active science task |
+| `E` | start the next science task at a station |
 | `Enter` | acknowledge a hazard briefing / resume traverse |
 | `1`–`4` | data layer: optical · slope · thermal inertia · mineralogy |
 | `M` | full route map + elevation profile |
 | `L` | headlights · `H` hide HUD · `V` recentre view · `N` mute |
-| drag | look around the cabin (double-click to recentre) |
+| drag · `Z` `X` | look around the cabin, a full 360° turn (double-click to recentre) |
+| `B` | look back over your shoulder |
 
 Touch devices get on-screen DRIVE / BRAKE / steer / TASK buttons.
+
+### Station tasks
+
+Science tasks are played first-person from the driver's seat. Each one is graded S to C against a par time, with penalties for slips, blurred frames, gaps or drill jams. The grades add up to a science score, shown with a local best score in the debrief.
+
+| Task | How to play |
+| --- | --- |
+| Instrument scan | Look at the marked rock and keep the reticle inside its ring until it locks. Laser ranging uses two rings on a bedded slab. The dosimeter points at open sky. |
+| Panorama | Turn to each camera frame and hold still for the shutter. Turning too fast blurs the shot. The 360° panorama needs a full turn. |
+| Signal search | No target ring. Turn toward the habitat antenna. The pings speed up as the signal grows. Hold the peak. |
+| Radar sweep | Start at an orange post and trace the radar line on the ground to the other post, slowly and steadily. |
+| Core drill | Hold `Space` (or the on-screen button) to press the drill. Keep the needle in the moving green band. Too much pressure jams the bit. |
+
+During a task the rover is parked: drag, `WASD` or the arrow keys look around, `Shift` holds your breath to steady the aim for about three seconds, and `Esc` cancels.
 
 ## What the screen shows
 

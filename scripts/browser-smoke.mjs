@@ -43,6 +43,22 @@ try {
   try { await page.waitForFunction(start => window.__isg.mission.s > start, before, { timeout: 20000 }); }
   finally { await page.keyboard.up('w'); }
   assert.ok(await page.evaluate(() => window.__isg.mission.s) > before, 'Surface rover responds to driving input');
+  // Station tasks are first-person mini-games: E starts one, Esc cancels it.
+  await page.evaluate(() => {
+    const { mission, simulate } = window.__isg;
+    for (let i = 0; i < 900 && mission.state !== 'station'; i++) {
+      if (mission.state === 'gate') mission.acknowledge();
+      else simulate(1, { boost: true });
+    }
+  });
+  assert.equal(await page.evaluate(() => window.__isg.mission.state), 'station');
+  await page.keyboard.press('e');
+  await page.waitForFunction(() => window.__isg.tasks.kind === 'scan');
+  assert.equal(await page.locator('#taskHud .th-panel').isVisible(), true);
+  await page.screenshot({ path: 'test-results/02b-station-task.png' });
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !window.__isg.tasks.active);
+  assert.equal(await page.evaluate(() => window.__isg.mission.activeTask.done), false);
   await page.close();
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
   mobile.on('pageerror', e => errors.push(e.message));
@@ -71,5 +87,5 @@ try {
   await mobile.getByRole('button', { name: /Turn around and return/ }).click();
   assert.equal(await mobile.evaluate(() => window.__isg.mission.aborted), true);
   assert.deepEqual(errors, [], 'No runtime errors');
-  console.log('Browser checks passed: Mars Surface Operations welcome and habitat entry on desktop and mobile, sources, Delta driving and wrist navigator, Gale dust return.');
+  console.log('Browser checks passed: Mars Surface Operations welcome and habitat entry on desktop and mobile, sources, Delta driving and wrist navigator, first-person station task, Gale dust return.');
 } finally { await browser.close(); }

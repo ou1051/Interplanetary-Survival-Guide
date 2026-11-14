@@ -19,7 +19,8 @@ function fitCanvas(canvas, w, h) {
 const kmh = (ms) => ms * 3.6;
 
 export class Hud {
-  constructor({ route, mission, mapRenderer, layers, input }) {
+  constructor({ route, mission, mapRenderer, layers, input, onTask = () => {} }) {
+    this.onTask = onTask;
     this.route = route;
     this.mission = mission;
     this.map = mapRenderer;
@@ -403,8 +404,8 @@ export class Hud {
       else if (M.boosting) html = 'TIME ×3';
     } else if (M.state === 'gate') html = `<span class="pulse">HAZARD BRIEFING — PRESS <kbd>ENTER</kbd> TO ACKNOWLEDGE</span>`;
     else if (M.state === 'station') {
-      const t = M.nextStop.ref.tasks.find((x) => !x.done);
-      html = t ? `HOLD <kbd>E</kbd> — ${t.label.toUpperCase()}` : '';
+      const t = M.activeTask;
+      if (t) html = M.interactiveTasks ? `<span class="pulse">PRESS <kbd>E</kbd> — START ${t.label.toUpperCase()}</span>` : `HOLD <kbd>E</kbd> — ${t.label.toUpperCase()}`;
     } else if (M.state === 'stationDone') html = `<span class="pulse">PRESS <kbd>ENTER</kbd> TO ${M.nextStop.ref.final ? 'END THE EVA' : 'RESUME THE TRAVERSE'}</span>`;
     if (el.innerHTML !== html) el.innerHTML = html;
   }
@@ -434,12 +435,20 @@ export class Hud {
         el.classList.toggle('locked', !t.done && t !== active);
         el.querySelector('.fill').style.width = `${(t.done ? 1 : t.progress) * 100}%`;
         const res = el.querySelector('.res');
-        if (t.done && res.textContent === '') res.textContent = `→ ${t.result}`;
+        if (t.done && res.textContent === '') res.textContent = `→ ${t.outcome ?? t.result}`;
+        const grade = el.querySelector('.grade');
+        if (t.grade && grade.textContent !== t.grade) {
+          grade.textContent = t.grade;
+          grade.dataset.grade = t.grade;
+        }
       });
       const cta = card.querySelector('.cta');
       const done = st.tasks.every((t) => t.done);
-      cta.disabled = !done;
-      cta.textContent = done ? (st.final ? 'END EVA [ENTER]' : 'RESUME TRAVERSE [ENTER]') : 'HOLD [E] ON EACH TASK';
+      const label = done ? (st.final ? 'END EVA [ENTER]' : 'RESUME TRAVERSE [ENTER]') : M.interactiveTasks ? 'START TASK [E]' : 'HOLD [E] ON EACH TASK';
+      cta.disabled = !done && !M.interactiveTasks;
+      if (cta.textContent !== label) cta.textContent = label;
+      const score = card.querySelector('.score b');
+      if (score) score.textContent = M.score.toLocaleString('en');
     }
   }
 
@@ -483,11 +492,16 @@ export class Hud {
       <h3>TASKS</h3>
       <div class="tasks">${st.tasks
         .map(
-          (t) => `<div class="task"><i class="fill"></i><i class="chk"></i><span class="lbl">${t.label}</span><span class="min">${t.minutes} min</span><span class="res"></span></div>`,
+          (t) => `<div class="task"><i class="fill"></i><i class="chk"></i><span class="lbl">${t.label}</span><span class="min"><b class="grade"></b>${t.minutes} min</span><span class="res"></span></div>`,
         )
         .join('')}</div>
+      ${this.mission.interactiveTasks ? '<div class="score">SCIENCE SCORE <b>0</b></div>' : ''}
       <button class="cta" disabled>HOLD [E] ON EACH TASK</button>`;
     card.querySelectorAll('.task').forEach((el) => {
+      if (this.mission.interactiveTasks) {
+        el.addEventListener('click', () => { if (el.classList.contains('active')) this.onTask(); });
+        return;
+      }
       const on = (e) => {
         if (!el.classList.contains('active')) return;
         e.preventDefault();
@@ -499,7 +513,10 @@ export class Hud {
       el.addEventListener('pointerleave', off);
       el.addEventListener('pointercancel', off);
     });
-    card.querySelector('.cta').addEventListener('click', () => this.mission.acknowledge());
+    card.querySelector('.cta').addEventListener('click', () => {
+      if (this.mission.interactiveTasks && this.mission.activeTask) this.onTask();
+      else this.mission.acknowledge();
+    });
   }
 
   // ------------------------------------------------------------ map overlay
@@ -543,7 +560,7 @@ export class Hud {
   }
 
   // ------------------------------------------------------------ debrief
-  showDebrief(onRestart) {
+  showDebrief(onRestart, { score = [], note = '' } = {}) {
     const M = this.mission;
     $('hud').classList.add('hidden');
     $('card').classList.add('hidden');
@@ -556,10 +573,13 @@ export class Hud {
       ['DOSE', `${M.dose.toFixed(1)} µSv`],
       ['SAMPLES', M.samples],
       ['GATES CLEARED', gates],
-      ['STATIONS', this.route.stations.length - 1],
+      ['STATIONS', this.route.stations.filter((st) => !st.final).length],
+      ...score,
     ];
     $('debriefGrid').innerHTML = items.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
     $('debriefSub').textContent = `${this.mission.aborted ? 'Returned early' : 'Science traverse'} · ${(this.route.site ?? SITE).name}`;
+    $('debriefNote').textContent = note;
+    $('debriefNote').hidden = !note;
     $('debrief').classList.remove('hidden');
     $('restartBtn').onclick = onRestart;
   }
