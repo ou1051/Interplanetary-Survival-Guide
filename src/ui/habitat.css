@@ -338,3 +338,178 @@
   .hab-s1-focused .hab-approaches { flex-direction: row; flex-wrap: wrap; }
   .hab-s1-focused .hab-approaches button { min-width: 102px; }
 }
+
+
+/* ---------------- Welcome: the habitat from outside ---------------- */
+.hab-intro { background: #120c09; }
+.hab-exterior { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; display: block; }
+.hab-intro-shade {
+  position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(90deg, #0c0806f0 0%, #0c0806c4 26%, #0c080600 56%),
+              linear-gradient(0deg, #0c08068a 0%, #0c080600 30%);
+}
+.hab-intro { isolation: isolate; }
+.hab-cut {
+  position: fixed; inset: 0; z-index: 4; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle at 50% 50%, #fff1dc 0%, #ffc483 45%, #d8783f 100%);
+}
+@media (max-width: 699px), (max-aspect-ratio: 6/5) {
+  .hab-intro-shade { background: linear-gradient(180deg, #0c080600 20%, #0c0806e6 60%); }
+}
+
+
+/* ---------------- Console · NASA mission-operations style ----------------
+   Deep navy display, NASA blue title bar with a red accent, Helvetica type,
+   data shown as labelled readouts, blue for selection, red for the main action. */
+#habitat {
+  --ops-bg: #071022;
+  --ops-panel: #0c1a33;
+  --ops-line: #1f3560;
+  --ops-text: #eef3fb;
+  --ops-dim: #8fa6cc;
+  --nasa-blue: #0b3d91;
+  --nasa-blue-hi: #2f6fd6;
+  --nasa-red: #fc3d21;
+  --ops-go: #34c46a;
+  --ops-font: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+/* monitor housing (zoomed view only; in the room the console is pinned to the 3D monitor) */
+#habitat .hab-stage .hab-wall { background: #0b0f17; border-color: #05070b; box-shadow: none; }
+#habitat.hab-zoomed .hab-stage .hab-wall {
+  background: linear-gradient(180deg, #2a2e35, #1b1e23);
+  border: 1px solid #0a0b0d; border-radius: 12px; padding: 12px 12px 28px;
+  box-shadow: inset 0 1px 0 #4b505a, 0 22px 50px #000a;
+}
+#habitat.hab-zoomed .hab-stage .hab-wall::after {
+  content: 'MISSION OPERATIONS  ·  CONSOLE 2  ·  EVA PLANNING';
+  position: absolute; left: 18px; bottom: 9px;
+  font: 600 9px/1 var(--ops-font); letter-spacing: .2em; color: #8b93a3;
+}
+#habitat.hab-zoomed .hab-stage .hab-wall::before {
+  content: ''; position: absolute; right: 18px; bottom: 10px; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--ops-go); box-shadow: 0 0 5px var(--ops-go);
+}
+/* display */
+#habitat .hab-stage .hab-screen {
+  background:
+    linear-gradient(var(--ops-bg), var(--ops-bg)) padding-box,
+    var(--ops-bg);
+  background-image:
+    linear-gradient(rgba(47, 111, 214, .06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(47, 111, 214, .06) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-color: var(--ops-bg);
+  border: 1px solid #000; border-radius: 3px; box-shadow: none;
+  padding: 0 0 14px; color: var(--ops-text); font-family: var(--ops-font);
+}
+#habitat .hab-stage .hab-screen > * { margin-left: 16px; margin-right: 16px; }
+/* title bar */
+#habitat .hab-stage .hab-header {
+  margin: 0 0 14px; padding: 9px 16px 9px 20px; border: 0; position: relative;
+  background: var(--nasa-blue); color: #fff; text-transform: none; align-items: center;
+}
+#habitat .hab-stage .hab-header::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--nasa-red); }
+.hab-zoomed .hab-stage .hab-header { margin-bottom: 0 !important; }
+#habitat .hab-stage .hab-header h1 { font: 700 15px/1.2 var(--ops-font); letter-spacing: .14em; text-transform: uppercase; color: #fff; }
+#habitat .hab-header > span, #habitat .hab-eva { color: #d6e2f7; font: 600 11px var(--ops-font); letter-spacing: .12em; }
+#habitat .hab-eva i { background: var(--ops-go); box-shadow: 0 0 5px var(--ops-go); border-radius: 50%; }
+#habitat .hab-nav { gap: 6px; }
+#habitat .hab-nav a, #habitat .hab-nav button {
+  font: 600 11px var(--ops-font); letter-spacing: .06em; color: #fff; text-decoration: none;
+  background: transparent; border: 1px solid #7fa2e0; border-radius: 3px; padding: 4px 10px;
+}
+#habitat .hab-nav a:hover, #habitat .hab-nav button:hover { background: #ffffff1f; filter: none; }
+/* map */
+#habitat .hab-stage .hab-mapframe { border: 1px solid var(--ops-line); box-shadow: none; background: #0a1426; border-radius: 2px; }
+#habitat .hab-mapframe::after {
+  background: none;
+  box-shadow: inset 0 0 0 1px #00000040;
+  /* corner ticks like a framed instrument view */
+  background-image:
+    linear-gradient(var(--ops-dim), var(--ops-dim)), linear-gradient(var(--ops-dim), var(--ops-dim)),
+    linear-gradient(var(--ops-dim), var(--ops-dim)), linear-gradient(var(--ops-dim), var(--ops-dim));
+  background-size: 14px 2px, 2px 14px, 14px 2px, 2px 14px;
+  background-position: 6px 6px, 6px 6px, calc(100% - 6px) calc(100% - 6px), calc(100% - 6px) calc(100% - 6px);
+  background-repeat: no-repeat;
+}
+#habitat .hab-stage .hab-mapframe > img { filter: saturate(.9) contrast(1.05) brightness(.95); }
+#habitat .hab-mapframe .hab-pin, #habitat .hab-base, #habitat .hab-north {
+  background: #071022e6; border: 1px solid var(--nasa-blue-hi); color: #fff; border-radius: 2px;
+  font: 700 11px var(--ops-font); letter-spacing: .04em;
+}
+#habitat .hab-scale { color: #fff; border-bottom-color: #fff; font: 600 10px var(--ops-font); }
+#habitat .hab-stage .hab-mapbar, #habitat .hab-stage .hab-mapcredit {
+  font: 500 11px var(--ops-font); letter-spacing: .02em; text-transform: none; color: var(--ops-dim);
+}
+#habitat .hab-key i { border-top-color: var(--ops-text); }
+/* left readouts (room view) */
+#habitat .hab-metrics div { border-top: 1px solid var(--ops-line); }
+#habitat .hab-metrics span { font: 600 10px var(--ops-font); letter-spacing: .14em; text-transform: uppercase; color: var(--ops-dim); }
+#habitat .hab-metrics b { font: 600 14px var(--ops-font); color: #fff; font-variant-numeric: tabular-nums; }
+/* segmented layer switch */
+#habitat .hab-stage .hab-layers { gap: 0; }
+#habitat .hab-stage .hab-layers button {
+  background: transparent; border: 1px solid var(--ops-line); color: var(--ops-dim); border-radius: 0;
+  font: 600 11px var(--ops-font); letter-spacing: .08em; text-transform: uppercase; padding: 5px 12px;
+}
+#habitat .hab-stage .hab-layers button:first-child { border-radius: 3px 0 0 3px; }
+#habitat .hab-stage .hab-layers button:last-child { border-radius: 0 3px 3px 0; border-left: 0; }
+#habitat .hab-stage .hab-layers button[aria-pressed=true] { background: var(--nasa-blue); border-color: var(--nasa-blue-hi); color: #fff; }
+/* right panel */
+#habitat .hab-zoomed .hab-brief, .hab-zoomed .hab-brief { border-left: 1px solid var(--ops-line) !important; padding-left: 20px !important; }
+#habitat .hab-scenario { color: var(--ops-dim); font: 600 10px var(--ops-font); letter-spacing: .14em; text-transform: uppercase; }
+#habitat .hab-scenario select {
+  background: var(--ops-panel); border: 1px solid var(--ops-line); border-radius: 3px; color: #fff;
+  font: 500 13px var(--ops-font); letter-spacing: 0; text-transform: none; padding: 7px 8px;
+}
+#habitat .hab-brief .hab-objective, #habitat .hab-brief h3 { font-family: var(--ops-font); color: #fff; letter-spacing: 0; }
+#habitat .hab-brief .hab-objective { font-size: 21px; margin-top: 16px; }
+#habitat .hab-brief p:not(.hab-eyebrow) { color: #c7d4ea; font-family: var(--ops-font); }
+#habitat [data-delta-summary] { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--ops-line); border: 1px solid var(--ops-line); margin: 10px 0 14px !important; }
+#habitat .hab-kv { background: var(--ops-panel); padding: 8px 10px; }
+#habitat .hab-kv small { display: block; font: 600 9.5px var(--ops-font); letter-spacing: .14em; text-transform: uppercase; color: var(--ops-dim); }
+#habitat .hab-kv b { display: block; font: 600 20px var(--ops-font); color: #fff; font-variant-numeric: tabular-nums; margin-top: 2px; }
+#habitat .hab-delta-stations { list-style: none; padding: 0; margin: 0 0 16px; font-family: var(--ops-font); color: #dce6f6; font-size: 13px; }
+#habitat .hab-delta-stations li { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #13254a; margin: 0; }
+#habitat .hab-delta-stations li i { font-style: normal; font: 700 10px var(--ops-font); color: #fff; background: var(--nasa-blue); border: 1px solid var(--nasa-blue-hi); border-radius: 2px; padding: 2px 5px; }
+/* buttons */
+#habitat .hab-step, #habitat .hab-launch {
+  display: flex; justify-content: space-between; align-items: center; width: 100%;
+  background: var(--nasa-red); border: 0; border-radius: 3px; color: #fff;
+  font: 700 13px var(--ops-font); letter-spacing: .12em; text-transform: uppercase; padding: 11px 14px;
+}
+#habitat .hab-step[data-s1-back] { background: transparent; border: 1px solid var(--ops-line); color: var(--ops-dim); width: auto; }
+#habitat .hab-routes button, #habitat .hab-observation {
+  background: var(--ops-panel); border: 1px solid var(--ops-line); border-radius: 3px; color: #fff; font-family: var(--ops-font);
+}
+#habitat .hab-routes button[aria-pressed=true] { background: #0e2a5e; border-color: var(--nasa-blue-hi); box-shadow: inset 3px 0 0 var(--nasa-blue-hi); color: #fff; }
+#habitat .hab-routes button[aria-pressed=true] b, #habitat .hab-routes button[aria-pressed=true] small { color: inherit !important; }
+#habitat .hab-routes button span { font: 600 16px var(--ops-font); font-variant-numeric: tabular-nums; }
+#habitat .hab-routes small, #habitat .hab-observation small { color: var(--ops-dim); }
+#habitat .hab-note { color: var(--ops-dim); font-family: var(--ops-font); }
+#habitat button:focus-visible, #habitat a:focus-visible, #habitat select:focus-visible { outline: 2px solid var(--nasa-blue-hi); outline-offset: 2px; }
+#habitat .hab-screen-open:hover { box-shadow: inset 0 0 0 2px var(--nasa-blue-hi); }
+
+/* The invisible "open console" layer over the monitor: no outline, no offset. */
+#habitat .hab-stage .hab-screen > .hab-screen-open { margin: 0; }
+#habitat .hab-screen-open, #habitat .hab-screen-open:hover, #habitat .hab-screen-open:focus, #habitat .hab-screen-open:focus-visible {
+  box-shadow: none !important; outline: none !important;
+}
+
+/* ---------------- 3D console map (team Mars globe) ---------------- */
+.hab-map3d { position: absolute; inset: 0; z-index: 1; }
+.hab-map3d .cesium-viewer, .hab-map3d .cesium-widget, .hab-map3d canvas { width: 100%; height: 100%; display: block; }
+.hab-map3d .cesium-viewer-bottom, .hab-map3d .cesium-widget-credits { display: none !important; }
+.hab-map3d-credit { position: absolute; right: 6px; bottom: 4px; z-index: 2; max-width: 70%; text-align: right; pointer-events: none;
+  font: 500 9px "Helvetica Neue", Arial, sans-serif; color: #c7d4ead0; text-shadow: 0 1px 2px #000; }
+.hab-map3d-credit * { color: inherit !important; font-size: inherit !important; display: inline !important; }
+.hab-map3d-credit img { display: none !important; }
+.hab-map3d-status { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;
+  font: 600 12px "Helvetica Neue", Arial, sans-serif; letter-spacing: .12em; text-transform: uppercase; color: #c7d4ea; }
+.hab-mapframe.is-3d > img, .hab-mapframe.is-3d > canvas, .hab-mapframe.is-3d .hab-pin,
+.hab-mapframe.is-3d .hab-base, .hab-mapframe.is-3d .hab-scale, .hab-mapframe.is-3d .hab-north { visibility: hidden; }
+.hab-mapframe.is-3d::after { z-index: 2; }
+#habitat .hab-mapbar { gap: 10px; }
+#habitat .hab-viewmode { margin-left: auto; }
+.hab-mapframe.is-3d { cursor: grab; }
+.hab-mapframe.is-3d:active { cursor: grabbing; }

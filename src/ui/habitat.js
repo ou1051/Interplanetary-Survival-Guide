@@ -1,6 +1,8 @@
 import { deltaPlan, buildDeltaTraverse, buildDeltaApproaches } from '../data/deltaTraverse.js';
 import { makeDeltaOverview } from './deltaOverview.js';
 import { mountHabitatRoom } from './habitatRoom.js';
+import { mountHabitatExterior } from './habitatExterior.js';
+import { mountConsoleMap3D } from './consoleMap3D.js';
 import { base, outcrop, gridPosition, imagery, observationSource, terrainSource, siteWidth, terrainSlope, planGaleRoutes } from '../data/galeSite.js';
 import './habitat.css';
 
@@ -22,6 +24,9 @@ export function mountHabitat(root, launch) {
   let s1Focused = false;
   let approachChoice;
   let mode = 'orbital';
+  let view3d = true;
+  let map3d = null;
+  let map3dLoading = null;
   root.innerHTML = `
     <div class="hab-stage hab-before-entry" inert>
       <canvas class="hab-room" data-room aria-hidden="true"></canvas>
@@ -48,6 +53,8 @@ export function mountHabitat(root, launch) {
               <div class="hab-mapframe">
                 <img src="${imagery.orbital}" alt="HiRISE orbital image of the Gale Crater demo area">
                 <canvas width="640" height="400" aria-hidden="true"></canvas>
+                <div class="hab-map3d" data-map3d hidden></div>
+                <span class="hab-map3d-status" data-map3d-status hidden>Loading 3D Mars…</span>
                 <button type="button" class="hab-pin" data-observation aria-label="Open Curiosity observation at the science stop">S1 ↗</button>
                 <button type="button" class="hab-pin hab-s1" data-s1 aria-label="S1 · Crater Floor Unit">S1 ↗</button>
                 <span class="hab-base">HAB</span><span class="hab-scale">50 m</span><span class="hab-north">↑ N</span>
@@ -58,6 +65,11 @@ export function mountHabitat(root, launch) {
             <div class="hab-layers" role="group" aria-label="Map layers">
               <button type="button" data-layer="orbital" aria-pressed="true" data-surface-layer>Terrain</button>
               <button type="button" data-layer="slope" aria-pressed="false">Slope</button>
+            </div>
+            <div class="hab-layers hab-viewmode" role="group" aria-label="Map view">
+              <button type="button" data-view3d="3d" aria-pressed="true">3D</button>
+              <button type="button" data-view3d="2d" aria-pressed="false">2D</button>
+              <button type="button" data-spin aria-pressed="true" title="Turn the view around the site">⟳ 360°</button>
             </div>
             <a data-gale-only href="${terrainSource}" target="_blank" rel="noopener" aria-label="HiRISE source: NASA, JPL-Caltech, University of Arizona and USGS">HiRISE ↗</a>
           </footer>
@@ -108,6 +120,8 @@ export function mountHabitat(root, launch) {
       <button type="button" data-review-open class="hab-review"><kbd>E</kbd> Review route</button>
     </div>
     <section class="hab-intro" data-intro aria-labelledby="hab-intro-title">
+      <canvas class="hab-exterior" data-exterior aria-hidden="true"></canvas>
+      <div class="hab-intro-shade" aria-hidden="true"></div>
       <div class="hab-intro-card">
         <p class="hab-eyebrow">Interplanetary Survival Guide</p>
         <h1 id="hab-intro-title">Mars Surface<br>Operations</h1>
@@ -116,6 +130,7 @@ export function mountHabitat(root, launch) {
         <button type="button" data-intro-enter>Enter habitat <span aria-hidden="true">→</span></button>
       </div>
     </section>
+    <div class="hab-cut" data-cut aria-hidden="true"></div>
     <div class="hab-airlock" data-airlock hidden>
       <div class="hab-hatch" aria-hidden="true"></div>
       <div class="hab-airlock-status" role="status" tabindex="-1">
@@ -217,9 +232,13 @@ export function mountHabitat(root, launch) {
       </button>`).join('');
       const stations = route.stations.filter(stop => !stop.final);
       const gates = route.stops.filter(stop => stop.kind === 'gate').length;
-      query('[data-delta-summary]').textContent =
-        `${(route.length / 1000).toFixed(2)} km · ${stations.length} science stations · ${gates} hazard gates · habitat return`;
-      query('[data-delta-stations]').innerHTML = stations.map(stop => `<li>${stop.name}</li>`).join('');
+      query('[data-delta-summary]').innerHTML = [
+        ['Round trip', `${(route.length / 1000).toFixed(2)} km`],
+        ['Science stations', stations.length],
+        ['Hazard gates', gates],
+        ['End point', 'Habitat'],
+      ].map(([k, v]) => `<span class="hab-kv"><small>${k}</small><b>${v}</b></span>`).join('');
+      query('[data-delta-stations]').innerHTML = stations.map((stop, i) => `<li><i>S${i + 1}</i>${stop.name}</li>`).join('');
     }
     for (const element of root.querySelectorAll('[data-gale-only], .hab-mapframe > img, .hab-pin:not(.hab-s1), .hab-base, .hab-scale')) {
       element.hidden = delta;
@@ -282,6 +301,7 @@ export function mountHabitat(root, launch) {
         ? 'Green <9° · Amber 9–17° · Red ≥17° · derived from 4 m DEM'
         : `Orbital imagery · ${crop.span} m across`;
     }
+    draw3D(delta);
     for (const button of root.querySelectorAll('[data-plan], [data-layer]')) {
       button.setAttribute('aria-pressed', String(button.dataset.plan === selected?.id || button.dataset.layer === mode));
     }
@@ -295,6 +315,49 @@ export function mountHabitat(root, launch) {
       `${selected.id === 'recommended' ? 'Avoids steeper mapped ground.' : 'Covers less ground and crosses steeper slopes.'} Estimated O₂ after return: ${oxygen(selected.returnOxygen)}.`;
   }
 
+  // ---------------------------------------------------------------- 3D map
+  function ensureMap3D() {
+    if (map3d || map3dLoading || !view3d) return;
+    query('[data-map3d-status]').hidden = false;
+    map3dLoading = mountConsoleMap3D(query('[data-map3d]'))
+      .then((m) => { map3d = m; query('[data-map3d-status]').hidden = true; update(); })
+      .catch((error) => { console.error(error); view3d = false; query('[data-map3d-status]').hidden = true; update(); });
+  }
+  function draw3D(delta) {
+    const frame = query('.hab-mapframe');
+    frame.classList.toggle('is-3d', view3d);
+    query('[data-map3d]').hidden = !view3d;
+    for (const b of root.querySelectorAll('[data-view3d]')) b.setAttribute('aria-pressed', String((b.dataset.view3d === '3d') === view3d));
+    query('[data-spin]').hidden = !view3d;
+    if (!view3d || !map3d) return;
+    query('[data-spin]').setAttribute('aria-pressed', String(map3d.spinning));
+    const lines = [];
+    const markers = [];
+    if (delta) {
+      const route = original.traverse.route;
+      if (!s1Focused) {
+        const loop = [];
+        for (let i = 0; i < route.count; i += 3) loop.push([route.x[i], route.z[i]]);
+        lines.push({ points: loop, color: '#9fe7ff', width: 5 });
+      }
+      for (const option of approaches) {
+        const pts = [];
+        for (let i = 0; i <= 50; i++) { const p = option.traverse.route.sample(option.s1 * i / 50); pts.push([p.x, p.z]); }
+        const on = approachChoice?.id === option.id;
+        lines.push({ points: pts, color: option.color, width: on ? 6 : 3, dashed: !on && !!approachChoice });
+      }
+      route.stations.forEach((st, i) => markers.push({ at: [st.x, st.z], text: st.final ? 'HAB' : `S${i + 1}`, color: st.final ? '#ffffff' : '#9fe7ff' }));
+    } else {
+      for (const plan of plans) {
+        const on = plan === selected;
+        lines.push({ points: plan.path.map((cell) => gridPosition(cell)), color: plan.id === 'recommended' ? '#77edff' : '#ffc373', width: on ? 6 : 3, dashed: !on });
+      }
+      markers.push({ at: gridPosition(base), text: 'HAB', color: '#ffffff' });
+      markers.push({ at: gridPosition(outcrop), text: 'S1 · Layered outcrop', color: '#9fe7ff' });
+    }
+    map3d.draw({ lines, markers });
+  }
+
   const stage = query('.hab-stage');
   const wall = query('.hab-wall');
   const intro = query('[data-intro]');
@@ -305,15 +368,42 @@ export function mountHabitat(root, launch) {
     for (const [key, value] of Object.entries(bounds)) stage.style.setProperty(`--screen-${key}`, `${value}%`);
   });
   stage.classList.toggle('hab-has-room', Boolean(room));
-  const enterHabitat = () => {
+  // Outside first: the habitat at dusk. Entering flies to the lit window, cuts
+  // inside through a warm flash, then pushes into the console screen.
+  const exterior = mountHabitatExterior(query('[data-exterior]'));
+  const cut = query('[data-cut]');
+  let entering = false;
+  const enterHabitat = async () => {
+    if (entering) return;
+    entering = true;
+    enter.disabled = true;
+    const still = motionReduced();
+    if (!still) {
+      query('.hab-intro-card').animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(-28px)' }],
+        { duration: 260, easing: 'ease-in', fill: 'forwards' });
+      query('.hab-intro-shade').animate([{ opacity: 1 }, { opacity: 0 }], { duration: 600, easing: 'ease-out', fill: 'forwards' });
+      await exterior?.flyIn(1400);
+      await cut.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: 'ease-in', fill: 'forwards' }).finished;
+    }
     intro.hidden = true;
+    exterior?.dispose();
     stage.inert = false;
     stage.classList.remove('hab-before-entry');
-    if (!motionReduced()) stage.animate([
-      { opacity: .38, transform: 'scale(1.07)' },
-      { opacity: 1, transform: 'scale(1)' },
-    ], { duration: 580, easing: 'cubic-bezier(.18,.7,.21,1)' });
-    screenOpen.focus({ preventScroll: true });
+    if (!still) {
+      cut.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 380, easing: 'ease-out', fill: 'forwards' });
+      // lean in from the back of the room to the console monitor
+      await new Promise((resolve) => {
+        const t0 = performance.now();
+        const step = (now) => {
+          const t = Math.min(1, (now - t0) / 900);
+          room?.setDolly(1 - (1 - t) ** 3);
+          if (t < 1) requestAnimationFrame(step);
+          else resolve();
+        };
+        requestAnimationFrame(step);
+      });
+    } else room?.setDolly(1);
+    ensureMap3D();
   };
   const brief = query('.hab-brief');
   const screenOpen = query('[data-screen-open]');
@@ -339,7 +429,7 @@ export function mountHabitat(root, launch) {
       zoomAnimation = wall.animate([
         { transformOrigin: '0 0', transform: `translate(${before.left - after.left}px, ${before.top - after.top}px) scale(${before.width / after.width}, ${before.height / after.height})` },
         { transformOrigin: '0 0', transform: 'none' },
-      ], { duration: 440, easing: 'cubic-bezier(.22,.75,.18,1)' });
+      ], { duration: 340, easing: 'cubic-bezier(.22,.75,.18,1)' });
     }
     (open ? reviewClose : lastZoomTrigger).focus({ preventScroll: true });
   }
@@ -381,7 +471,15 @@ export function mountHabitat(root, launch) {
       }
     }
     if (button.dataset.approach) approachChoice = approaches.find(option => option.id === button.dataset.approach);
-    if (button.dataset.layer) mode = button.dataset.layer;
+    if (button.dataset.layer) {
+      mode = button.dataset.layer;
+      if (mode === 'slope') view3d = false; // the slope layer is a 2D map
+    }
+    if (button.dataset.view3d) {
+      view3d = button.dataset.view3d === '3d';
+      if (view3d) { mode = 'orbital'; ensureMap3D(); }
+    }
+    if (button.hasAttribute('data-spin') && map3d) map3d.setSpin(!map3d.spinning);
     if (button.dataset.plan) selected = galeSelection = plans.find(plan => plan.id === button.dataset.plan);
     if (button.hasAttribute('data-observation')) observation.showModal();
     if (button.hasAttribute('data-photo-close')) observation.close();

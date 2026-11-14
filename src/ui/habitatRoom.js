@@ -300,9 +300,12 @@ export function mountHabitatRoom(canvas, onScreen) {
   box(1.5, .11, 1.57, 6.56, 1.16, -7, trim);
   box(.25, .13, .06, 6.8, .53, -6.18, orange);
 
+  // 0 = standing back in the room, 1 = leaning in to the console monitor
+  let dolly = 0;
   function draw() {
     const { clientWidth: width, clientHeight: height } = canvas;
     if (!width || !height) return;
+    camera.position.set(0, 2.55 + 0.22 * dolly, 8.5 - 2.4 * dolly);
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
     // Fit the monitor at narrow widths and retain the room around it on wide displays.
@@ -322,6 +325,10 @@ export function mountHabitatRoom(canvas, onScreen) {
   draw();
   return {
     draw,
+    setDolly(value) {
+      dolly = value;
+      draw();
+    },
     dispose() {
       resize.disconnect();
       const resources = new Set([panels, steel, dust, instrumentMap, ...displayMaps]);
