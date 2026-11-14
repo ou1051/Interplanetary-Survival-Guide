@@ -17,7 +17,8 @@ import { Game } from './sim/game.js';
 import { planRoundTrip, routeBounds } from './sim/routeApi.js';
 import { MissionMapScreen } from './ui/missionScreenHost.js';
 import { LaunchDesk } from './ui/launchDesk.js';
-import { playLiftoff, showOutcome } from './ui/finale.js';
+import { showOutcome } from './ui/finale.js';
+import { startJourney } from './journey/Journey.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -237,7 +238,7 @@ async function init() {
     onLaunch: (w) => {
       hideAll();
       mode = 'liftoff';
-      playLiftoff(w, game.forecast(w), openOutcome);
+      startJourney({ renderer, introduction: false, onComplete: openOutcome });
     },
     onEnd: () => openOutcome(),
   });
@@ -391,7 +392,17 @@ async function init() {
 
   if (game.run.outcome !== 'planning') openOutcome();
   else if (game.run.pendingRehearsal) showRehearsalBrief();
-  else showAssignmentBrief();
+  else {
+    if (sessionStorage.getItem('isg-flight-preview-v1')) showAssignmentBrief();
+    else {
+      hideAll();
+      mode = 'journey';
+      startJourney({ renderer, onComplete: () => {
+        sessionStorage.setItem('isg-flight-preview-v1', 'seen');
+        showAssignmentBrief();
+      } });
+    }
+  }
 
   // debug / automated testing hook: advance the simulation with a fixed step
   const simulate = (seconds, o = {}) => {
@@ -405,6 +416,11 @@ async function init() {
     timer.update();
     const dt = Math.min(timer.getDelta(), 0.05);
     time += dt;
+    if (mode === 'journey' || mode === 'liftoff') {
+      input.endFrame();
+      requestAnimationFrame(frame);
+      return;
+    }
 
     // ---- discrete inputs
     if (!$('brief').classList.contains('hidden') && input.hit('enter') && !beginBtn.disabled) beginBtn.click();
@@ -519,7 +535,7 @@ async function init() {
     input.endFrame();
 
     // the mission map covers the whole screen with its own WebGL globe: don't render underneath it
-    if (mode !== 'planner') renderer.render(scene, camera);
+    if (!['planner', 'journey', 'liftoff'].includes(mode)) renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);

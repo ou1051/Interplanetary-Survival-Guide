@@ -291,3 +291,16 @@
 @media (prefers-reduced-motion: reduce) {
   .ms *, .ms *::before, .ms *::after { animation: none !important; transition: none !important; }
 }
+
+/* 3D planning uses the host's terrain-clamped route and scouting overlays. */
+.ms.spatial-planning.globe-ready[data-view='site'] .ms-globe {opacity:1;visibility:visible;transform:none;pointer-events:auto}
+.ms.spatial-planning.globe-ready[data-view='site'] .ms-assign {display:none}
+.ms.spatial-planning.globe-ready .ms-site {pointer-events:none}
+.ms.spatial-planning.globe-ready .ms-site .mm {background:transparent;pointer-events:none}
+.ms.spatial-planning.globe-ready .ms-site .mm-stage,
+.ms.spatial-planning.globe-ready .ms-site .mm-layers,
+.ms.spatial-planning.globe-ready .ms-site .mm-legend {display:none}
+.ms.spatial-planning.globe-ready .ms-site .mm-side,
+.ms.spatial-planning.globe-ready .ms-site .mm-modal {pointer-events:auto}
+.ms.spatial-planning.globe-ready[data-view='site'] .ms-help {display:none}
+@media(max-width:600px){.ms.spatial-planning.globe-ready[data-view='site'] .mm-side{max-height:55vh;overflow:auto}}
