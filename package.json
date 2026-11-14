@@ -1,0 +1,31 @@
+{
+  "name": "interplanetary-survival-guide",
+  "version": "0.1.0",
+  "description": "Martian Map: first-person 3D rover traverse with survival route, hazard gates and science stations (NASA Space Apps)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:single": "vite build --mode single",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ou1051/Interplanetary-Survival-Guide.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ou1051/Interplanetary-Survival-Guide/issues"
+  },
+  "homepage": "https://github.com/ou1051/Interplanetary-Survival-Guide#readme",
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.8",
+    "vite-plugin-singlefile": "^2.3.4"
+  },
+  "type": "module",
+  "private": true
+}
