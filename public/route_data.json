@@ -1,0 +1,21 @@
+{
+  "path": [
+    [
+      12,
+      4
+    ],
+    [
+      12,
+      5
+    ],
+    [
+      13,
+      6
+    ]
+  ],
+  "oxygen_cost": 0.08941531712492945,
+  "battery_drain": 2.3367202875314894,
+  "hazard_warnings": [
+    "Radiation Spike"
+  ]
+}

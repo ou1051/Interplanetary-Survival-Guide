@@ -1,6 +1,15 @@
 # Routing API
 
-Run `npm run api` to serve the two JSON endpoints on port 3001 (set `PORT` to change it). The same endpoints are available on the UI origin during `npm run dev` and `npm run preview`. A deployed static Pages client needs a Node host for the API.
+Run `npm run api` to serve the JSON endpoints on port 3001 (set `PORT` to change it). The same endpoints are available on the UI origin during `npm run dev` and `npm run preview`. A deployed static Pages client needs a Node host for the API.
+
+**3D and UI handoff.** Send the user's start and end cells as zero-based `[column, row]` pairs. The server loads the mock grid from `public/cost_matrix.json` at startup. It uses the grid format below, plus optional `hazardLabels` keyed by `"column,row"`.
+
+```sh
+curl -s http://localhost:3001/api/route-data -H 'Content-Type: application/json' \
+  -d '{"start":[12,4],"end":[13,6]}'
+```
+
+Draw `path` in order, including both endpoints. Show `oxygen_cost` in minutes of suit supply and `battery_drain` in watt-hours. Each named hazard on the path appears once in `hazard_warnings`. Invalid coordinates return HTTP 400 and an impassable or unreachable endpoint returns HTTP 422. For static demos, `public/route_data.json` contains the response to the example request.
 
 **Plan a leg** with `POST /api/route`. Role 1 supplies the grid. Coordinates are zero-based cells, with columns increasing east and rows increasing south. `elevationM[row * width + col]` is elevation in metres. Use `null` for missing terrain. Optional `blockedCells` lists impassable cells. Optional `hazardCost` is a row-major array of nonnegative penalties: a value of 1 doubles the search cost of entering that cell.
 

@@ -1,4 +1,5 @@
 import { planRoute, rerouteForHazard } from '../src/routes/pathfinding.js';
+import costMatrix from '../public/cost_matrix.json' with { type: 'json' };
 
 function inputError(body, reroute) {
   const grid = body?.grid;
@@ -30,7 +31,7 @@ function inputError(body, reroute) {
 
 export async function routeApi(req, res, next) {
   const path = req.url.split('?')[0];
-  if (path !== '/api/route' && path !== '/api/reroute') return next();
+  if (path !== '/api/route' && path !== '/api/reroute' && path !== '/api/route-data') return next();
   const send = (status, data) => {
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(data));
@@ -59,6 +60,29 @@ export async function routeApi(req, res, next) {
     body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
   } catch {
     return send(400, { error: 'invalid_json' });
+  }
+  if (path === '/api/route-data') {
+    const inBounds = pair => Array.isArray(pair) && pair.length === 2 && pair.every(Number.isInteger) &&
+      pair[0] >= 0 && pair[0] < costMatrix.width && pair[1] >= 0 && pair[1] < costMatrix.height;
+    if (!inBounds(body?.start) || !inBounds(body?.end)) {
+      return send(400, { error: 'invalid_request', message: 'start and end must be [col, row] pairs inside the cost matrix.' });
+    }
+    const [col, row] = body.start;
+    const [endCol, endRow] = body.end;
+    const route = planRoute(costMatrix, { col, row }, { col: endCol, row: endRow });
+    if (!route) return send(422, { error: 'no_route' });
+    const cells = route.path.map(cell => [cell.col, cell.row]);
+    const warnings = new Set();
+    for (const [x, y] of cells) {
+      const label = costMatrix.hazardLabels?.[`${x},${y}`];
+      if (label) warnings.add(label);
+    }
+    return send(200, {
+      path: cells,
+      oxygen_cost: route.oxygenMinutes,
+      battery_drain: route.batteryWh,
+      hazard_warnings: [...warnings],
+    });
   }
   const reroute = path === '/api/reroute';
   const message = inputError(body, reroute);
