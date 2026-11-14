@@ -74,7 +74,7 @@ function padScene() {
 
 // Generated fallback maps remain usable offline. They are explicitly illustrative.
 function planetTexture(mars) {
-  const canvas = document.createElement('canvas'); canvas.width = 2048; canvas.height = 1024;
+  const canvas = document.createElement('canvas'); canvas.width = mars ? 2048 : 512; canvas.height = mars ? 1024 : 256;
   const ctx = canvas.getContext('2d'), pixels = ctx.createImageData(canvas.width, canvas.height);
   const noise = new SimplexNoise({ random: mulberry32(mars ? 1234 : 42) });
   for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) {
@@ -270,6 +270,9 @@ export class Journey {
     if (this.done) return false;
     if (this.active && !this.paused) this.clock += dt; this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix();
     if (!this.active) {
+      // The entry view is still: only redraw after a resize instead of burning GPU time.
+      if (this.heroWidth === innerWidth && this.heroHeight === innerHeight) return true;
+      this.heroWidth = innerWidth; this.heroHeight = innerHeight;
       this.camera.position.set(38, 34, 63); this.camera.lookAt(-12, 27, 0);
       this.renderer.render(this.pad, this.camera); return true;
     }

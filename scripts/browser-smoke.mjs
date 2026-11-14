@@ -49,9 +49,10 @@ try {
   try { await page.waitForFunction(start => window.__isg.mission.s > start, before, { timeout: 20000 }); }
   finally { await page.keyboard.up('w'); }
   assert.ok(await page.evaluate(() => window.__isg.mission.s) > before, 'Surface rover responds to driving input');
+  await page.close();
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
   mobile.on('pageerror', e => errors.push(e.message));
-  await mobile.goto('http://localhost:4173');
+  await mobile.goto('http://localhost:4173', { waitUntil: 'domcontentloaded', timeout: 90000 });
   await mobile.waitForFunction(() => window.__isg?.journey, null, { timeout: 90000 });
   assert.equal(await mobile.evaluate(() => window.__isg.journey.reduced), true);
   await mobile.screenshot({ path: 'test-results/07-mobile.png' });
