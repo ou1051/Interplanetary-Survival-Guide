@@ -75,6 +75,23 @@ export class Mission {
     this.emit('state', { state: this.state });
   }
 
+  returnToHabitat() {
+    if (this.route.retracesOutbound === false || !['drive', 'gate'].includes(this.state) || this.aborted || this.s <= 1 || this.s >= this.route.length / 2) return false;
+    this.s = this.route.length - this.s;
+    this.stopIndex = this.route.stops.findIndex(stop => stop.s >= this.s);
+    if (this.stopIndex < 0) this.stopIndex = this.route.stops.length;
+    this.speed = 0;
+    this.cruise = false;
+    this.lateral = -this.lateral;
+    this.yawOff = 0;
+    this.aborted = true;
+    this.dustWarning = false;
+    this.state = 'drive';
+    this.emit('log', { text: 'Returning along the outbound track', tone: 'warn' });
+    this.emit('state', { state: this.state });
+    return true;
+  }
+
   acknowledge() {
     if (this.state === 'gate') {
       const z = this.nextStop.ref;
@@ -130,8 +147,8 @@ export class Mission {
     this.boosting = input.boost;
     const k = this.boosting ? BOOST : 1;
     const sdt = dt * k;
-    const throttle = input.throttle || this.cruise;
-    const brake = input.brake;
+    const throttle = !this.dustWarning && (input.throttle || this.cruise);
+    const brake = this.dustWarning || input.brake;
     if (brake) this.cruise = false;
 
     const stop = this.nextStop;
@@ -217,7 +234,7 @@ export class Mission {
       if (task.progress >= 1) {
         task.done = true;
         this._consume(task.minutes * 60, { work: true });
-        if (/^collect/i.test(task.label)) this.samples++;
+        if (/^collect/i.test(task.label)) this.samples += task.sampleCount ?? 1;
         this.emit('log', { text: `${st.id} ✓ ${task.label} — ${task.result}`, tone: 'ok' });
         this.emit('task', { station: st, task });
         if (st.tasks.every((t) => t.done)) {

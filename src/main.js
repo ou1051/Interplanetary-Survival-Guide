@@ -12,19 +12,18 @@ import { RoverAudio } from './sim/audio.js';
 import { MapRenderer, bearingTo } from './ui/mapRenderer.js';
 import { Hud } from './ui/hud.js';
 import { PlanningBoard } from './ui/planningBoard.js';
+import { mountHabitat } from './ui/habitat.js';
+import { heightGrid, missionHeight, outcrop, worldPosition, sampleMinutes, imagery, observationSource } from './data/galeSite.js';
 import { clamp, damp, DEG } from './core/math.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
-// Mode 1 · Planning Board (2D overlay; independent of the 3D engine)
 const planningBoard = new PlanningBoard();
-document.getElementById('boardBtn')?.addEventListener('click', () => planningBoard.toggle(true));
+document.getElementById('boardBtn').addEventListener('click', () => planningBoard.toggle(true));
 
-async function init() {
+async function init(plan, scenario, status) {
   const T0 = performance.now();
   const viewport = document.getElementById('viewport');
-  const beginBtn = document.getElementById('beginBtn');
-  const status = (t) => (beginBtn.textContent = t);
 
   // ---------------------------------------------------------------- renderer
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -60,12 +59,21 @@ async function init() {
   // ---------------------------------------------------------------- world
   status('GENERATING TERRAIN…');
   await nextFrame();
-  const terrain = new Terrain();
+  const terrain = plan.traverse?.terrain ?? new Terrain({ height: missionHeight, inner: heightGrid });
   scene.add(terrain.group);
 
   status('PLANNING ROUTE…');
   await nextFrame();
-  const route = new Route(terrain);
+  const route = plan.traverse?.route ?? new Route(terrain, { points: plan.points, exact: true, areaHazards: [], stations: [{
+    id: 'S1', name: 'Layered outcrop', at: worldPosition(outcrop),
+    objective: 'Use the Curiosity field reference to identify two beds and collect a sample from each.',
+    why: ['Compare rock textures above and below the visible contact.'],
+    observation: { image: imagery.mastcam, source: observationSource },
+    tasks: [{ label: 'Collect paired samples', minutes: sampleMinutes, sampleCount: 2, result: 'Two samples bagged for comparison · simulation' }],
+  }] });
+  route.planName = plan.name;
+  route.retracesOutbound = !plan.traverse;
+  route.site = plan.site;
   const visuals = new RouteVisuals(route, terrain);
   scene.add(visuals.group);
 
@@ -155,13 +163,15 @@ async function init() {
   timer.connect(document);
 
   console.info(`[ISG] world ready in ${Math.round(performance.now() - T0)} ms · rocks ${rocks.userData.count}`);
-  hud.fillBriefing();
-  hud.ready(() => {
-    audio.start();
-    hud.showHud();
-    mission.start();
-    input.resetLook();
-  });
+  document.getElementById('habitat').classList.add('hidden');
+  audio.start();
+  hud.showHud();
+  document.getElementById('boardBtn').focus({ preventScroll: true });
+  mission.start();
+  input.resetLook();
+  const fieldAlert = document.getElementById('fieldAlert');
+  const dustAt = route.length * 0.29;
+  let dustActive = false;
 
   // debug / automated testing hook: advance the simulation with a fixed step
   const simulate = (seconds, o = {}) => {
@@ -177,8 +187,7 @@ async function init() {
     time += dt;
 
     // ---- discrete inputs
-    if (mission.state === 'brief' && input.hit('enter') && !beginBtn.disabled) beginBtn.click();
-    if (mission.state !== 'brief') {
+    if (!planningBoard.open && mission.state !== 'brief') {
       for (const l of LAYERS) if (input.hit(l.key)) setLayer(l.id);
       if (input.hit('m')) hud.toggleMap();
       if (input.hit('escape')) hud.toggleMap(false);
@@ -198,8 +207,24 @@ async function init() {
     }
 
     // ---- simulation
-    mission.update(dt, input, view.pitch);
-    if (planningBoard.open) planningBoard.updateReadouts();
+    if (!planningBoard.open) mission.update(dt, input, view.pitch);
+    if (route.retracesOutbound && scenario === 'dust' && !mission.aborted && !mission.dustWarning &&
+        mission.state === 'drive' && mission.s >= dustAt && mission.s < route.length / 2) {
+      mission.dustWarning = true;
+      mission.speed = 0;
+      mission.cruise = false;
+      scene.fog.density = 0.008;
+      dustActive = true;
+      hud.log('Simulated dust front ahead. Open wrist navigation [P].', 'danger');
+      planningBoard.toggle(true);
+    }
+    if (dustActive && mission.aborted) {
+      scene.fog.density = 0.00042;
+      dustActive = false;
+    }
+    if (planningBoard.open) planningBoard.updateField();
+    const showAlert = mission.dustWarning && !mission.aborted && mission.state !== 'complete';
+    fieldAlert.classList.toggle('hidden', !showAlert);
 
     route.sample(mission.s, p);
     const x = p.x + p.rx * mission.lateral;
@@ -294,8 +319,4 @@ async function init() {
   requestAnimationFrame(frame);
 }
 
-init().catch((err) => {
-  console.error(err);
-  const b = document.getElementById('beginBtn');
-  if (b) b.textContent = `ERROR: ${err.message}`;
-});
+mountHabitat(document.getElementById('habitat'), init);

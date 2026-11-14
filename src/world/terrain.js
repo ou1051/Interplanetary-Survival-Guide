@@ -333,9 +333,10 @@ export function sampleContext(terrain, x, z, ctx) {
 }
 
 export class Terrain {
-  constructor() {
-    const I = TERRAIN.inner;
-    this.inner = buildGrid(I, (x, z) => analyticHeight(x, z));
+  constructor({ height = analyticHeight, inner = TERRAIN.inner } = {}) {
+    this.height = height;
+    const I = inner;
+    this.inner = buildGrid(I, height);
     this.innerBounds = { x0: I.cx - I.size / 2, x1: I.cx + I.size / 2, z0: I.cz - I.size / 2, z1: I.cz + I.size / 2 };
 
     const O = TERRAIN.outer;
@@ -344,7 +345,7 @@ export class Terrain {
     // so the detailed mesh always wins (grid lines are aligned on the border).
     this.outer = buildGrid(O, (x, z) => {
       const inside = x > b.x0 + 1 && x < b.x1 - 1 && z > b.z0 + 1 && z < b.z1 - 1;
-      return analyticHeight(x, z) - (inside ? 40 : 0);
+      return height(x, z) - (inside ? 40 : 0);
     });
 
     const tex = makeDetailTextures();
@@ -441,7 +442,7 @@ export class Terrain {
     const fz = (z - g.z0) / g.step;
     const ix = Math.floor(fx);
     const iz = Math.floor(fz);
-    if (ix < 0 || iz < 0 || ix >= g.n - 1 || iz >= g.n - 1) return analyticHeight(x, z);
+    if (ix < 0 || iz < 0 || ix >= g.n - 1 || iz >= g.n - 1) return this.height(x, z);
     const tx = fx - ix;
     const tz = fz - iz;
     const H = g.heights;

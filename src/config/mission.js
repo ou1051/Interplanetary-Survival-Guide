@@ -9,12 +9,12 @@
 // ---------------------------------------------------------------------------
 
 export const SITE = {
-  name: 'SITE A · DELTA FRONT TRAVERSE',
-  eva: 'EVA-03',
+  name: 'GALE CRATER · VERA RUBIN RIDGE AREA',
+  eva: 'EVA-01',
   sol: 214,
   lmstStart: 14 * 60 + 10, // local mean solar time at EVA start, minutes
   outsideTemperatureC: -35, // simulated ambient temperature for this EVA
-  note: 'Procedural placeholder terrain — no NASA data connected yet',
+  note: 'HiRISE elevation · simulated EVA conditions',
 };
 
 export const TERRAIN = {

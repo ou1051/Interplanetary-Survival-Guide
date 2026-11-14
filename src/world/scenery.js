@@ -43,7 +43,12 @@ export function createRocks(terrain, route) {
   const p = {};
 
   const place = (x, z, size, tiltAmt = 0.4) => {
-    if (distanceToRoute(x, z) < clearance + size * 0.8) return;
+    let distance;
+    if (route.exactPath) {
+      const i = route.indexAt(route.nearestS(x, z));
+      distance = Math.hypot(x - route.x[i], z - route.z[i]);
+    } else distance = distanceToRoute(x, z);
+    if (distance < clearance + size * 0.8) return;
     if (Math.hypot(x - HAB.x, z - HAB.z) < 38) return;
     const m = featureMasks(x, z);
     if (m.craterInterior > 0.5 && size > 1.5) return;

@@ -27,6 +27,7 @@ export class TraverseRelief {
       top: Math.min(...points.map(([, y]) => y)),
       bottom: Math.max(...points.map(([, y]) => y)),
     };
+    this.route = route;
     this.path = [];
     for (let i = 0; i < route.count; i += 4) {
       this.path.push(this.project(route.x[i], route.z[i], route.h[i], 2));
@@ -37,7 +38,7 @@ export class TraverseRelief {
     });
   }
 
-  draw(canvas, selected) {
+  draw(canvas, selected, roverS) {
     const width = canvas.clientWidth;
     if (!width) return;
     const height = width * 0.66;
@@ -47,7 +48,7 @@ export class TraverseRelief {
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
     const { left, right, top, bottom } = this.bounds;
-    const scale = Math.min((width - 25) / (right - left), (height - 54) / (bottom - top));
+    const scale = Math.min((width - 25) / (right - left), Math.max(height * 0.55, height - 54) / (bottom - top));
     const toScreen = ([x, y]) => [
       width / 2 + (x - (left + right) / 2) * scale,
       height / 2 + (y - (top + bottom) / 2) * scale + 3,
@@ -121,6 +122,17 @@ export class TraverseRelief {
     this.stops.forEach((stop, index) => {
       if (index !== selected) marker(stop, false);
     });
+    if (Number.isFinite(roverS)) {
+      const { x, z } = this.route.sample(roverS);
+      const position = this.project(x, z, this.route.terrain.heightAt(x, z), 2);
+      ctx.beginPath();
+      ctx.arc(...toScreen(position), 4, 0, 2 * Math.PI);
+      ctx.strokeStyle = '#15210f';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#f3ffdf';
+      ctx.fill();
+    }
     if (this.stops[selected]) marker(this.stops[selected], true);
   }
 }

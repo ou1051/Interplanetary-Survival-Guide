@@ -2,15 +2,15 @@
 
 NASA Space Apps Challenge · *Interplanetary Survival Guide: Martian Map*
 
-A **first-person 3D survival map** for a Mars EVA. You sit in the driver's seat of an open-frame,
-pressurised-suit rover and drive a pre-planned **survival route** across a delta-front landing
-site. The route is evaluated against the terrain: steep stretches and hazardous ground become
-**hazard gates** you must acknowledge before continuing, and **science stations** stop the rover so
-the crew can run their tasks. Consumables (O₂, rover power, radiation dose, comms, walk-back limit)
-update as you go.
+Enter the textured 3D habitat from the opening screen, then click the console to zoom into the mission map. **Original Delta Traverse** is selected by default. Select **S1** to compare the three approaches from the habitat. **Intermediate** follows the original 1.8 km loop. Shortest and Longer change only the approach to S1. Choose **Go outside** to drive the selected route.
 
-> The rover terrain and site planning grid use synthetic data. The separate scouting globe
-> streams real Mars imagery and elevation.
+Select **Gale Crater · Vera Rubin Ridge** to compare a gentler route and a shorter route to a layered outcrop, consult a Curiosity observation, and collect paired samples. Select **Dust front ahead** before launch to try an early return in Gale. Press **P** or click **Wrist navigator** in either mission for the next stop, nearby hazards, and estimated oxygen on return.
+
+For Gale Crater, the wall map and rover terrain share a crop of an archived Mars Reconnaissance Orbiter HiRISE elevation product. The two route cards report the steepest sampled terrain slope along each route. The rover also measures pitch and roll along the corridor, so its hazard gates use a different measure. The science stop and habitat are demo placements, and weather, oxygen and sample results are simulated.
+
+- **Orbital and elevation**: [HiRISE DTEEC_009149_1750_009294_1750_U01 and PSP_009149_1750_RED_A_01_ORTHO](https://www.uahirise.org/dtm/dtm.php?ID=PSP_009149_1750), NASA/JPL-Caltech/University of Arizona, [USGS Analysis Ready Data](https://stac.astrogeology.usgs.gov/docs/data/mars/hirise_dtms/). The local assets are made from a 640 m crop in Mars 2015 equirectangular coordinates, with elevation resampled to 4 m and slopes derived from that grid. The wall display frames a 320 m portion. Outside the crop the simulation extends the edge elevations.
+- **Science reference**: [Curiosity Mastcam Sol 1790, PIA21851](https://science.nasa.gov/photojournal/looking-up-at-layers-of-vera-rubin-ridge-on-sol-1790/), NASA/JPL-Caltech/MSSS. This is a regional reference for the visible bedding, not a photograph from the exact simulated station.
+- **Globe**: [JPL Mars Trek](https://trek.nasa.gov/mars/) continues to provide imagery for the separate scouting map.
 
 ## Run it
 
@@ -68,10 +68,9 @@ footprint. Combined tilt ≥ 9° → *caution* (speed limit 10 km/h), ≥ 15° �
 gate). Area hazards (ejecta block field, soft regolith) come from `AREA_HAZARDS` in the config.
 Comms line-of-sight to the habitat mast is ray-marched over the same terrain.
 
-The tool is honest about resolution: hazards smaller than the DEM grid are not detected, and the
-map says so.
+Hazards smaller than the elevation grid are outside the scope of the slope analysis. The demo provides simulated guidance for the selected scenario.
 
-## Connecting real NASA data
+## Optional simulation layers
 
 | Placeholder | File | Replace with |
 | --- | --- | --- |

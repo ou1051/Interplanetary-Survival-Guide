@@ -8,15 +8,38 @@ import { clamp, DEG } from '../core/math.js';
 // ---------------------------------------------------------------------------
 
 export class Route {
-  constructor(terrain) {
+  constructor(terrain, { points = ROUTE_POINTS, stations = STATIONS, areaHazards = AREA_HAZARDS, exact = false, approach = null } = {}) {
     this.terrain = terrain;
-    const pts = ROUTE_POINTS.map(([x, z]) => new THREE.Vector3(x, 0, z));
-    const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
-    curve.arcLengthDivisions = 4000;
+    const pts = points.map(([x, z]) => new THREE.Vector3(x, 0, z));
+    let curve;
+    if (exact) {
+      curve = new THREE.CurvePath();
+      for (let i = 1; i < pts.length; i++) curve.add(new THREE.LineCurve3(pts[i - 1], pts[i]));
+    } else {
+      curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+      curve.arcLengthDivisions = 4000;
+    }
+    if (approach) {
+      const original = curve;
+      const added = approach.curve.getLength();
+      const remaining = original.getLength() - approach.joinAt;
+      const length = added + remaining;
+      curve = {
+        getLength: () => length,
+        getPoint: (t) => {
+          const distance = t * length;
+          return distance <= added ? approach.curve.getPointAt(distance / added)
+            : original.getPointAt(clamp((approach.joinAt + distance - added) / (approach.joinAt + remaining), 0, 1));
+        },
+      };
+    }
+    this.exactPath = exact || approach ? curve : null;
     this.length = curve.getLength();
-    const N = Math.ceil(this.length); // ~1 m spacing
-    this.step = this.length / N;
-    const spaced = curve.getSpacedPoints(N);
+    const steps = exact ? Math.ceil(this.length / 2) * 2 : Math.ceil(this.length);
+    this.step = this.length / steps;
+    const spaced = this.exactPath
+      ? Array.from({ length: steps + 1 }, (_, i) => curve.getPoint(i / steps))
+      : curve.getSpacedPoints(steps);
     this.count = spaced.length;
     this.x = new Float32Array(this.count);
     this.z = new Float32Array(this.count);
@@ -30,7 +53,7 @@ export class Route {
     }
     for (let i = 0; i < this.count; i++) {
       const a = Math.max(0, i - 1);
-      const b = Math.min(this.count - 1, i + 1);
+      const b = exact && i === steps / 2 ? i : Math.min(this.count - 1, i + 1);
       let dx = this.x[b] - this.x[a];
       let dz = this.z[b] - this.z[a];
       const len = Math.hypot(dx, dz) || 1;
@@ -39,8 +62,8 @@ export class Route {
     }
 
     this._analyse();
-    this._placeStations();
-    this._buildZones();
+    this._placeStations(stations);
+    this._buildZones(areaHazards);
     this._buildStops();
   }
 
@@ -51,6 +74,11 @@ export class Route {
     const t = f - i;
     out.x = this.x[i] + (this.x[i + 1] - this.x[i]) * t;
     out.z = this.z[i] + (this.z[i + 1] - this.z[i]) * t;
+    if (this.exactPath) {
+      const point = this.exactPath.getPoint(clamp(s / this.length, 0, 1));
+      out.x = point.x;
+      out.z = point.z;
+    }
     let tx = this.tx[i] + (this.tx[i + 1] - this.tx[i]) * t;
     let tz = this.tz[i] + (this.tz[i + 1] - this.tz[i]) * t;
     const l = Math.hypot(tx, tz) || 1;
@@ -119,11 +147,11 @@ export class Route {
     this.stats = { maxTilt, climb, minH: Math.min(...this.h), maxH: Math.max(...this.h) };
   }
 
-  _placeStations() {
-    this.stations = STATIONS.map((st, idx) => ({
+  _placeStations(stations) {
+    this.stations = stations.map((st, idx) => ({
       ...st,
       index: idx,
-      s: this.nearestS(st.at[0], st.at[1]),
+      s: st.s ?? this.nearestS(st.at[0], st.at[1]),
       done: false,
       tasks: st.tasks.map((t) => ({ ...t, progress: 0, done: false })),
     }));
@@ -148,7 +176,7 @@ export class Route {
     }
   }
 
-  _buildZones() {
+  _buildZones(areaHazards) {
     const n = this.count;
     const cls = new Int8Array(n);
     for (let i = 0; i < n; i++) {
@@ -231,7 +259,7 @@ export class Route {
         basis: 'Elevation model',
       });
     }
-    for (const hz of AREA_HAZARDS) {
+    for (const hz of areaHazards) {
       let a = -1;
       let b = -1;
       for (let i = 0; i < n; i++) {

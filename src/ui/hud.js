@@ -33,10 +33,10 @@ export class Hud {
     this._v = new THREE.Vector3();
     this._buildMarkers();
     this._buildLayerButtons();
-    $('evaId').textContent = SITE.eva;
-    $('siteName').textContent = SITE.name;
-    $('sol').textContent = SITE.sol;
-    $('mapSite').textContent = SITE.name;
+    $('evaId').textContent = (route.site ?? SITE).eva;
+    $('siteName').textContent = (route.site ?? SITE).name;
+    $('sol').textContent = (route.site ?? SITE).sol;
+    $('mapSite').textContent = (route.site ?? SITE).name;
     $('mapClose').addEventListener('click', () => this.toggleMap(false));
   }
 
@@ -92,32 +92,7 @@ export class Hud {
     $('mapSub').textContent = `Layer: ${layer.name} (${layer.source}) · planned source: ${layer.future}`;
   }
 
-  fillBriefing() {
-    const R = this.route;
-    const gates = R.zones.filter((z) => z.severity === 'danger').length;
-    const items = [
-      ['TRAVERSE', formatDist(R.length)],
-      ['SCI STATIONS', R.stations.length - 1],
-      ['HAZARD GATES', gates],
-      ['MAX TILT', `${R.stats.maxTilt.toFixed(1)}°`],
-      ['TOTAL CLIMB', `${Math.round(R.stats.climb)} m`],
-      ['EVA BUDGET', `${LIFE_SUPPORT.evaHours} h O₂`],
-      ['ROVER VMAX', `${Math.round(kmh(ROVER.maxSpeed))} km/h`],
-      ['SITE', 'Delta front'],
-    ];
-    $('briefGrid').innerHTML = items.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
-    $('briefEva').textContent = SITE.eva;
-  }
-
-  ready(onBegin) {
-    const b = $('beginBtn');
-    b.disabled = false;
-    b.textContent = 'BEGIN EVA ▸';
-    b.addEventListener('click', onBegin, { once: true });
-  }
-
   showHud() {
-    $('brief').classList.add('hidden');
     $('hud').classList.remove('hidden');
   }
 
@@ -502,6 +477,9 @@ export class Hud {
       </div>
       <h3>WHY HERE</h3>
       <ul>${st.why.map((w) => `<li>${w}</li>`).join('')}</ul>
+      ${st.observation ? `<a class="station-observation" href="${st.observation.source}" target="_blank" rel="noopener">
+        <img src="${st.observation.image}" alt="Horizontal rock beds photographed by Curiosity">
+        Curiosity Mastcam · Sol 1790 ↗</a>` : ''}
       <h3>TASKS</h3>
       <div class="tasks">${st.tasks
         .map(
@@ -581,7 +559,7 @@ export class Hud {
       ['STATIONS', this.route.stations.length - 1],
     ];
     $('debriefGrid').innerHTML = items.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
-    $('debriefSub').textContent = `${SITE.eva} · ${SITE.name}`;
+    $('debriefSub').textContent = `${this.mission.aborted ? 'Returned early' : 'Science traverse'} · ${(this.route.site ?? SITE).name}`;
     $('debrief').classList.remove('hidden');
     $('restartBtn').onclick = onRestart;
   }
