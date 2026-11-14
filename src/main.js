@@ -94,7 +94,10 @@ async function init() {
   const hud = new Hud({ route, mission, mapRenderer: map, layers: LAYERS, input });
   document.querySelectorAll('#touch button').forEach((b) => input.bindButton(b, b.dataset.v));
   // keep keyboard shortcuts from re-triggering whatever button was clicked last
-  document.addEventListener('click', (e) => e.target.closest && e.target.closest('button') && e.target.closest('button').blur());
+  document.addEventListener('click', (e) => {
+    const button = e.target.closest?.('button');
+    if (button && button.id !== 'boardBtn' && !planningBoard.el.contains(button)) button.blur();
+  });
 
   // ---------------------------------------------------------------- layers
   let layer = null;
@@ -109,6 +112,7 @@ async function init() {
   status('RENDERING DATA LAYERS…');
   await nextFrame();
   setLayer('optical');
+  planningBoard.connectTraverse(mission);
   hud.onLayerClick((id) => {
     setLayer(id);
     hud.log(`Layer: ${layer.name} (${layer.source})`, 'info');
@@ -195,6 +199,7 @@ async function init() {
 
     // ---- simulation
     mission.update(dt, input, view.pitch);
+    if (planningBoard.open) planningBoard.updateReadouts();
 
     route.sample(mission.s, p);
     const x = p.x + p.rx * mission.lateral;
