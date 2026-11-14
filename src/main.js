@@ -20,6 +20,9 @@ const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 // Mode 1 · Planning Board (2D overlay; independent of the 3D engine)
 const planningBoard = new PlanningBoard();
 document.getElementById('boardBtn')?.addEventListener('click', () => planningBoard.toggle(true));
+const sourcesDialog = document.getElementById('sourcesDialog');
+document.getElementById('sourcesBtn').addEventListener('click', () => sourcesDialog.showModal());
+sourcesDialog.addEventListener('click', e => { if (e.target === sourcesDialog) sourcesDialog.close(); });
 
 async function init() {
   const T0 = performance.now();
@@ -174,9 +177,7 @@ async function init() {
   const surfaceBtn = document.getElementById('surfaceBtn');
   surfaceBtn.disabled = false;
   surfaceBtn.addEventListener('click', () => journey.finish(), { once: true });
-  const sources = document.getElementById('sourcesDialog');
-  document.getElementById('sourcesBtn').addEventListener('click', () => sources.showModal());
-  sources.addEventListener('click', e => { if (e.target === sources) sources.close(); });
+
 
   // debug / automated testing hook: advance the simulation with a fixed step
   const simulate = (seconds, o = {}) => {
@@ -324,6 +325,11 @@ async function init() {
 init().catch((err) => {
   console.error(err);
   const b = document.getElementById('beginBtn');
-  if (b) b.textContent = `ERROR: ${err.message}`;
+  if (b) {
+    b.disabled = false;
+    b.textContent = 'RETRY 3D EXPERIENCE →';
+    b.onclick = () => location.reload();
+  }
+  document.querySelector('.launch-copy > p').textContent = 'The 3D scene could not start. Try reloading in a WebGL-enabled browser. You can still read Mission & sources or open Explore Mars.';
 });
 

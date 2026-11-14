@@ -12,7 +12,7 @@ for (let attempt = 0; attempt < 100; attempt++) {
 }
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
-  page.on('pageerror', e => errors.push(e.message));
+  page.on('pageerror', e => { errors.push(e.message); console.log('PAGE ERROR:', e.stack); });
   await page.goto('http://localhost:4173');
   await page.waitForFunction(() => window.__isg?.journey, null, { timeout: 90000 });
   await page.screenshot({ path: 'test-results/01-launch.png' });
@@ -43,7 +43,11 @@ try {
   assert.equal(await page.locator('#hud').isVisible(), true);
   await page.screenshot({ path: 'test-results/06-surface.png' });
   const before = await page.evaluate(() => window.__isg.mission.s);
-  await page.keyboard.down('w'); await page.waitForTimeout(1200); await page.keyboard.up('w');
+  console.log('Surface state:', await page.evaluate(() => ({ state: window.__isg.mission.state, s: window.__isg.mission.s, nextStop: window.__isg.mission.nextStop?.s })));
+  assert.deepEqual(errors, [], 'No runtime errors before driving');
+  await page.keyboard.down('w');
+  try { await page.waitForFunction(start => window.__isg.mission.s > start, before, { timeout: 20000 }); }
+  finally { await page.keyboard.up('w'); }
   assert.ok(await page.evaluate(() => window.__isg.mission.s) > before, 'Surface rover responds to driving input');
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
   mobile.on('pageerror', e => errors.push(e.message));

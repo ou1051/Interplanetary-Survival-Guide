@@ -231,6 +231,7 @@ export class PlanningBoard {
       this.render({ keepPage: true });
     });
     window.addEventListener('keydown', (e) => {
+      if (document.body.classList.contains('at-launch')) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key.toLowerCase() === 'p') {
         e.preventDefault();
@@ -487,3 +488,4 @@ export class PlanningBoard {
     text('BASE', hx, hy + cell * 0.65, G, Math.max(8, cell * 0.26));
   }
 }
+
