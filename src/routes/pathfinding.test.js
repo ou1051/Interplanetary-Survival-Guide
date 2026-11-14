@@ -86,3 +86,16 @@ test('least travel time can choose a longer horizontal path around steep terrain
     segmentEstimate(10, 100).durationSeconds + segmentEstimate(10, -100).durationSeconds;
   assert.ok(result.durationSeconds < steepDirectSeconds);
 });
+
+test('distance policy minimizes surface metres while the default retains time and hazard costs', () => {
+  const grid = flat(3, 3);
+  grid.elevationM[4] = 2;
+  grid.hazardCost = Array(9).fill(0);
+  grid.hazardCost[4] = 100;
+  const shortest = planRoute(grid, cell(0, 1), cell(2, 1), 'distance');
+  const fastest = planRoute(grid, cell(0, 1), cell(2, 1));
+  assert.deepEqual(shortest.path, [cell(0, 1), cell(1, 1), cell(2, 1)]);
+  close(shortest.distanceM, 2 * Math.hypot(10, 2));
+  assert.ok(!fastest.path.some(p => p.col === 1 && p.row === 1));
+  assert.ok(shortest.distanceM < fastest.distanceM);
+});

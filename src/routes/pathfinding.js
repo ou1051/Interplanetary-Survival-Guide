@@ -36,7 +36,7 @@ class MinHeap {
   }
 }
 
-export function planRoute(grid, start, goal) {
+export function planRoute(grid, start, goal, policy = 'time') {
   const { width, height, cellSizeM, elevationM, hazardCost } = grid;
   const blocked = new Set((grid.blockedCells ?? []).map(cell => cell.row * width + cell.col));
   const mapped = (col, row) => col >= 0 && row >= 0 && col < width && row < height &&
@@ -50,7 +50,7 @@ export function planRoute(grid, start, goal) {
   const heuristic = (col, row) => {
     const dx = Math.abs(goal.col - col);
     const dz = Math.abs(goal.row - row);
-    return (Math.max(dx, dz) + (Math.SQRT2 - 1) * Math.min(dx, dz)) * cellSizeM / ROVER.maxSpeed;
+    return (Math.max(dx, dz) + (Math.SQRT2 - 1) * Math.min(dx, dz)) * cellSizeM / (policy === 'distance' ? 1 : ROVER.maxSpeed);
   };
   const open = new MinHeap();
   costs[startId] = 0;
@@ -87,7 +87,9 @@ export function planRoute(grid, start, goal) {
         const id = (row + dr) * width + col + dc;
         const segment = segmentEstimate(Math.hypot(dc, dr) * cellSizeM, elevationM[id] - elevationM[current.id]);
         // Hazard surcharges affect route choice; resource totals remain physical estimates.
-        const cost = current.cost + segment.durationSeconds * (1 + (hazardCost?.[id] ?? 0));
+        const cost = current.cost + (policy === 'distance'
+          ? segment.distanceM
+          : segment.durationSeconds * (1 + (hazardCost?.[id] ?? 0)));
         if (cost >= costs[id]) continue;
         costs[id] = cost;
         previous[id] = current.id;
