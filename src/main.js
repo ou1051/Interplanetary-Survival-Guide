@@ -15,7 +15,7 @@ import { clamp, damp, DEG } from './core/math.js';
 import { ROUTE_OPTIONS, VISIBILITY_FOG, ASSIGNMENT, STATIONS, SCOUT_PINS, LIFE_SUPPORT } from './config/mission.js';
 import { Game } from './sim/game.js';
 import { planRoundTrip, routeBounds } from './sim/routeApi.js';
-import { Planner } from './ui/planner.js';
+import { MissionMapScreen } from './ui/missionScreenHost.js';
 import { LaunchDesk } from './ui/launchDesk.js';
 import { playLiftoff, showOutcome } from './ui/finale.js';
 
@@ -219,12 +219,13 @@ async function init() {
     return out.toDataURL('image/jpeg', 0.86);
   };
 
-  const planner = new Planner({
+  // Mission map: the map module's screen (src/map) — globe + site plan — driven by this game.
+  const planner = new MissionMapScreen({
+    container: $('missionScreen'),
     game,
     routes,
-    baseMap,
-    layers: LAYERS,
-    onLayer: (id) => setLayer(id),
+    terrain,
+    bounds: plannerBounds,
     snapshot,
     onRehearse: () => requestRehearsal(),
     onDesk: () => openDesk(),
@@ -245,7 +246,10 @@ async function init() {
   // Scouting changes what the planner knows: ask the route API again.
   let plannedFor = game.run.revealed.join();
   game.onChange(async (run) => {
-    if (run.revealed.join() === plannedFor) return;
+    if (run.revealed.join() === plannedFor) {
+      if (mode === 'planner') planner.render();
+      return;
+    }
     plannedFor = run.revealed.join();
     setPlannerRoute(await planRoundTrip(terrain, plannerBounds, run.revealed));
     if (!routes[run.routeId]) game.chooseRoute('survival', 'Survival route');
@@ -514,7 +518,8 @@ async function init() {
     audio.update(simSpeed, roughness);
     input.endFrame();
 
-    renderer.render(scene, camera);
+    // the mission map covers the whole screen with its own WebGL globe: don't render underneath it
+    if (mode !== 'planner') renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);

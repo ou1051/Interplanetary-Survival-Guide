@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "api": "node server/start.js",
     "test": "npm run test:routes && vitest run",
-    "test:routes": "node --test src/routes/*.test.js src/physics/*.test.js server/routes.test.js",
+    "test:routes": "node --test src/routes/*.test.js src/physics/*.test.js src/ui/*.test.js server/routes.test.js",
     "typecheck": "tsc"
   },
   "repository": {

@@ -173,6 +173,26 @@ rule (open while `turn ≤ lastOpenTurn`, one turn per new observation) until `s
 | `planRoutes.ts` | Joins legs through waypoints and stations back to base; compares shortest surface distance with terrain-aware travel time |
 | `dev/demo.ts`, `/map.html` | Demo harness (stand-in for game flow) |
 
+## Inside the Freelance Astronaut flow
+
+The game flow (`src/main.js`) runs this module as its mission map screen. The
+host side is `src/ui/missionScreenHost.js`. All conversion is in
+`src/ui/missionAdapter.js`, which is pure and tested with `node --test`:
+
+| Flow | Map module |
+| --- | --- |
+| Local metres, route-map bounds | 25 m grid `Site` (`geo` = Vera Rubin Ridge, so the backdrop is real HiRISE) |
+| 4 stations, 4 scouting sites, ground-view snapshots | `stations`, `observations` (`imageUrl` = snapshot) |
+| Survival / direct / planner routes | `RoutePlan` with `path` (smooth line), `estimates` (O₂, battery, hazard gates) and `badge` (API or Local) |
+| `Game` (turn, windows, approval, rehearsal weather) | `MapInput` (`approval`, `rehearsal`, `launchDesk`) |
+| `scout`, `chooseRoute`, `setRehearsalWindow` | Map actions, applied with `applyMapAction` |
+| Rehearse, launch desk | Handed back to the flow |
+
+Waypoint and station-order editing is off (`planEditing: false`), because the
+flow's routes fix them. The flow's mission overlay (`src/ui/siteGlobe.js`) is
+drawn on this module's globe through `onGlobeReady`. The background 3D scene
+stops rendering while the map is open.
+
 ## Swapping in teammates' work
 
 1. **Shared types (Person 6):** replace the bodies in `contracts.ts` with re-exports from `src/shared/`.

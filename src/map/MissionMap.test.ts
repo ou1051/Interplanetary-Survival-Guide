@@ -318,3 +318,57 @@ describe('map · layers', () => {
     expect($('[data-layer="imagery"]').getAttribute('aria-pressed')).toBe('false');
   });
 });
+
+describe('map · host extensions (fixed route options, rehearsal weather, launch desk)', () => {
+  it('without plan editing lists stations in order and hides waypoint tools', () => {
+    map = new MissionMap(host, { site: SITE, onAction: (a) => actions.push(a), draw: false, planEditing: false, initialTab: 'plan' });
+    map.update(input(initialRun()));
+    expect($('[data-act="wp-add"]')).toBeNull();
+    expect($('[data-act="station-up"]')).toBeNull();
+    expect($$('.mm-stop').map((s) => s.textContent!.trim())).toEqual(['1Ridge', '2Bedrock']);
+    expect($$('.mm-route')).toHaveLength(2);
+  });
+
+  it('shows consumables and badges on route cards', () => {
+    mount();
+    const withEst: RoutePlan = { ...SHORT, badge: 'API', estimates: { oxygenMinutes: 7.4, batteryWh: 230, hazardGates: 3 } };
+    const other: RoutePlan = { ...GENTLE, estimates: { oxygenMinutes: 7.3, batteryWh: 222, hazardGates: 0 } };
+    map.update(input({ ...initialRun(), selectedRouteId: null }, [withEst, other]));
+    click($('[data-act="tab"][data-tab="plan"]'));
+    const card = $$('.mm-route')[0];
+    expect(card.querySelector('.mm-badge')!.textContent).toBe('API');
+    expect(card.querySelector('.mm-metrics.sub')!.textContent).toContain('7.4 min');
+    expect(card.querySelector('.mm-metrics.sub')!.textContent).toContain('3hazard gates');
+    // the cheaper route is flagged best on oxygen
+    expect($$('.mm-route')[1].querySelector('.mm-metrics.sub .best')!.textContent).toContain('7.3');
+  });
+
+  it('rehearsal weather, the host approval verdict and the launch desk emit actions', () => {
+    mount();
+    map.update({
+      ...input({ ...initialRun(), selectedRouteId: SHORT.id }),
+      approval: { ok: false, reason: 'The traverse has not been rehearsed yet.' },
+      launchDesk: true,
+      rehearsal: { selectedId: 'W1', options: [{ id: 'W1', label: 'W1', detail: 'clear' }, { id: 'W2', label: 'W2', detail: 'hazy', disabled: true }] },
+    });
+    click($('[data-act="tab"][data-tab="plan"]'));
+    expect($('.mm-status').textContent).toBe('The traverse has not been rehearsed yet.');
+    expect($('[data-act="rehearsal-window"][data-id="W1"]').getAttribute('aria-checked')).toBe('true');
+    expect(($('[data-act="rehearsal-window"][data-id="W2"]') as HTMLButtonElement).disabled).toBe(true);
+    click($('[data-act="rehearsal-window"][data-id="W1"]'));
+    click($('[data-act="desk"]'));
+    click($('[data-act="rehearse"]'));
+    expect(actions).toEqual([
+      { type: 'setRehearsalWindow', windowId: 'W1' },
+      { type: 'openLaunchDesk' },
+      { type: 'startRehearsal', routeId: SHORT.id, planRevision: 0 },
+    ]);
+  });
+
+  it('opens a scouting site on request (pins clicked on the globe)', () => {
+    mount();
+    map.update(input(initialRun()));
+    map.openObservation('obs-bedrock');
+    expect($('.mm-confirm')).toBeTruthy();
+  });
+});

@@ -73,7 +73,8 @@ export interface Site {
   textureUrl: string;
   walkBudgetSeconds: number;
   stationRadiusM: number;
-  stations: [FieldStation, FieldStation];
+  /** The plan's science stations (the shared example has two; hosts may have more). */
+  stations: FieldStation[];
   observations: Observation[];
   sources: SourceRecord[];
   /** Source id of the terrain product (optional). */
@@ -103,6 +104,17 @@ export interface RoutePlan {
   /** Optional policy hint from the planner, e.g. 'distance' | 'terrain'. */
   policy?: string;
   label?: string;
+  /** Optional consumables estimate shown on the route card. */
+  estimates?: { oxygenMinutes: number; batteryWh: number; hazardGates?: number };
+  /** Optional short tag on the card, e.g. 'API' or 'Local' for a planner route. */
+  badge?: string;
+  /**
+   * Optional smooth line for drawing, in fractional cell coordinates in the same
+   * frame as `cells` (col 0 = centre of column 0, col 0.5 = its east edge).
+   * `cells` stays the logical route; hosts with continuous routes pass this so
+   * lines are not drawn as steps.
+   */
+  path?: Cell[];
 }
 
 export interface LaunchWindow {
@@ -156,6 +168,12 @@ export interface MapInput {
   rehearsalAvailable?: boolean;
   /** True while the planner is computing. */
   routesPending?: boolean;
+  /** Optional: weather conditions the player can rehearse in (one is selected). */
+  rehearsal?: { options: { id: string; label: string; detail: string; disabled?: boolean }[]; selectedId: string | null };
+  /** Optional: the host's own approval verdict (replaces the map's default status line). */
+  approval?: { ok: boolean; reason?: string };
+  /** Optional: show a "Launch desk" button that emits openLaunchDesk. */
+  launchDesk?: boolean;
 }
 
 /** Actions the map emits. Game flow owns the resulting state change. */
@@ -164,4 +182,6 @@ export type MapAction =
   | { type: 'setWaypoints'; waypoints: Cell[] }
   | { type: 'setStationOrder'; stationIds: string[] }
   | { type: 'chooseRoute'; routeId: string }
-  | { type: 'startRehearsal'; routeId: string; planRevision: number };
+  | { type: 'startRehearsal'; routeId: string; planRevision: number }
+  | { type: 'setRehearsalWindow'; windowId: string }
+  | { type: 'openLaunchDesk' };

@@ -130,45 +130,8 @@
         </div>
       </section>
 
-      <section id="planner" class="overlay planner hidden">
-        <div class="overlay-inner">
-          <div class="overlay-head">
-            <div>
-              <div class="overlay-title">MISSION MAP · <span id="plannerSite"></span></div>
-              <div class="overlay-sub" id="plannerSub"></div>
-            </div>
-            <div class="turn-strip" id="turnStrip"></div>
-          </div>
-          <div class="overlay-body">
-            <div class="map-wrap">
-              <div id="plannerGlobe" class="planner-globe"></div>
-              <canvas id="plannerCanvas"></canvas>
-              <div class="map-toolbar">
-                <div class="map-views" id="mapViews">
-                  <button data-view="globe">◍ GLOBE</button><button data-view="plan">▦ SITE PLAN</button>
-                </div>
-                <div class="map-layers" id="plannerLayers"></div>
-              </div>
-              <div class="globe-actions" id="globeActions">
-                <button class="ghost" data-globe="site">◎ FLY TO SITE</button>
-                <button class="ghost" data-globe="home">◍ WHOLE PLANET</button>
-              </div>
-              <div class="globe-status" id="globeStatus"></div>
-              <div class="scout-view hidden" id="scoutView"></div>
-            </div>
-            <div class="overlay-side planner-side">
-              <div class="panel-title">YOUR JOB</div>
-              <div class="assignment" id="assignment"></div>
-              <div class="panel-title">1 · SCOUT <small>optional</small></div>
-              <div class="pin-list" id="pinList"></div>
-              <div class="panel-title">2 · PICK A ROUTE</div>
-              <div class="route-options" id="routeOptions"></div>
-              <div class="panel-title">3 · REHEARSE &amp; LAUNCH</div>
-              <div class="readiness" id="readiness"></div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <!-- mission map: src/map MissionScreen (globe + site plan), mounted by src/ui/missionScreenHost.js -->
+      <section id="missionScreen" class="hidden"></section>
 
       <section id="desk" class="overlay desk hidden">
         <div class="overlay-inner desk-inner">

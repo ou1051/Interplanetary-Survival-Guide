@@ -1,9 +1,8 @@
 import { SCOUT_PINS, AREA_HAZARDS, HAB } from '../config/mission.js';
 
 // ---------------------------------------------------------------------------
-// The team's 3D Mars globe (src/map/globe, CesiumJS + NASA orbital imagery and
-// Mars elevation) inside the mission map, with this mission drawn on the real
-// surface: habitat, science stations, scouting sites, known hazards and routes.
+// This mission drawn on the team's 3D Mars globe (src/map/globe): habitat,
+// science stations, scouting sites, known hazards and routes on the real surface.
 //
 // The site is anchored at Vera Rubin Ridge, the assignment area on the globe.
 // Local metres (x = east, z = −north, as in the 3D rehearsal) are converted to
@@ -20,16 +19,12 @@ export function toLonLat(x, z) {
   return [lon, lat];
 }
 
-export async function createSiteGlobe(container, { onPin } = {}) {
-  const [{ MarsGlobe }, { IMAGERY }, C] = await Promise.all([
-    import('../map/globe/MarsGlobe.ts'),
-    import('../map/globe/catalog.ts'),
-    import('cesium'),
-  ]);
-  const credits = document.createElement('div');
-  credits.className = 'globe-credits';
-  container.parentElement.appendChild(credits);
-  const globe = new MarsGlobe(container, { creditContainer: credits });
+/**
+ * Draw this mission (habitat, stations, scouting sites, known hazards, routes)
+ * on an existing MarsGlobe (the mission screen's globe, src/map).
+ */
+export async function attachSiteOverlay(globe, { onPin } = {}) {
+  const [{ IMAGERY }, C] = await Promise.all([import('../map/globe/catalog.ts'), import('cesium')]);
   return new SiteGlobe(globe, C, IMAGERY, onPin);
 }
 

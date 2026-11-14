@@ -32,6 +32,12 @@ export interface MissionMapOptions {
   topInset?: number;
   /** Wait for loadBackdrop() before fetching imagery (host shows the map later). */
   deferBackdrop?: boolean;
+  /**
+   * Waypoints and station order can be edited (default). Hosts whose planner
+   * cannot route through player waypoints pass false: the Plan tab then lists
+   * the stations in visiting order and compares the host's route options.
+   */
+  planEditing?: boolean;
 }
 
 type Tab = 'scout' | 'plan';
@@ -77,7 +83,7 @@ export class MissionMap {
   constructor(container: HTMLElement, options: MissionMapOptions) {
     this.site = options.site;
     this.slopes = slopeGrid(this.site);
-    this.opts = { draw: options.draw ?? true, initialTab: options.initialTab ?? 'scout', maxWaypoints: options.maxWaypoints ?? 6, connectivity: options.connectivity ?? 8, showClock: options.showClock ?? true, topInset: options.topInset ?? 0, deferBackdrop: options.deferBackdrop ?? false, onAction: options.onAction };
+    this.opts = { draw: options.draw ?? true, initialTab: options.initialTab ?? 'scout', maxWaypoints: options.maxWaypoints ?? 6, connectivity: options.connectivity ?? 8, showClock: options.showClock ?? true, topInset: options.topInset ?? 0, deferBackdrop: options.deferBackdrop ?? false, planEditing: options.planEditing ?? true, onAction: options.onAction };
     this.tab = this.opts.initialTab;
     // small screens: start with the assignment folded so the map stays visible
     this.jobCollapsed = typeof window !== 'undefined' && window.innerWidth <= 900 && window.innerWidth > 0 && this.opts.draw;
@@ -165,6 +171,15 @@ export class MissionMap {
     const area = JSON.stringify([Math.round(r.width), Math.round(r.height), this.freeArea(r.width, r.height)]);
     if (area !== this.lastArea) this.resize();
     else this.draw();
+  }
+
+  /** Open a scouting site as if its pin was clicked (e.g. from a pin on the 3D globe). */
+  openObservation(id: string): void {
+    const o = this.obs(id);
+    if (!o || !this.input) return;
+    this.tab = 'scout';
+    this.renderPanel();
+    this.requestScout(o);
   }
 
   /** Swap in a new site (e.g. when Person 1's real data replaces the fixture). */
@@ -468,6 +483,12 @@ export class MissionMap {
           this.emit({ type: 'startRehearsal', routeId: run.selectedRouteId, planRevision: run.planRevision });
         }
         break;
+      case 'rehearsal-window':
+        if (d.id) this.emit({ type: 'setRehearsalWindow', windowId: d.id });
+        break;
+      case 'desk':
+        this.emit({ type: 'openLaunchDesk' });
+        break;
       case 'show-on-map': {
         const o = this.obs(d.id!);
         this.closeDialog(false);
@@ -698,6 +719,9 @@ export class MissionMap {
       .map((id, i) => {
         const s = this.site.stations.find((x) => x.id === id);
         if (!s) return '';
+        if (!this.opts.planEditing) {
+          return `<li class="mm-stop"><span class="mm-dia sm">${i + 1}</span><span class="mm-row-t">${esc(s.name)}</span></li>`;
+        }
         return `<li class="mm-stop">
           <span class="mm-dia sm">${i + 1}</span><span class="mm-row-t">${esc(s.name)}</span>
           <span class="mm-ctl">
@@ -720,6 +744,13 @@ export class MissionMap {
       })
       .join('');
     const adding = this.mode.kind === 'add';
+    if (!this.opts.planEditing) {
+      return `
+      <h3 class="mm-h">Routes</h3>
+      ${this.routesBlock(input)}
+      <h3 class="mm-h">Stations <small>visit order</small></h3>
+      <ul class="mm-list">${stations}</ul>`;
+    }
     return `
       <h3 class="mm-h">Stations <small>visit order</small></h3>
       <ul class="mm-list">${stations}</ul>
@@ -750,13 +781,28 @@ export class MissionMap {
     const html = cards
       .map((c, i) => {
         const color = ROUTE_COLORS[i % ROUTE_COLORS.length];
+        const plan = input.routes.find((r) => r.id === c.id);
+        const est = plan?.estimates;
+        const all = input.routes.map((r) => r.estimates).filter((e): e is NonNullable<typeof e> => !!e);
+        const several = all.length > 1;
+        const bestO2 = !!est && several && est.oxygenMinutes === Math.min(...all.map((e) => e.oxygenMinutes));
+        const bestWh = !!est && several && est.batteryWh === Math.min(...all.map((e) => e.batteryWh));
         return `<button class="mm-route ${c.selected ? 'on' : ''}" role="radio" aria-checked="${c.selected}" data-act="route" data-id="${esc(c.id)}" data-key="route:${esc(c.id)}" style="--route:${color}">
-          <span class="mm-route-head"><i class="mm-swatch"></i><span>${esc(c.label)}</span>${c.selected ? '<em>Selected</em>' : ''}</span>
+          <span class="mm-route-head"><i class="mm-swatch"></i><span>${esc(c.label)}</span>${plan?.badge ? `<span class="mm-badge">${esc(plan.badge)}</span>` : ''}${c.selected ? '<em>Selected</em>' : ''}</span>
           <span class="mm-metrics">
             ${metric(formatDistance(c.distanceM), 'distance', c.best.distance)}
             ${metric(formatSlope(c.maxSlopeDeg), 'max slope', c.best.slope)}
             ${metric(formatDistance(c.limitedM), 'low coverage', c.best.coverage)}
           </span>
+          ${
+            est
+              ? `<span class="mm-metrics sub">
+            ${metric(`${est.oxygenMinutes.toFixed(1)} min`, 'oxygen', bestO2)}
+            ${metric(`${Math.round(est.batteryWh)} Wh`, 'battery', bestWh)}
+            ${est.hazardGates !== undefined ? `<div class="${est.hazardGates ? 'warn' : ''}"><b>${est.hazardGates}</b><small>hazard gates</small></div>` : ''}
+          </span>`
+              : ''
+          }
           ${c.comparison ? `<span class="mm-cmp">${esc(c.comparison)}</span>` : ''}</button>`;
       })
       .join('');
@@ -769,20 +815,38 @@ export class MissionMap {
   }
 
   private planFooter(): string {
-    if (this.input!.rehearsalAvailable === false) {
+    const input = this.input!;
+    if (input.rehearsalAvailable === false) {
       return '<footer class="mm-foot"><span class="mm-status">Rehearsal unavailable in this demo</span></footer>';
     }
     const run = this.run;
-    const selected = !this.input!.routesPending && this.input!.routes.some((r) => r.id === run.selectedRouteId);
+    const selected = !input.routesPending && input.routes.some((r) => r.id === run.selectedRouteId);
     const last = run.latestRehearsal;
     let status = '<span class="mm-status">Not rehearsed</span>';
-    if (run.surfaceApproved) status = '<span class="mm-status ok">Approved</span>';
+    if (input.approval) {
+      status = input.approval.ok
+        ? '<span class="mm-status ok">Approved · ready to launch</span>'
+        : `<span class="mm-status warn">${esc(input.approval.reason ?? 'Not approved')}</span>`;
+    } else if (run.surfaceApproved) status = '<span class="mm-status ok">Approved</span>';
     else if (last && last.planRevision === run.planRevision) status = '<span class="mm-status warn">Rehearsal incomplete</span>';
     else if (last) status = '<span class="mm-status warn">Plan changed · rehearse again</span>';
-    return `<footer class="mm-foot">
+    const wx = input.rehearsal;
+    const weather = wx
+      ? `<div class="mm-wx"><span>Rehearse in</span><span class="mm-seg" role="radiogroup" aria-label="Rehearsal weather">${wx.options
+          .map(
+            (o) => `<button role="radio" aria-checked="${o.id === wx.selectedId}" data-act="rehearsal-window" data-id="${esc(o.id)}" data-key="wx:${esc(o.id)}" ${o.disabled ? 'disabled' : ''}>
+              <b>${esc(o.label)}</b><small>${esc(o.detail)}</small></button>`,
+          )
+          .join('')}</span></div>`
+      : '';
+    return `<footer class="mm-foot ${wx || input.launchDesk ? 'rich' : ''}">
+      ${weather}
       ${status}
-      <button class="mm-btn primary" data-act="rehearse" data-key="rehearse" ${selected ? '' : 'disabled'}>
-        ${ICON.play}<span>${selected ? 'Rehearse route' : 'Choose a route'}</span></button>
+      <div class="mm-foot-actions">
+        ${input.launchDesk ? '<button class="mm-btn ghost" data-act="desk" data-key="desk"><span>Launch desk</span></button>' : ''}
+        <button class="mm-btn primary" data-act="rehearse" data-key="rehearse" ${selected ? '' : 'disabled'}>
+          ${ICON.play}<span>${selected ? 'Rehearse route' : 'Choose a route'}</span></button>
+      </div>
     </footer>`;
   }
 

@@ -103,16 +103,17 @@
 .ms-where-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--mars); color: #fff; flex: none; }
 .ms-where-icon svg { width: 17px; height: 17px; }
 .ms-where > svg { width: 16px; height: 16px; color: var(--blue); }
-.ms-btn {
+.ms .ms-btn {
+  box-shadow: none; text-transform: none; opacity: 1; /* hosts may style button.primary / button.ghost globally */
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 var(--s4);
   border-radius: var(--r-lg); border: 0; cursor: pointer; white-space: nowrap;
   font: var(--t-body); font-weight: 600; letter-spacing: var(--t-body-ls);
   transition: background 0.15s var(--ease), transform 0.12s var(--ease), filter 0.15s;
 }
-.ms-btn:active { transform: scale(0.98); }
-.ms-btn svg { width: 16px; height: 16px; }
-.ms-btn.primary { background: var(--blue); color: #fff; }
-.ms-btn.primary:hover { filter: brightness(1.1); }
+.ms .ms-btn:active { transform: scale(0.98); }
+.ms .ms-btn svg { width: 16px; height: 16px; }
+.ms .ms-btn.primary { background: var(--blue); color: #fff; }
+.ms .ms-btn.primary:hover { filter: brightness(1.1); }
 .ms-fine { margin: 0; font: var(--t-footnote); color: var(--label-3); }
 
 /* ---------------- toolbar buttons + popovers ---------------- */

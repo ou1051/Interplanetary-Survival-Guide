@@ -24,6 +24,12 @@ export interface MissionScreenOptions {
   /** Draw the 2D site map on canvas (false in unit tests: jsdom has no canvas). */
   drawMap?: boolean;
   initialView?: View;
+  /** Called once the 3D globe is up (hosts draw their own overlays on it). */
+  onGlobeReady?: (globe: MarsGlobe) => void;
+  /** Call to action on the assignment card (default "Plan the walk"). */
+  planLabel?: string;
+  /** Passed to MissionMap: false when the host cannot route through player waypoints. */
+  planEditing?: boolean;
 }
 
 const BAR_H = 52;
@@ -109,6 +115,7 @@ export class MissionScreen {
       initialTab: 'scout',
       draw: opts.drawMap ?? true,
       deferBackdrop: true, // the globe's data goes first; see prefetch below
+      planEditing: opts.planEditing,
     });
 
     this.root.addEventListener('click', (e) => this.onClick(e));
@@ -182,6 +189,7 @@ export class MissionScreen {
         });
         this.globe.setActive(this.view === 'globe');
         this.root.classList.add('globe-ready');
+        this.opts.onGlobeReady?.(this.globe);
       } catch (err) {
         console.error('[globe]', err);
         this.root.classList.add('globe-failed');
@@ -270,7 +278,7 @@ export class MissionScreen {
         <span class="ms-where-icon">${ICON.places}</span>
         <span><b>${esc(place.name)}</b>${esc(place.note.replace(/^Assignment area · /, ''))}</span>${ICON.locate}
       </button>
-      <button class="ms-btn primary" data-cmd="open-site"><span>Plan the walk</span>${ICON.chevron}</button>
+      <button class="ms-btn primary" data-cmd="open-site"><span>${esc(this.opts.planLabel ?? 'Plan the walk')}</span>${ICON.chevron}</button>
       ${this.site.synthetic ? '<p class="ms-fine">Orbital data is real. The planning grid is a synthetic placeholder until the site data pack lands.</p>' : ''}`;
   }
 

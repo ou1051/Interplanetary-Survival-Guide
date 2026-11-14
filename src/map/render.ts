@@ -41,7 +41,7 @@ export interface View {
 }
 
 // Apple system colours (dark appearance).
-export const ROUTE_COLORS = ['#0a84ff', '#bf5af2'];
+export const ROUTE_COLORS = ['#0a84ff', '#bf5af2', '#64d2ff'];
 const C = {
   bg: '#0b0b0c',
   label: '#ffffff',
@@ -345,15 +345,16 @@ export function render(g: CanvasRenderingContext2D, v: View, s: RenderState): vo
     }
   }
 
-  // hairline grid
+  // hairline grid (only every 5th line when cells are small, so the ground stays readable)
+  const every = px < 28 ? 5 : 1;
   g.strokeStyle = C.grid;
   g.lineWidth = 1;
   g.beginPath();
-  for (let col = 1; col < site.width; col++) {
+  for (let col = every; col < site.width; col += every) {
     g.moveTo(gx + col * px + 0.5, gy);
     g.lineTo(gx + col * px + 0.5, gy + gh);
   }
-  for (let row = 1; row < site.height; row++) {
+  for (let row = every; row < site.height; row += every) {
     g.moveTo(gx, gy + row * px + 0.5);
     g.lineTo(gx + gw, gy + row * px + 0.5);
   }
@@ -384,11 +385,12 @@ export function render(g: CanvasRenderingContext2D, v: View, s: RenderState): vo
   // --- routes: casing + core; alternatives underneath and quieter
   const ordered = s.routes.map((r, i) => ({ r, i })).sort((a, b) => Number(a.r.id === run.selectedRouteId) - Number(b.r.id === run.selectedRouteId));
   for (const { r, i } of ordered) {
-    if (r.cells.length < 2) continue;
+    if ((r.path ?? r.cells).length < 2) continue;
     const sel = r.id === run.selectedRouteId;
     const color = ROUTE_COLORS[i % ROUTE_COLORS.length];
-    const off = s.routes.length > 1 ? (i === 0 ? -1 : 1) * Math.max(2.5, px * 0.05) : 0;
-    const pts = r.cells.map((c) => {
+    // fan parallel routes out symmetrically so overlapping legs stay distinguishable
+    const off = (i - (s.routes.length - 1) / 2) * Math.max(3, Math.min(6, px * 0.08));
+    const pts = (r.path ?? r.cells).map((c) => {
       const p = cellCenter(v, c);
       return { x: p.x + off, y: p.y + off };
     });

@@ -62,10 +62,10 @@
 .mm-job.collapsed .mm-job-toggle svg { transform: rotate(0deg); }
 .mm-job h1 { margin: var(--s2) 0 var(--s1); font: var(--t-title1); letter-spacing: var(--t-title1-ls); }
 .mm-job p { margin: 0 0 var(--s3); font: var(--t-callout); letter-spacing: var(--t-callout-ls); color: var(--label-2); }
-.mm-stations { list-style: none; margin: 0; padding: 0; display: flex; gap: var(--s2); }
+.mm-stations { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--s2); }
 .mm-stations li {
   display: flex; align-items: center; gap: var(--s2); height: 32px; padding: 0 var(--s3) 0 5px;
-  border-radius: var(--r-pill); background: var(--fill-4); font: var(--t-subhead); font-weight: 600;
+  border-radius: var(--r-pill); background: var(--fill-4); font: var(--t-subhead); font-weight: 600; white-space: nowrap;
 }
 .mm-stations li.done { color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
 
@@ -178,21 +178,22 @@
 .mm-icon:hover:not(:disabled) { background: var(--fill-4); }
 .mm-icon:disabled { color: var(--label-4); cursor: default; }
 
-.mm-btn {
+.mm .mm-btn {
+  box-shadow: none; text-transform: none; opacity: 1; /* hosts may style button.primary / button.ghost globally */
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   height: 44px; padding: 0 var(--s4); border-radius: var(--r-lg); border: 0;
   font: var(--t-body); font-weight: 600; letter-spacing: var(--t-body-ls); cursor: pointer;
   transition: background 0.15s var(--ease), filter 0.15s, transform 0.12s var(--ease);
 }
-.mm-btn:active:not(:disabled) { transform: scale(0.98); }
-.mm-btn svg { width: 16px; height: 16px; }
-.mm-btn.primary { background: var(--blue); color: #fff; }
-.mm-btn.primary:hover:not(:disabled) { filter: brightness(1.1); }
-.mm-btn.primary:disabled { background: var(--fill-3); color: var(--label-3); cursor: default; }
-.mm-btn.ghost { background: var(--fill-4); color: var(--blue); }
-.mm-btn.ghost:hover { background: var(--fill-3); }
-.mm-btn.ghost.active { background: color-mix(in srgb, var(--blue) 20%, transparent); color: var(--label); }
-.mm-btn.wide { width: 100%; margin-top: var(--s2); }
+.mm .mm-btn:active:not(:disabled) { transform: scale(0.98); }
+.mm .mm-btn svg { width: 16px; height: 16px; }
+.mm .mm-btn.primary { background: var(--blue); color: #fff; }
+.mm .mm-btn.primary:hover:not(:disabled) { filter: brightness(1.1); }
+.mm .mm-btn.primary:disabled { background: var(--fill-3); color: var(--label-3); cursor: default; opacity: 1; }
+.mm .mm-btn.ghost { background: var(--fill-4); color: var(--blue); }
+.mm .mm-btn.ghost:hover { background: var(--fill-3); }
+.mm .mm-btn.ghost.active { background: color-mix(in srgb, var(--blue) 20%, transparent); color: var(--label); }
+.mm .mm-btn.wide { width: 100%; margin-top: var(--s2); }
 
 .mm-routes { display: flex; flex-direction: column; gap: var(--s2); }
 .mm-route {
@@ -210,6 +211,10 @@
 .mm-metrics b { font: var(--t-title3); font-variant-numeric: tabular-nums; }
 .mm-metrics small { color: var(--label-2); font: var(--t-caption); }
 .mm-metrics .best b { color: var(--green); }
+.mm-metrics.sub { padding-top: var(--s3); border-top: 0.5px solid var(--separator); }
+.mm-metrics.sub b { font: var(--t-callout); font-weight: 600; }
+.mm-metrics .warn b { color: var(--orange); }
+.mm-badge { padding: 1px 6px; border-radius: 5px; font: var(--t-caption); font-weight: 600; color: var(--label-2); background: var(--fill-3); }
 .mm-cmp { color: var(--label-2); font: var(--t-subhead); }
 .mm-note { margin: var(--s3) var(--s1) 0; font: var(--t-footnote); color: var(--label-2); }
 .mm-note.accent { color: var(--teal); }
@@ -234,6 +239,20 @@
   display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
   padding: var(--s3) var(--s3) var(--s3) var(--s4); border-top: 0.5px solid var(--separator);
 }
+.mm-foot.rich { flex-direction: column; align-items: stretch; gap: var(--s3); }
+.mm-foot-actions { display: flex; gap: var(--s2); }
+.mm-foot.rich .mm-foot-actions .mm-btn { flex: 1; }
+.mm-foot.rich .mm-status { align-self: flex-start; }
+.mm-wx { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); font: var(--t-footnote); color: var(--label-2); }
+.mm-seg { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 2px; border-radius: 9px; background: var(--fill-3); }
+.mm-seg button {
+  display: flex; flex-direction: column; align-items: center; gap: 0; min-width: 64px; padding: 3px 8px;
+  border: 0; border-radius: 7px; background: none; cursor: pointer; line-height: 1.15;
+}
+.mm-seg button b { font: var(--t-footnote); font-weight: 600; }
+.mm-seg button small { font: var(--t-caption); color: var(--label-2); text-transform: capitalize; }
+.mm-seg button[aria-checked='true'] { background: #636366; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12); }
+.mm-seg button:disabled { opacity: 0.35; cursor: default; }
 .mm-status { font: var(--t-footnote); color: var(--label-2); display: inline-flex; align-items: center; gap: 6px; }
 .mm-status::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--label-3); }
 .mm-status.ok { color: var(--green); }
