@@ -27,9 +27,12 @@ export function startRehearsal(root, options, onExit) {
   el('.walk-conditions').textContent = windowId + ' · ' + visibility + ' visibility (simulated)';
   const first = route.cells.find(cell => cell.col !== site.base.col || cell.row !== site.base.row);
   let heading = first ? Math.atan2(first.col - site.base.col, site.base.row - first.row) : 0;
-  const entries = route.orderedStationIds.map(id => {
+  const entries = route.stationIds.map(id => {
     const station = site.stations.find(item => item.id === id);
-    const observation = site.observations.find(item => item.id === station.observationId);
+    const observation = station.observationId
+      ? site.observations.find(item => item.id === station.observationId)
+      : site.observations.find(item => item.characterizedCells.some(cell =>
+        cell.col === station.cell.col && cell.row === station.cell.row));
     const source = site.sources.find(item => item.id === observation?.sourceId);
     const card = document.createElement('div');
     card.className = 'walk-station';
@@ -82,7 +85,7 @@ export function startRehearsal(root, options, onExit) {
     const bearing = (Math.round(heading * 180 / Math.PI) % 360 + 360) % 360;
     headingText.textContent = ['N','NE','E','SE','S','SW','W','NW'][Math.round(bearing / 45) % 8] + ' ' + bearing + '°';
     timeText.textContent = formatHMS(walk.elapsedSeconds);
-    distanceText.textContent = Math.round(walk.distanceM) + ' m walked';
+    distanceText.textContent = Math.round(walk.distanceWalkedM) + ' m walked';
     let next;
     let nearest = Infinity;
     for (const { station, range, record, evidence } of entries) {

@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { summarizeWalk } from './debrief.js';
 
 const site = { walkBudgetSeconds: 300, stations: [{ id: 'ridge', name: 'Ridge' }, { id: 'rock', name: 'Adjacent rock' }] };
-const result = { returnedToBase: true, observedStationIds: ['ridge', 'rock'], elapsedSeconds: 300, distanceM: 140 };
+const result = { returnedToBase: true, observedStationIds: ['ridge', 'rock'], elapsedSeconds: 300, distanceWalkedM: 140 };
 
 test('distinguishes a successful return, a missed station, an over-budget walk, and an early exit', () => {
   expect(summarizeWalk(site, result).title).toBe('Round trip complete');

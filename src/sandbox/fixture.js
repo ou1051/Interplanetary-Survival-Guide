@@ -5,7 +5,7 @@ import rockUrl from './rock.png';
 // Synthetic development fixture: every image, position and measurement is invented.
 export const site = {
   id: 'synthetic-development-fixture',
-  name: 'Synthetic practice site',
+  name: 'Synthetic practice site', synthetic: true, terrainSourceId: 'synthetic-grid',
   width: 9, height: 7, cellSizeM: 10,
   elevationM: Array.from({ length: 63 }, (_, i) => i % 9 === 4 && Math.floor(i / 9) >= 2 && Math.floor(i / 9) <= 4 ? 4 : 0),
   base: { col: 1, row: 3 },
@@ -23,8 +23,8 @@ export const site = {
     { id: 'overhead-view', cell: { col: 3, row: 3 }, characterizedCells: [{ col: 3, row: 3 }, { col: 4, row: 3 }, { col: 5, row: 3 }], imageUrl: textureUrl, sourceId: 'synthetic-grid', caption: 'Synthetic north-up grid illustration. The overhead view characterizes cells (3,3), (4,3) and (5,3).' },
   ],
   sources: [
-    { id: 'synthetic-grid', productId: 'DEV-GRID-9x7', mission: 'Synthetic development fixture — no NASA mission', url: null, scale: '10 m per cell, invented elevations in metres', processingNote: '9 × 7 north-up grid. Column 4, rows 2–4 are 4 m high. All other cells are 0 m. The texture is a generated diagram.' },
-    { id: 'synthetic-images', productId: 'DEV-SKETCHES-01', mission: 'Synthetic development fixture — no NASA mission', url: null, scale: 'Unscaled illustration', processingNote: 'Procedurally drawn ridge and rock placeholders. Camera cells and characterized cells are fictional and listed separately.' },
+    { id: 'synthetic-grid', productId: 'DEV-GRID-9x7', mission: 'Synthetic development fixture — no NASA mission', url: '', kind: 'synthetic', scale: '10 m per cell, invented elevations in metres', processingNote: '9 × 7 north-up grid. Column 4, rows 2–4 are 4 m high. All other cells are 0 m. The texture is a generated diagram.' },
+    { id: 'synthetic-images', productId: 'DEV-SKETCHES-01', mission: 'Synthetic development fixture — no NASA mission', url: '', kind: 'synthetic', scale: 'Unscaled illustration', processingNote: 'Procedurally drawn ridge and rock placeholders. Camera cells and characterized cells are fictional and listed separately.' },
   ],
 };
 
@@ -35,9 +35,11 @@ const cells = [
 const characterized = new Set(site.observations.flatMap(observation => observation.characterizedCells.map(cell => `${cell.col},${cell.row}`)));
 export const route = {
   id: 'practice-round-trip', cells,
-  orderedStationIds: ['ridge', 'adjacent-rock'],
+  stationIds: ['ridge', 'adjacent-rock'],
   distanceM: (cells.length - 1) * site.cellSizeM,
+  maxSegmentSlopeDeg: Math.atan(4 / site.cellSizeM) * 180 / Math.PI,
+  comparison: 'Practice loop across the rise and back past both stations.',
   // Development metric: a leg has limited coverage if either endpoint lacks a characterized cell.
-  limitedCoverageDistanceM: cells.slice(1).reduce((distance, cell, index) => distance +
+  limitedCoverageM: cells.slice(1).reduce((distance, cell, index) => distance +
     (characterized.has(`${cell.col},${cell.row}`) && characterized.has(`${cells[index].col},${cells[index].row}`) ? 0 : site.cellSizeM), 0),
 };

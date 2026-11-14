@@ -102,7 +102,7 @@ export function createWalk({ site, route, planRevision, windowId, visibility }) 
     x: site.base.col * site.cellSizeM,
     z: site.base.row * site.cellSizeM,
     elapsedSeconds: 0,
-    distanceM: 0,
+    distanceWalkedM: 0,
     observedStationIds: [],
     step(east, south, dt) {
       if (!Number.isFinite(east) || !Number.isFinite(south) || !Number.isFinite(dt) || dt < 0) return;
@@ -113,7 +113,7 @@ export function createWalk({ site, route, planRevision, windowId, visibility }) 
       const nextX = walk.x + east / length * dt;
       const nextZ = walk.z + south / length * dt;
       if (!clearSegment(site, walk.x, walk.z, nextX, nextZ)) return;
-      walk.distanceM += Math.hypot(nextX - walk.x, nextZ - walk.z);
+      walk.distanceWalkedM += Math.hypot(nextX - walk.x, nextZ - walk.z);
       walk.x = nextX;
       walk.z = nextZ;
       if (!walk.nearby(site.base)) leftBase = true;
@@ -123,13 +123,13 @@ export function createWalk({ site, route, planRevision, windowId, visibility }) 
     },
     record(stationId) {
       const station = site.stations.find(station => station.id === stationId);
-      if (!station || !route.orderedStationIds.includes(stationId) || !walk.nearby(station.cell)) return false;
+      if (!station || !route.stationIds.includes(stationId) || !walk.nearby(station.cell)) return false;
       if (!walk.observedStationIds.includes(stationId)) walk.observedStationIds.push(stationId);
       return true;
     },
     result() {
       return { planRevision, windowId, visibility, observedStationIds: [...walk.observedStationIds],
-        returnedToBase: leftBase && walk.nearby(site.base), elapsedSeconds: walk.elapsedSeconds, distanceM: walk.distanceM };
+        returnedToBase: leftBase && walk.nearby(site.base), elapsedSeconds: walk.elapsedSeconds, distanceWalkedM: walk.distanceWalkedM };
     },
   };
   return walk;

@@ -29,7 +29,7 @@ export function openDemo(root) {
     order.value = chosen === route ? 'forward' : 'reverse';
     order.onchange = () => {
       chosen = order.value === 'forward' ? route : { ...route, id: 'practice-reverse',
-        cells: [...route.cells].reverse(), orderedStationIds: [...route.orderedStationIds].reverse() };
+        cells: [...route.cells].reverse(), stationIds: [...route.stationIds].reverse() };
       revision++;
       draw();
     };
@@ -60,10 +60,10 @@ export function openDemo(root) {
       box.querySelector('[data-log]').textContent = 'Recorded: ' +
         (result.observedStationIds.map(id => site.stations.find(station => station.id === id).name).join(', ') || 'none') +
         ' · ' + (result.returnedToBase ? 'Returned to base' : 'No base return');
-      box.querySelector('[data-metrics]').textContent = Math.round(result.distanceM) + ' m walked in ' + formatHMS(result.elapsedSeconds) +
+      box.querySelector('[data-metrics]').textContent = Math.round(result.distanceWalkedM) + ' m walked in ' + formatHMS(result.elapsedSeconds) +
         ' · 1 m/s horizontal walking speed · 5 min budget';
       box.querySelector('[data-plan]').textContent = 'Plan revision ' + result.planRevision + ' · ' + result.windowId + ' · ' + result.visibility +
-        ' visibility · ' + rehearsed.limitedCoverageDistanceM + ' m of the planned route have limited evidence.';
+        ' visibility · ' + rehearsed.limitedCoverageM + ' m of the planned route have limited evidence.';
     }
   }
   planning();

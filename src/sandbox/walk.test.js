@@ -8,7 +8,7 @@ const site = {
   base: { col: 1, row: 3 }, stationRadiusM: 10,
   stations: [{ id: 'ridge', cell: { col: 7, row: 2 } }, { id: 'rock', cell: { col: 7, row: 4 } }],
 };
-const route = { cells: [site.base, ...site.stations.map(s => s.cell), site.base], orderedStationIds: ['ridge', 'rock'] };
+const route = { cells: [site.base, ...site.stations.map(s => s.cell), site.base], stationIds: ['ridge', 'rock'] };
 const start = (overrides = {}) => createWalk({ site, route, planRevision: 3, windowId: 'dawn', visibility: 'poor', ...overrides });
 function travel(walk, cell) {
   const dx = cell.col * site.cellSizeM - walk.x;
@@ -28,7 +28,7 @@ for (const stations of [site.stations, [...site.stations].reverse()]) {
     assert.deepEqual(walk.result(), {
       planRevision: 3, windowId: 'dawn', visibility: 'poor',
       observedStationIds: stations.map(s => s.id), returnedToBase: true,
-      elapsedSeconds: 2 * Math.hypot(60, 10) + 20, distanceM: 2 * Math.hypot(60, 10) + 20,
+      elapsedSeconds: 2 * Math.hypot(60, 10) + 20, distanceWalkedM: 2 * Math.hypot(60, 10) + 20,
     });
   });
 }
@@ -56,11 +56,11 @@ test('interaction radius includes its edge and uses cells in world meters', () =
 test('normalizes horizontal speed, counts idle time and snapshots results', () => {
   const walk = start();
   walk.step(1, 1, 2);
-  assert.ok(Math.abs(walk.distanceM - 2) < 1e-10);
+  assert.ok(Math.abs(walk.distanceWalkedM - 2) < 1e-10);
   assert.ok(Math.abs(walk.x - (10 + Math.SQRT2)) < 1e-10);
   walk.step(0, 0, 4);
   assert.equal(walk.elapsedSeconds, 6);
-  assert.ok(Math.abs(walk.distanceM - 2) < 1e-10);
+  assert.ok(Math.abs(walk.distanceWalkedM - 2) < 1e-10);
   const snapshot = walk.result();
   snapshot.observedStationIds.push('fake');
   assert.deepEqual(walk.observedStationIds, []);
@@ -73,7 +73,7 @@ test('holes, map boundaries, large time steps and diagonal corners cannot be cro
   assert.equal(walk.x, 10);
   walk.step(-1, 0, 100);
   assert.equal(walk.x, 10);
-  assert.equal(walk.distanceM, 0);
+  assert.equal(walk.distanceWalkedM, 0);
   assert.equal(walk.elapsedSeconds, 140);
   const corner = { ...site, elevationM: [...site.elevationM] };
   corner.elevationM[3 * 9 + 2] = null;
@@ -114,7 +114,7 @@ test('mapped neighboring centers stay walkable beside missing terrain', () => {
   walk.step(1, 0, 30);
   assert.equal(walk.x, 30);
   assert.equal(walk.z, 10);
-  assert.equal(walk.distanceM, 30);
+  assert.equal(walk.distanceWalkedM, 30);
   assert.equal(heightAt(corridor, walk.x, walk.z), 6);
 });
 
