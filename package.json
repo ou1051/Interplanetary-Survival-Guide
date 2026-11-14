@@ -6,7 +6,10 @@
     "dev": "vite",
     "build": "vite build",
     "build:single": "vite build --mode single",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "api": "node server/start.js",
+    "test": "node --test",
+    "test:routes": "node --test src/routes/*.test.js src/physics/*.test.js server/routes.test.js"
   },
   "repository": {
     "type": "git",

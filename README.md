@@ -24,6 +24,10 @@ npm run build:single # one self-contained file: dist-single/index.html
 A GitHub Actions workflow (`.github/workflows/deploy.yml`) publishes `dist/` to GitHub Pages on
 every push to `main`. Enable it once under **Settings → Pages → Source: GitHub Actions**.
 
+## Routing API
+
+Run `npm run api` to plan a route or recalculate the remaining leg after a hazard update. For grid fields, consumable units and runnable requests, see the [routing API reference](docs/api/routing.md).
+
 ## Controls
 
 | Key | Action |
@@ -81,7 +85,13 @@ Each layer exposes `source`, `future` and `legend`, which the UI already display
 ## Project structure
 
 ```
+docs/api/routing.md   HTTP contract, examples and model assumptions
+server/
+  start.js            standalone Node server
+  routes.js           HTTP handlers and request validation
 src/
+  routes/pathfinding.js  A* search and live hazard rerouting
+  physics/traverse.js    travel time and consumable estimates shared by routing and simulation
   config/mission.js   site, route, stations, area hazards, rover & life-support numbers (mock)
   world/terrain.js    procedural DEM, grid mesh, exact surface sampling
   world/route.js      route spline, hazard analysis, ribbon / beacons / gates
