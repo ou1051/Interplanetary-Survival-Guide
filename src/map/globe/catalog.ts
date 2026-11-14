@@ -1,6 +1,7 @@
 // ---------------------------------------------------------------------------
 // Real Mars data used by the globe. Endpoints and limits were read from each
-// service's own WMTS capabilities / ArcGIS REST metadata (Nov 2026):
+// service's own WMTS capabilities / ArcGIS REST metadata and checked by
+// requesting real tiles at the assignment site (Nov 2026):
 //   https://trek.nasa.gov/tiles/Mars/EQ/<layer>/1.0.0/WMTSCapabilities.xml
 //   https://astro.arcgis.com/arcgis/rest/services/OnMars/<service>?f=json
 // Same layers as NASA-funded OpenSpace's "nasa-treks" Mars assets.
@@ -69,9 +70,11 @@ export const SOURCES = {
     id: 'ctx-global',
     url: 'https://astro.arcgis.com/arcgis/rest/services/OnMars/CTX/MapServer/tile/{z}/{y}/{x}',
     tileSize: 512,
-    maxLevel: 17,
+    // REST metadata lists 18 LODs, but the cache stops at 12 (≈5 m/px, the source
+    // resolution); deeper requests 404 without CORS. Verified at Vera Rubin Ridge.
+    maxLevel: 12,
     minViewLevel: 7,
-    alpha: 0.82,
+    alpha: 0.78, // keeps a trace of the colour base under the greyscale CTX
     mission: 'Mars Reconnaissance Orbiter',
     instrument: 'CTX global mosaic (Murray Lab, Caltech)',
     resolution: '5 m/px',
@@ -84,6 +87,7 @@ export const SOURCES = {
     maxLevel: 12,
     bbox: { west: 135.1842593, south: -6.5732988, east: 139.2413012, north: -2.8077809 },
     minViewLevel: 8,
+    alpha: 0.86,
     blackIsNoData: true,
     mission: 'Mars Reconnaissance Orbiter',
     instrument: 'CTX, Gale block-adjusted mosaic',
@@ -97,6 +101,7 @@ export const SOURCES = {
     maxLevel: 16,
     bbox: { west: 137.1224669, south: -4.9254743, east: 137.7298129, north: -4.2489588 },
     minViewLevel: 10,
+    alpha: 0.9,
     blackIsNoData: true,
     mission: 'Mars Reconnaissance Orbiter',
     instrument: 'HiRISE, Curiosity traverse mosaic',
@@ -110,8 +115,8 @@ export const IMAGERY: ImageryStyle[] = [
     id: 'best',
     name: 'Best available',
     short: 'Best',
-    description: 'Colour relief, sharpening to CTX and HiRISE as you zoom in',
-    stack: [SOURCES.colorRelief, SOURCES.ctxGlobal, SOURCES.galeCtx, SOURCES.curiosityHirise],
+    description: 'Viking colour, sharpening to CTX and HiRISE as you zoom in',
+    stack: [SOURCES.viking, SOURCES.ctxGlobal, SOURCES.galeCtx, SOURCES.curiosityHirise],
   },
   {
     id: 'relief',
@@ -148,6 +153,8 @@ export interface Place {
   note: string;
   /** Parent feature for the breadcrumb. */
   region?: string;
+  /** Pin only shown when the camera is closer than this (m); avoids clutter at Gale. */
+  showBelowM?: number;
   assignment?: boolean;
 }
 
@@ -156,8 +163,8 @@ export interface Place {
 // Olympus Mons summit, central Valles Marineris.
 export const PLACES: Place[] = [
   { id: 'vrr', name: 'Vera Rubin Ridge', lat: -4.714, lon: 137.357, range: 9000, pitchDeg: -38, note: 'Assignment area · Gale Crater', region: 'Gale Crater', assignment: true },
-  { id: 'gale', name: 'Gale Crater', lat: -5.4, lon: 137.8, range: 260000, pitchDeg: -55, note: '154 km impact crater' },
-  { id: 'sharp', name: 'Mount Sharp', lat: -5.08, lon: 137.85, range: 70000, pitchDeg: -30, note: 'Aeolis Mons, ~5.5 km high', region: 'Gale Crater' },
+  { id: 'gale', name: 'Gale Crater', lat: -5.4, lon: 137.8, range: 260000, pitchDeg: -55, note: '154 km impact crater', showBelowM: 3_000_000 },
+  { id: 'sharp', name: 'Mount Sharp', lat: -5.08, lon: 137.85, range: 70000, pitchDeg: -30, note: 'Aeolis Mons, ~5.5 km high', region: 'Gale Crater', showBelowM: 700_000 },
   { id: 'jezero', name: 'Jezero Crater', lat: 18.4447, lon: 77.4508, range: 90000, pitchDeg: -50, note: 'Perseverance landing site' },
   { id: 'olympus', name: 'Olympus Mons', lat: 18.65, lon: -133.8, range: 1100000, pitchDeg: -50, note: 'Largest volcano in the solar system' },
   { id: 'valles', name: 'Valles Marineris', lat: -13.9, lon: -59.2, range: 1600000, pitchDeg: -60, note: '4,000 km canyon system' },

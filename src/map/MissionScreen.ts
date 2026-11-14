@@ -187,7 +187,7 @@ export class MissionScreen {
 
   private onCamera(c: CameraInfo) {
     this.cam = c;
-    this.q('[data-s="alt"]').innerHTML = `<small>Alt</small> ${formatAltitude(c.altitudeM)}`;
+    this.q('[data-s="alt"]').innerHTML = `<small>${c.aboveGround ? 'Above ground' : 'Alt'}</small> ${formatAltitude(c.altitudeM)}`;
     (this.q('.ms-compass i') as HTMLElement).style.transform = `rotate(${-c.headingDeg}deg)`;
     const mpp = this.globe?.metresPerPixel() ?? metresPerPixel(c.altitudeM, this.root.clientHeight || 800);
     const s = niceScale(mpp, 110);

@@ -6,9 +6,11 @@ import {
   Cartographic,
   Color,
   Credit,
+  DistanceDisplayCondition,
   EasingFunction,
   Ellipsoid,
   EllipsoidTerrainProvider,
+  EllipsoidalOccluder,
   Entity,
   GeographicTilingScheme,
   HeadingPitchRange,
@@ -43,7 +45,9 @@ export interface CursorInfo {
 }
 
 export interface CameraInfo {
+  /** Height above the ground under the camera when terrain is known, else above the datum. */
   altitudeM: number;
+  aboveGround: boolean;
   headingDeg: number;
   pitchDeg: number;
   lat: number;
@@ -125,7 +129,7 @@ export class MarsGlobe {
     scene.globe.enableLighting = false;
     scene.globe.showGroundAtmosphere = false;
     scene.globe.maximumScreenSpaceError = 1.5;
-    scene.globe.tileCacheSize = 400;
+    scene.globe.tileCacheSize = 1200; // oblique views keep many tiles alive; avoid evict-and-refetch
     scene.globe.depthTestAgainstTerrain = true;
     scene.fog.enabled = false;
     if (scene.moon) scene.moon.show = false;
@@ -237,6 +241,7 @@ export class MarsGlobe {
 
   private addPlaces() {
     for (const p of PLACES) {
+      const show = p.showBelowM ? new DistanceDisplayCondition(0, p.showBelowM) : undefined;
       const e = this.viewer.entities.add({
         id: `place:${p.id}`,
         position: Cartesian3.fromDegrees(p.lon, p.lat, 0, MARS),
@@ -244,8 +249,9 @@ export class MarsGlobe {
           image: p.assignment ? pinImage('#e8794a', '#fff3ea', 46) : pinImage('rgba(18,20,24,0.92)', '#f4efe9', 34),
           verticalOrigin: VerticalOrigin.BOTTOM,
           heightReference: HeightReference.CLAMP_TO_GROUND,
-          disableDepthTestDistance: 60_000, // stay visible over nearby relief, hide behind the planet
+          disableDepthTestDistance: Number.POSITIVE_INFINITY, // never clipped by relief; far side hidden by updatePins()
           scaleByDistance: new NearFarScalar(2e4, 1.1, 1.2e7, 0.7),
+          distanceDisplayCondition: show,
         },
         label: {
           text: p.name,
@@ -257,8 +263,9 @@ export class MarsGlobe {
           verticalOrigin: VerticalOrigin.TOP,
           pixelOffset: new Cartesian2(0, 8),
           heightReference: HeightReference.CLAMP_TO_GROUND,
-          disableDepthTestDistance: 60_000, // stay visible over nearby relief, hide behind the planet
+          disableDepthTestDistance: Number.POSITIVE_INFINITY, // never clipped by relief; far side hidden by updatePins()
           translucencyByDistance: new NearFarScalar(1.5e6, 1, p.assignment ? 3e7 : 9e6, p.assignment ? 1 : 0),
+          distanceDisplayCondition: show,
         },
       });
       this.placeEntities.set(p.id, e);
@@ -369,11 +376,26 @@ export class MarsGlobe {
     return h === undefined ? undefined : h / (this.viewer.scene.verticalExaggeration || 1);
   }
 
+  /** Hide pins on the far side of the planet (depth testing is off so relief never clips them). */
+  private updatePins() {
+    const occluder = new EllipsoidalOccluder(MARS, this.viewer.camera.positionWC);
+    const now = this.viewer.clock.currentTime;
+    for (const e of this.placeEntities.values()) {
+      const p = e.position?.getValue(now);
+      if (!p) continue;
+      const visible = occluder.isPointVisible(p);
+      if (e.show !== visible) e.show = visible;
+    }
+  }
+
   private emitCamera() {
+    this.updatePins();
     const c = this.viewer.camera;
     const carto = c.positionCartographic;
+    const ground = this.viewer.scene.globe.getHeight(carto);
     this.events.onCamera?.({
-      altitudeM: carto.height,
+      altitudeM: ground === undefined ? carto.height : carto.height - ground,
+      aboveGround: ground !== undefined,
       headingDeg: CMath.toDegrees(c.heading),
       pitchDeg: CMath.toDegrees(c.pitch),
       lat: CMath.toDegrees(carto.latitude),

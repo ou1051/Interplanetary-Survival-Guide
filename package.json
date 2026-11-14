@@ -25,6 +25,7 @@
   "homepage": "https://github.com/ou1051/Interplanetary-Survival-Guide#readme",
   "dependencies": {
     "cesium": "^1.147.0",
+    "lerc": "^3.0.0",
     "three": "^0.187.0"
   },
   "devDependencies": {

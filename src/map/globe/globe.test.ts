@@ -26,8 +26,19 @@ describe('map · globe catalog', () => {
     const best = IMAGERY.find((s) => s.id === 'best')!;
     expect(coverageAt(best, vrr.lon, vrr.lat).pop()!.id).toBe('curiosity-hirise');
     // far from Gale only the global layers cover
-    expect(coverageAt(best, -133.8, 18.65).map((s) => s.id)).toEqual(['mola-hrsc-color', 'ctx-global']);
+    expect(coverageAt(best, -133.8, 18.65).map((s) => s.id)).toEqual(['viking-mdim', 'ctx-global']);
   });
+  it('caps each source at the deepest level that really exists', () => {
+    // checked against live tiles at Vera Rubin Ridge: CTX to 12, HiRISE to 16, Gale CTX to 12
+    expect(SOURCES.ctxGlobal.maxLevel).toBe(12);
+    expect(SOURCES.curiosityHirise.maxLevel).toBe(16);
+    expect(SOURCES.galeCtx.maxLevel).toBe(12);
+    // ground resolution at the cap matches the product
+    const mPerDeg = (Math.PI / 180) * 3396190;
+    expect(degreesPerPixel(12, 512) * mPerDeg).toBeCloseTo(5.06, 1);
+    expect(degreesPerPixel(16, 256) * mPerDeg).toBeLessThan(0.7);
+  });
+
   it('every place has a sane position and framing', () => {
     for (const p of PLACES) {
       expect(Math.abs(p.lat)).toBeLessThanOrEqual(90);
