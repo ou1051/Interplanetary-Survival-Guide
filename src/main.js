@@ -125,6 +125,21 @@ async function initSurface(plan, scenario, status) {
   await nextFrame();
   setLayer('optical');
   planningBoard.connectTraverse(mission);
+  planningBoard.setDeployHandler(({ site, pathId }) => {
+    const label = pathId.charAt(0).toUpperCase() + pathId.slice(1);
+    route.planName = `${site.name.split('·')[0].trim()} · ${label} to S1`;
+    route.site = { ...route.site, name: site.name };
+    const siteEl = document.getElementById('siteName');
+    if (siteEl) siteEl.textContent = site.name.toUpperCase();
+    mission.s = 0;
+    mission.lateral = 0;
+    mission.yawOff = 0;
+    mission.speed = 0;
+    mission.cruise = false;
+    mission.state = 'drive';
+    planningBoard.updateField();
+    hud.log(`Survey target updated: ${route.planName}`, 'ok');
+  });
   hud.onLayerClick((id) => {
     setLayer(id);
     hud.log(`Layer: ${layer.name} (${layer.source})`, 'info');
@@ -187,7 +202,7 @@ async function initSurface(plan, scenario, status) {
     for (let t = 0; t < seconds; t += 1 / 30) mission.update(1 / 30, fake, view.pitch);
     return { s: +mission.s.toFixed(1), v: +mission.speed.toFixed(2), state: mission.state };
   };
-  window.__isg = { renderer, input, mission, route, rover, terrain, setLayer, hud, simulate };
+  window.__isg = { renderer, input, mission, route, rover, terrain, setLayer, hud, simulate, planningBoard };
 
   function frame() {
     timer.update();

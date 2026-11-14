@@ -526,3 +526,168 @@
 .hab-unknowns p { margin: 0 0 4px; }
 .hab-unknowns ul { margin: 0 0 6px; padding-left: 16px; }
 .hab-unknowns small { color: #d9c3a6; }
+
+/* ---------------- Integrated Site Topology Console Tabs & Viewport Lock ---------------- */
+#habitat .hab-stage .hab-wall {
+  overflow: hidden;
+  box-sizing: border-box;
+}
+#habitat .hab-stage .hab-screen {
+  overflow: hidden;
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
+}
+.hab-console-tabs {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
+  margin-right: 10px;
+}
+#habitat .hab-console-tabs button {
+  background: rgba(12, 26, 51, 0.72);
+  border: 1px solid #5f86cc;
+  color: #dbe8ff;
+  padding: 4px 10px;
+  font: 700 11px var(--ops-font);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+#habitat .hab-console-tabs button[aria-pressed="true"] {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #071022;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
+}
+#habitat:not(.hab-zoomed) .hab-stage .hab-header {
+  padding: 5px 10px 5px 14px;
+  margin-bottom: 6px;
+}
+#habitat:not(.hab-zoomed) .hab-stage .hab-header h1 {
+  font-size: clamp(10px, 1.05vw, 13px);
+  white-space: nowrap;
+}
+#habitat:not(.hab-zoomed) .hab-console-tabs {
+  margin-right: 6px;
+  gap: 3px;
+}
+#habitat:not(.hab-zoomed) .hab-console-tabs button {
+  padding: 2px 6px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+#habitat .hab-topology-panel {
+  grid-column: 1 / -1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin: 0 !important;
+  padding: 12px 16px 0;
+  box-sizing: border-box;
+}
+#habitat:not(.hab-zoomed).hab-topology-mode .hab-topology-panel {
+  padding: 4px 8px 0;
+}
+#habitat:not(.hab-zoomed).hab-topology-mode .st-preview-card,
+#habitat:not(.hab-zoomed).hab-topology-mode .st-site-strip,
+#habitat:not(.hab-zoomed).hab-topology-mode .st-globe-footer,
+#habitat:not(.hab-zoomed).hab-topology-mode .st-topo-sidebar,
+#habitat:not(.hab-zoomed).hab-topology-mode .st-topo-legend {
+  display: none;
+}
+
+@media (min-width: 801px) {
+  #habitat.hab-zoomed {
+    overflow: hidden;
+  }
+  #habitat.hab-zoomed .hab-stage {
+    height: 100dvh;
+    max-height: 100dvh;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: clamp(8px, 1.5vh, 18px) clamp(10px, 2vw, 24px);
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  #habitat.hab-zoomed .hab-stage .hab-wall,
+  #habitat.hab-zoomed .hab-stage.hab-has-room .hab-wall {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    max-width: 1320px;
+    height: min(760px, calc(100dvh - 20px));
+    max-height: calc(100dvh - 20px);
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+  }
+  #habitat.hab-zoomed .hab-stage .hab-screen {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+    grid-template: auto minmax(0, 1fr) / minmax(0, 2.2fr) minmax(265px, 1fr);
+    gap: 10px 18px;
+  }
+  #habitat.hab-topology-mode.hab-zoomed .hab-stage .hab-screen {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0;
+  }
+  #habitat.hab-zoomed .hab-console-grid {
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    padding-top: 10px;
+  }
+  #habitat.hab-zoomed .hab-layout {
+    min-height: 0;
+    height: 100%;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  #habitat.hab-zoomed .hab-map {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #habitat.hab-zoomed .hab-stage .hab-mapframe,
+  #habitat.hab-zoomed .hab-stage.hab-has-room .hab-mapframe {
+    width: 100%;
+    height: auto;
+    max-height: 100%;
+    max-width: 100%;
+    aspect-ratio: 640 / 400;
+  }
+  #habitat.hab-zoomed .hab-brief {
+    min-height: 0;
+    height: 100%;
+    overflow-y: auto;
+    padding-top: 10px;
+  }
+}
+
+@media (max-width: 800px) {
+  #habitat.hab-topology-mode.hab-zoomed .hab-stage .hab-screen {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0;
+  }
+}
