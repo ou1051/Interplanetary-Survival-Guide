@@ -1,16 +1,23 @@
-# Interplanetary Survival Guide — Martian Map
+# Freelance Astronaut — Martian Map
 
 NASA Space Apps Challenge · *Interplanetary Survival Guide: Martian Map*
 
-A **first-person 3D survival map** for a Mars EVA. You sit in the driver's seat of an open-frame,
-pressurised-suit rover and drive a pre-planned **survival route** across a delta-front landing
-site. The route is evaluated against the terrain: steep stretches and hazardous ground become
-**hazard gates** you must acknowledge before continuing, and **science stations** stop the rover so
-the crew can run their tasks. Consumables (O₂, rover power, radiation dose, comms, walk-back limit)
-update as you go.
+You are a space enthusiast on your **first paid assignment**: survey four science stations at a
+delta-front landing site and decide when to launch. The game follows the Freelance Astronaut plan:
 
-> The rover terrain and site planning grid use synthetic data. The separate scouting globe
-> streams real Mars imagery and elevation.
+1. **Mission map** (opens first): scout sites to reveal ground views and hidden hazards. Each new
+   site costs one preparation turn, and launch windows close as turns pass.
+2. **Choose a route**: compare the *survival route* and the *direct route* by length, climb,
+   max tilt, hazard gates and unscouted ground.
+3. **Rehearse** the chosen route in the first-person 3D rover (the original Martian Map traverse),
+   in the surface visibility forecast for the window you pick. A complete round trip with O₂ in
+   reserve approves the surface plan; changing the route or scouting new ground on it clears it.
+4. **Launch desk**: compare three fictional windows (Earth weather at departure, Mars at arrival
+   and during the traverse). Launch, hold for a forecast update, or defer.
+5. **Liftoff** and a decision debrief, then *Retry same weather* or *New weather*.
+
+> The rover terrain, route grid, ground views and weather are synthetic placeholders. The separate
+> scouting globe (`/map.html`) streams real Mars imagery and elevation.
 
 ## Run it
 
@@ -94,7 +101,13 @@ server/
 src/
   routes/pathfinding.js  A* search and live hazard rerouting
   physics/traverse.js    travel time and consumable estimates shared by routing and simulation
-  config/mission.js   site, route, stations, area hazards, rover & life-support numbers (mock)
+  config/mission.js   site, routes (survival + direct), stations, scouting sites, hazards (mock)
+  sim/routeApi.js     asks the routing API for the planner route over the 3D terrain grid
+  data/scenarios.js   launch-window weather scenarios (simulated; LLM output later)
+  sim/game.js         the player's run: turns, scouting, route choice, approval, hold, launch
+  ui/planner.js       mission map: scouting, route comparison, rehearsal conditions
+  ui/launchDesk.js    three launch windows, hold / defer / launch
+  ui/finale.js        liftoff animation + decision debrief
   world/terrain.js    procedural DEM, grid mesh, exact surface sampling
   world/route.js      route spline, hazard analysis, ribbon / beacons / gates
   world/scenery.js    instanced rocks, habitat, ascent vehicle

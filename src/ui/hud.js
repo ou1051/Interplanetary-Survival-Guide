@@ -103,17 +103,16 @@ export class Hud {
       ['TOTAL CLIMB', `${Math.round(R.stats.climb)} m`],
       ['EVA BUDGET', `${LIFE_SUPPORT.evaHours} h O₂`],
       ['ROVER VMAX', `${Math.round(kmh(ROVER.maxSpeed))} km/h`],
-      ['SITE', 'Delta front'],
+      ['SITE', 'Vera Rubin Ridge'],
     ];
     $('briefGrid').innerHTML = items.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
-    $('briefEva').textContent = SITE.eva;
   }
 
-  ready(onBegin) {
+  ready(onBegin, label = 'BEGIN EVA ▸') {
     const b = $('beginBtn');
     b.disabled = false;
-    b.textContent = 'BEGIN EVA ▸';
-    b.addEventListener('click', onBegin, { once: true });
+    b.textContent = label;
+    b.onclick = onBegin;
   }
 
   showHud() {
@@ -565,7 +564,7 @@ export class Hud {
   }
 
   // ------------------------------------------------------------ debrief
-  showDebrief(onRestart) {
+  showDebrief(onRestart, { title = 'TRAVERSE COMPLETE', approval = null } = {}) {
     const M = this.mission;
     $('hud').classList.add('hidden');
     $('card').classList.add('hidden');
@@ -577,9 +576,17 @@ export class Hud {
       ['ROVER PWR', `${M.batteryPct.toFixed(0)} %`],
       ['DOSE', `${M.dose.toFixed(1)} µSv`],
       ['SAMPLES', M.samples],
-      ['GATES CLEARED', gates],
-      ['STATIONS', this.route.stations.length - 1],
+      ['GATES CLEARED', `${this.route.zones.filter((z) => z.severity === 'danger' && z.acknowledged).length} / ${gates}`],
+      ['STATIONS', `${this.route.stations.filter((s) => s.done && !s.final).length} / ${this.route.stations.length - 1}`],
     ];
+    $('debriefTitle').firstChild.textContent = title;
+    const ap = $('debriefApproval');
+    ap.className = `approval-banner ${approval && approval.ok ? 'ok' : 'no'}`;
+    ap.innerHTML = approval
+      ? approval.ok
+        ? '<b>SURFACE PLAN APPROVED</b><span>This route is cleared for launch.</span>'
+        : `<b>NOT APPROVED</b><span>${approval.reasons.join(' ')}</span>`
+      : '';
     $('debriefGrid').innerHTML = items.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
     $('debriefSub').textContent = `${SITE.eva} · ${SITE.name}`;
     $('debrief').classList.remove('hidden');

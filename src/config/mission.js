@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------
 
 export const SITE = {
-  name: 'SITE A · DELTA FRONT TRAVERSE',
+  name: 'VERA RUBIN RIDGE · GALE CRATER',
   eva: 'EVA-03',
   sol: 214,
   lmstStart: 14 * 60 + 10, // local mean solar time at EVA start, minutes
@@ -50,6 +50,92 @@ export const ROUTE_POINTS = [
   [40, -25],
   [0, -14], // back at habitat
 ];
+
+// Alternative the player can pick instead: straight lines between the same
+// stations. Shorter, but it does not avoid the scarp and the ridge flank.
+export const DIRECT_POINTS = [
+  [0, -14],
+  [-90, -130],
+  [-175, -250], // S1
+  [-125, -380],
+  [-70, -505], // S2
+  [70, -585],
+  [205, -630], // S3
+  [300, -490],
+  [395, -345], // S4
+  [200, -182],
+  [60, -64],
+  [0, -14],
+];
+
+export const ROUTE_OPTIONS = [
+  {
+    id: 'survival',
+    name: 'Survival route',
+    note: 'Hand-planned detours around the steepest scarp and crater-rim ground.',
+    points: ROUTE_POINTS,
+  },
+  {
+    id: 'direct',
+    name: 'Direct route',
+    note: 'Straight lines between stations. Shorter, but it meets the terrain head-on.',
+    points: DIRECT_POINTS,
+  },
+];
+
+// The player's job (Freelance Astronaut). Stations come from STATIONS below.
+export const ASSIGNMENT = {
+  client: 'Gale Sample Consortium (fictional)',
+  title: 'First assignment · Vera Rubin Ridge survey',
+  brief:
+    'Visit all four science stations, record each one, and bring the rover back to the habitat with oxygen to spare.',
+  prepTurns: 'Each newly scouted site costs one preparation turn. Launch windows close as turns pass.',
+};
+
+// Scouting sites. Revealing one costs a preparation turn and shows a ground view
+// of the area plus what it tells you. `radius` = ground it characterizes (m).
+// `reveals` = area hazards (AREA_HAZARDS ids) that only become known once scouted.
+export const SCOUT_PINS = [
+  {
+    id: 'P1',
+    name: 'Delta front scarp',
+    at: [-30, -560],
+    camera: [-160, -420],
+    radius: 120,
+    reveals: [],
+    finding: 'Layered scarp face. The direct line climbs it head-on; the survival route traverses it at an angle.',
+  },
+  {
+    id: 'P2',
+    name: 'Fresh crater ejecta',
+    at: [255, -600],
+    camera: [160, -500],
+    radius: 110,
+    reveals: ['H-EJECTA'],
+    finding: 'Block field around the fresh crater. Both routes cross it near S3: expect a slow, marked corridor.',
+  },
+  {
+    id: 'P3',
+    name: 'Ripple field',
+    at: [185, -95],
+    camera: [95, -25],
+    radius: 110,
+    reveals: ['H-RIPPLE'],
+    finding: 'Soft regolith ripples on the way home. The survival route crosses them; the direct line passes north of them.',
+  },
+  {
+    id: 'P4',
+    name: 'Ridge flank',
+    at: [330, -430],
+    camera: [225, -330],
+    radius: 120,
+    reveals: [],
+    finding: 'Ridge flank below the overlook. Gentle from the south, steeper on the straight approach.',
+  },
+];
+
+// Fog density for the walk visibility forecast of the rehearsal window.
+export const VISIBILITY_FOG = { clear: 0.00042, hazy: 0.0021, poor: 0.0062 };
 
 export const HAB = { x: 0, z: 0, name: 'HABITAT', code: 'HAB' };
 

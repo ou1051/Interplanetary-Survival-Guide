@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { SimplexNoise } from 'three/addons/math/SimplexNoise.js';
-import { TERRAIN, FEATURES, ROUTE_POINTS, HAB } from '../config/mission.js';
+import { TERRAIN, FEATURES, ROUTE_OPTIONS, HAB } from '../config/mission.js';
 import { mulberry32, smoothstep, clamp } from '../core/math.js';
 
 // ---------------------------------------------------------------------------
@@ -48,13 +48,19 @@ function crater(r, R, depth) {
   return h;
 }
 
-// Distance from a point to the planned route polyline (used to keep the
-// corridor free of small random craters and rocks).
+// Distance from a point to the nearest route option polyline (used to keep
+// every selectable corridor free of small random craters and rocks).
 export function distanceToRoute(x, z) {
   let best = Infinity;
-  for (let i = 0; i < ROUTE_POINTS.length - 1; i++) {
-    const [ax, az] = ROUTE_POINTS[i];
-    const [bx, bz] = ROUTE_POINTS[i + 1];
+  for (const opt of ROUTE_OPTIONS) best = Math.min(best, distanceToPolyline(opt.points, x, z));
+  return best;
+}
+
+function distanceToPolyline(points, x, z) {
+  let best = Infinity;
+  for (let i = 0; i < points.length - 1; i++) {
+    const [ax, az] = points[i];
+    const [bx, bz] = points[i + 1];
     const vx = bx - ax;
     const vz = bz - az;
     const t = clamp(((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz), 0, 1);

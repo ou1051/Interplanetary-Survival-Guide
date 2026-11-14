@@ -30,6 +30,14 @@ export class MapRenderer {
     this._buildRoutePath();
   }
 
+  // Same raster and bounds, different route on top (shares the base canvas).
+  withRoute(route) {
+    const m = Object.create(this);
+    m.route = route;
+    m._buildRoutePath();
+    return m;
+  }
+
   // Per-pixel sampling context + hillshade, computed once.
   _cache() {
     const { w, h, mpp, bounds: b } = this;

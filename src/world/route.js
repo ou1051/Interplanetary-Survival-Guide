@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ROUTE_POINTS, STATIONS, AREA_HAZARDS, HAB, ROVER, SLOPE_CLASSES } from '../config/mission.js';
+import { ROUTE_OPTIONS, STATIONS, AREA_HAZARDS, HAB, ROVER, SLOPE_CLASSES } from '../config/mission.js';
 import { clamp, DEG } from '../core/math.js';
 
 // ---------------------------------------------------------------------------
@@ -8,9 +8,10 @@ import { clamp, DEG } from '../core/math.js';
 // ---------------------------------------------------------------------------
 
 export class Route {
-  constructor(terrain) {
+  constructor(terrain, option = ROUTE_OPTIONS[0]) {
     this.terrain = terrain;
-    const pts = ROUTE_POINTS.map(([x, z]) => new THREE.Vector3(x, 0, z));
+    this.option = option;
+    const pts = option.points.map(([x, z]) => new THREE.Vector3(x, 0, z));
     const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
     curve.arcLengthDivisions = 4000;
     this.length = curve.getLength();
