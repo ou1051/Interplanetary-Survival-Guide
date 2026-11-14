@@ -117,6 +117,12 @@ function flightScene() {
   const starsGeo = new THREE.BufferGeometry(); starsGeo.setAttribute('position', new THREE.Float32BufferAttribute(coords, 3));
   const stars = new THREE.Points(starsGeo, new THREE.PointsMaterial({ color: '#d4e5f1', size: 1, sizeAttenuation: true })); scene.add(stars);
   const earth = planet(scene, 60, false), mars = planet(scene, 45, true);
+  let disposed = false;
+  new THREE.TextureLoader().load(new URL('../../public/textures/earth-atmosphere.jpg', import.meta.url).href, texture => {
+    if (disposed) { texture.dispose(); return; }
+    texture.colorSpace = THREE.SRGBColorSpace; texture.anisotropy = 8;
+    earth.material.map.dispose(); earth.material.map = texture; earth.material.needsUpdate = true;
+  }, undefined, () => { /* Keep the illustrative fallback if image decoding fails. */ });
   const cabin = new THREE.Group(); scene.add(cabin);
   const shell = material('#d8ddd8', .28, .46), graphite = material('#152329', .45, .36), edge = material('#405058', .75, .27);
   box(cabin, graphite, 0, -1.1, 0, 7.4, .3, 12);
@@ -168,7 +174,7 @@ function flightScene() {
     if (Math.hypot(x, z) < 80) continue;
     const rock = mesh(descent, new THREE.DodecahedronGeometry(scale, 0), material('#81543e'), x, 0, z); rock.rotation.set(rand(), rand(), rand());
   }
-  return { scene, cabin, earth, mars, terrain, stars, screenCanvas, screenTexture };
+  return { scene, cabin, earth, mars, terrain, stars, screenCanvas, screenTexture, disposePending: () => { disposed = true; } };
 }
 
 export class Journey {
@@ -203,7 +209,7 @@ export class Journey {
     this.paused = !this.paused;
     this.el.querySelector('#journeyPause').textContent = this.paused ? 'Resume' : 'Pause';
     this.el.querySelector('#journeyPause').setAttribute('aria-pressed', String(this.paused));
-    if (this.gain) this.gain.gain.setTargetAtTime(this.paused ? 0 : .018, this.audio.currentTime, .15);
+    if (this.gain) this.gain.gain.setTargetAtTime(this.paused || !this.soundEnabled ? 0 : .018, this.audio.currentTime, .15);
   }
   next() {
     const stage = chapterAt(this.elapsed);
@@ -218,17 +224,18 @@ export class Journey {
       this.osc.type = 'sine'; this.osc.frequency.value = 54; this.gain.gain.value = 0;
       this.osc.connect(this.gain).connect(this.audio.destination); this.osc.start();
     }
-    this.muted = !this.muted; // First click enables sound.
+    this.soundEnabled = !this.soundEnabled;
     this.audio.resume().catch(() => {});
-    this.gain.gain.setTargetAtTime(this.muted && !this.paused ? .018 : 0, this.audio.currentTime, .2);
-    this.el.querySelector('#journeySound').textContent = this.muted ? 'Sound: on' : 'Sound: off';
-    this.el.querySelector('#journeySound').setAttribute('aria-pressed', String(this.muted));
+    this.gain.gain.setTargetAtTime(this.soundEnabled && !this.paused ? .018 : 0, this.audio.currentTime, .2);
+    this.el.querySelector('#journeySound').textContent = this.soundEnabled ? 'Sound: on' : 'Sound: off';
+    this.el.querySelector('#journeySound').setAttribute('aria-pressed', String(this.soundEnabled));
   }
   finish() {
     if (this.done) return;
     this.done = true; this.active = false;
     this.el.classList.add('hidden'); document.body.classList.remove('in-flight', 'at-launch');
     document.removeEventListener('visibilitychange', this.visibilityHandler);
+    this.flight.disposePending();
     if (this.audio) this.audio.close().catch(() => {});
     // The Mars renderer reuses the same canvas; release the launch sequence's GPU allocations.
     const geometries = new Set(), materials = new Set(), textures = new Set();
@@ -261,7 +268,7 @@ export class Journey {
   }
   render(dt) {
     if (this.done) return false;
-    this.clock += dt; this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix();
+    if (this.active && !this.paused) this.clock += dt; this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix();
     if (!this.active) {
       this.camera.position.set(38, 34, 63); this.camera.lookAt(-12, 27, 0);
       this.renderer.render(this.pad, this.camera); return true;
@@ -284,7 +291,7 @@ export class Journey {
     this.el.querySelector('#journeyTime').textContent = `${Math.floor(this.elapsed).toString().padStart(2, '0')} / ${TOTAL_DURATION} SEC`;
     this.look.lerp(new THREE.Vector2(this.input.look.yaw, this.input.look.pitch), 1 - Math.exp(-dt * 8));
     if (stage.id === 'board') {
-      this.camera.position.set(mix(12, 3.5, p), 41.7 + (this.reduced ? 0 : Math.sin(p * 60) * .035), 0);
+      this.camera.position.set(mix(12, 2.8, p), 41.7 + (this.reduced ? 0 : Math.sin(p * 60) * .035), 0);
       this.camera.lookAt(-2, 41.4, -.05);
       this.camera.rotateY(this.look.x * .5); this.camera.rotateX(this.look.y * .5);
       this.renderer.render(this.pad, this.camera); return true;

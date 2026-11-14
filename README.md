@@ -25,7 +25,7 @@ The rocket, cabin, planets and landing scene are illustrative, generated reconst
 No trajectory solver, live telemetry or human-rated vehicle model is implied. Local surface
 terrain and environmental layers remain synthetic. The separate Cesium globe retains its
 NASA/USGS imagery and elevation sources. Rendering uses antialiasing, up to 2× device pixel
-ratio, 2048-pixel shadows and 2048×1024 procedural planet textures; these textures are not NASA imagery.
+ratio, 2048-pixel shadows and 2048×1024 planet textures. Earth uses the Three.js example Earth texture; Mars is illustrative. See [asset credits](docs/ASSETS.md).
 The launch sequence disposes its GPU assets after landing.
 
 ### References studied
@@ -35,8 +35,8 @@ The launch sequence disposes its GPU assets after landing.
 - [NASA AMMOS 3DTilesRendererJS](https://github.com/NASA-AMMOS/3DTilesRendererJS): multiscale terrain architecture and resolution-aware rendering.
 - [NASA Mars facts](https://science.nasa.gov/mars/facts/) and [Perseverance](https://science.nasa.gov/mission/mars-2020-perseverance/): scientific context.
 
-The journey implementation is original. No application code, models or textures from the
-reference projects have been copied. Three.js and Cesium retain their existing package licenses.
+The journey implementation is original. No application code or models from the
+reference projects have been copied. The Earth texture is redistributed from Three.js examples under its MIT license. Three.js and Cesium retain their existing package licenses.
 This project is independent and is not endorsed by NASA.
 
 ## Run it
