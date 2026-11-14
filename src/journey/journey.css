@@ -7,7 +7,7 @@
 .launch-header nav a, .launch-header nav button { font: 12px var(--sans); background: none; color: #f1f2e8; text-decoration: none; border: 0; padding: 10px 0; cursor: pointer; }
 .launch-header nav a:hover, .launch-header nav button:hover { color: #d0edab; }
 .edition { font: 9px var(--mono); letter-spacing: .15em; border-left: 1px solid #ffffff30; padding-left: 25px; }
-.launch-copy { position: absolute; top: 25%; left: 8%; width: min(600px, 55%); }
+.launch-copy { position: absolute; top: 25%; left: 8%; width: min(780px, 58%); }
 .launch-kicker { font: 9px var(--mono); letter-spacing: .2em; color: #c7d4ce; display: flex; align-items: center; gap: 10px; }
 .launch-kicker > span, .live-dot, .flight-indicator { display: inline-block; width: 5px; height: 5px; background: #c9e9a4; border-radius: 50%; box-shadow: 0 0 12px #c9e9a455; }
 .launch-copy h1 { font-family: var(--sans); font-size: clamp(66px, 7.9vw, 132px); line-height: .92; font-weight: 450; letter-spacing: -.065em; margin: 25px 0 24px; color: #f4f4ec; }
@@ -31,7 +31,7 @@
 .launch-route > div { width: clamp(30px, 6vw, 90px); height: 1px; background: #afc0ba36; position: relative; }
 .launch-route > div::after { content: ''; position: absolute; right: 0; top: -2px; width: 4px; height: 4px; border: 1px solid #9eada4; border-radius: 50%; }
 .launch-footnote { font-size: 11px; font-weight: 350; line-height: 1.6; color: #9facaa; }
-.at-launch #visor { opacity: .4; }.in-flight #visor { opacity: 1; }
+.at-launch #visor { opacity: 0; }.in-flight #visor { opacity: 1; }
 .journey-overlay { position: absolute; inset: 0; color: #e4f0e9; pointer-events: none; background: linear-gradient(0deg, #061015ed, transparent 28%, transparent 80%, #06101599); font-family: var(--sans); }
 .journey-overlay button { pointer-events: auto; font: 10px var(--mono); background: #0b1b20aa; border: 1px solid #c6dfcf35; color: #dce9df; border-radius: 3px; padding: 10px 14px; cursor: pointer; }
 .journey-overlay button:hover { background: #cce2b9; color: #14251b; }

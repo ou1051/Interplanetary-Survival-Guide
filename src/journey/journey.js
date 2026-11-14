@@ -61,6 +61,13 @@ function padScene() {
   }
   for (let i = 0; i < 30; i++) box(scene, white, 3 + i * .32, 40.07, 0, .035, .03, 3.1);
   const hatch = mesh(scene, new THREE.CircleGeometry(1.4, 48), dark, 3.23, 41.4, 0); hatch.rotation.y = Math.PI / 2;
+  const hatchRim = mesh(scene, new THREE.TorusGeometry(1.43, .09, 12, 64), white, 3.32, 41.4, 0); hatchRim.rotation.y = Math.PI / 2;
+  const hatchLight = mesh(scene, new THREE.TorusGeometry(1.30, .025, 8, 64), new THREE.MeshBasicMaterial({ color: '#bfdac9' }), 3.34, 41.4, 0); hatchLight.rotation.y = Math.PI / 2;
+  for (let i = 0; i < 16; i++) {
+    const a = i / 16 * Math.PI * 2;
+    mesh(scene, new THREE.SphereGeometry(.045, 8, 6), steel, 3.40, 41.4 + Math.sin(a) * 1.43, Math.cos(a) * 1.43);
+  }
+  const crewLabel = mesh(scene, new THREE.PlaneGeometry(2, .5), label('01 / CREW ACCESS', '#15252b'), 3.37, 43.2, 0); crewLabel.rotation.y = Math.PI / 2;
   // Ground infrastructure gives the launch site a human scale.
   for (let i = 0; i < 5; i++) {
     mesh(scene, new THREE.CylinderGeometry(3, 3, 9, 24), white, -35 - i * 9, 4.5, -24);
@@ -124,7 +131,7 @@ function flightScene() {
     earth.material.map.dispose(); earth.material.map = texture; earth.material.needsUpdate = true;
   }, undefined, () => { /* Keep the illustrative fallback if image decoding fails. */ });
   const cabin = new THREE.Group(); scene.add(cabin);
-  const shell = material('#d8ddd8', .28, .46), graphite = material('#152329', .45, .36), edge = material('#405058', .75, .27);
+  const shell = material('#adb9ba', .18, .55), graphite = material('#152329', .2, .55), edge = material('#405058', .35, .45);
   box(cabin, graphite, 0, -1.1, 0, 7.4, .3, 12);
   box(cabin, shell, -3.6, 2, 0, .3, 6.4, 10); box(cabin, shell, 3.6, 2, 0, .3, 6.4, 10);
   box(cabin, graphite, 0, 5.1, 0, 7.4, .3, 10);
@@ -139,24 +146,31 @@ function flightScene() {
     for (let z = -2; z < 5; z += 1.5) {
       box(cabin, edge, x, 1.8, z, .15, 3.7, .055);
       box(cabin, graphite, x, 1.6, z + .6, .19, 1.8, .95);
+      for (let row = 0; row < 5; row++) {
+        box(cabin, row === 0 ? teal : edge, x - Math.sign(x) * .12, 2.16 - row * .24, z + .6, .025, .025, .65);
+        box(cabin, teal, x - Math.sign(x) * .13, 2.16 - row * .24, z + .9, .025, .045, .055);
+      }
     }
   }
   const dash = box(cabin, graphite, 0, -.02, -1.6, 6.5, .55, 2.5); dash.rotation.x = .14;
   const screenCanvas = document.createElement('canvas'); screenCanvas.width = 1536; screenCanvas.height = 512;
   const screenTexture = new THREE.CanvasTexture(screenCanvas); screenTexture.colorSpace = THREE.SRGBColorSpace;
   const screenMat = new THREE.MeshBasicMaterial({ map: screenTexture });
-  const display = mesh(cabin, new THREE.PlaneGeometry(5.8, 1.93), screenMat, 0, .25, -1.7); display.rotation.x = -Math.PI / 2 + .27;
+  const display = mesh(cabin, new THREE.PlaneGeometry(5.8, 1.93), screenMat, 0, .62, -1.7); display.rotation.x = -Math.PI / 2 + .27;
   for (let i = 0; i < 20; i++) {
     const x = -2.8 + i * .3;
     box(cabin, i % 5 === 0 ? new THREE.MeshBasicMaterial({ color: '#ffb679' }) : teal, x, .13, -.22, .06, .04, .12);
   }
   mesh(cabin, new THREE.PlaneGeometry(2.8, .7), label('ARES · FLIGHT SYSTEMS'), 0, 4.5, -3.25);
+  const hands = new THREE.Group(); hands.position.set(0, .3, -1.3); cabin.add(hands);
+  const suit = material('#e8e2d1', .08, .75);
   for (const x of [-1, 1]) {
-    const sleeve = mesh(cabin, new THREE.CapsuleGeometry(.2, .8, 6, 16), shell, x, -.3, 2.1); sleeve.rotation.x = -.8;
-    const glove = mesh(cabin, new THREE.CapsuleGeometry(.19, .24, 6, 16), shell, x, .12, 1.7); glove.rotation.x = -1;
-    mesh(cabin, new THREE.SphereGeometry(.1, 16, 12), shell, x - Math.sign(x) * .18, .15, 1.62);
-    const grip = mesh(cabin, new THREE.CylinderGeometry(.065, .08, .5, 12), graphite, x, .22, 1.51); grip.rotation.x = -.2;
-    box(cabin, edge, x, -.7, 2.5, .7, .25, 2);
+    const sleeve = mesh(hands, new THREE.CapsuleGeometry(.2, .8, 6, 16), suit, x, -.3, 2.1); sleeve.rotation.x = -.8;
+    const glove = mesh(hands, new THREE.CapsuleGeometry(.19, .24, 6, 16), suit, x, .12, 1.7); glove.rotation.x = -1;
+    mesh(hands, new THREE.SphereGeometry(.1, 16, 12), suit, x - Math.sign(x) * .18, .15, 1.62);
+    mesh(hands, new THREE.TorusGeometry(.205, .045, 8, 24), material('#a86142'), x, .02, 1.95);
+    const grip = mesh(hands, new THREE.CylinderGeometry(.065, .08, .5, 12), graphite, x, .22, 1.51); grip.rotation.x = -.2;
+    box(hands, edge, x, -.7, 2.5, .7, .25, 2);
   }
   const cabinLight = new THREE.PointLight('#b3f5e9', 8, 10); cabinLight.position.set(0, 3, 2); scene.add(cabinLight);
   const terrainGeo = new THREE.PlaneGeometry(1800, 1800, 200, 200); terrainGeo.rotateX(-Math.PI / 2);
