@@ -165,7 +165,7 @@ export class Route {
       final: true,
       objective: 'Return to the habitat, stow samples and complete dust-off before ingress.',
       why: ['End of traverse', 'Samples must be stowed inside the hab'],
-      tasks: [{ label: 'Stow samples & dust-off', minutes: 20, result: 'Samples stowed · EVA complete', progress: 0, done: false }],
+      tasks: [{ label: 'Stow samples & dust-off', kind: 'scan', targets: 2, minutes: 20, result: 'Samples stowed · EVA complete', progress: 0, done: false }],
       done: false,
     });
     for (const st of this.stations) {

@@ -3,7 +3,7 @@ import { Terrain, featureMasks, sampleContext } from './world/terrain.js';
 import { Route, RouteVisuals } from './world/route.js';
 import { createRocks, createHabitat } from './world/scenery.js';
 import { createSky, createEnvironment, DustMotes, WheelDust, SUN_DIR, HORIZON } from './world/atmosphere.js';
-import { Rover } from './rover/rover.js';
+import { Rover, EYE } from './rover/rover.js';
 import { drawNav, drawTraverse, drawScience, drawLife } from './rover/screens.js';
 import { LAYERS, layerById } from './data/layers.js';
 import { Mission } from './sim/mission.js';
@@ -14,7 +14,8 @@ import { Hud } from './ui/hud.js';
 import { PlanningBoard } from './ui/planningBoard.js';
 import { mountHabitat } from './ui/habitat.js';
 import { heightGrid, missionHeight, outcrop, worldPosition, sampleMinutes, imagery, observationSource } from './data/galeSite.js';
-import { clamp, damp, DEG } from './core/math.js';
+import { clamp, damp, smoothstep, wrapAngle, DEG } from './core/math.js';
+import { TaskRunner } from './ui/taskRunner.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -74,7 +75,7 @@ async function initSurface(plan, scenario, status) {
     objective: 'Use the Curiosity field reference to identify two beds and collect a sample from each.',
     why: ['Compare rock textures above and below the visible contact.'],
     observation: { image: imagery.mastcam, source: observationSource },
-    tasks: [{ label: 'Collect paired samples', minutes: sampleMinutes, sampleCount: 2, result: 'Two samples bagged for comparison · simulation' }],
+    tasks: [{ label: 'Collect paired samples', kind: 'drill', minutes: sampleMinutes, sampleCount: 2, result: 'Two samples bagged for comparison · simulation' }],
   }] });
   route.planName = plan.name;
   route.retracesOutbound = !plan.traverse;
@@ -103,7 +104,17 @@ async function initSurface(plan, scenario, status) {
   const map = new MapRenderer(terrain, route);
   const mission = new Mission(route, terrain, hab.userData.antennaTop);
   const audio = new RoverAudio();
-  const hud = new Hud({ route, mission, mapRenderer: map, layers: LAYERS, input });
+  // Station tasks are played first-person (see src/sim/fieldTasks.js).
+  mission.interactiveTasks = true;
+  const tasks = new TaskRunner({ mission, scene, camera, terrain, rover, audio, habAntenna: hab.userData.antennaTop });
+  const startTask = () => {
+    if (planningBoard.open || tasks.active || !mission.activeTask) return;
+    // Space presses the drill, so no button may keep the focus.
+    document.getElementById('viewport').focus({ preventScroll: true });
+    tasks.start();
+  };
+  const hud = new Hud({ route, mission, mapRenderer: map, layers: LAYERS, input, onTask: startTask });
+  const lookChip = document.getElementById('lookChip');
   document.querySelectorAll('#touch button').forEach((b) => input.bindButton(b, b.dataset.v));
   // keep keyboard shortcuts from re-triggering whatever button was clicked last
   document.addEventListener('click', (e) => {
@@ -136,8 +147,26 @@ async function initSurface(plan, scenario, status) {
       hud.log(p.text, p.tone);
       audio.beep(p.tone === 'danger' ? 'danger' : p.tone === 'warn' ? 'warn' : p.tone === 'ok' ? 'ok' : 'info');
     }
-    if (type === 'state' && p.state === 'complete') setTimeout(() => hud.showDebrief(() => location.reload()), 1400);
+    if (type === 'state' && p.state === 'complete') setTimeout(() => hud.showDebrief(() => location.reload(), scoreSummary()), 1400);
   });
+
+  // Science score for the debrief, with a local best per site.
+  function scoreSummary() {
+    const graded = mission.grades.length;
+    if (!graded) return {};
+    const average = mission.score / graded;
+    const rank = average >= 450 ? 'S' : average >= 300 ? 'A' : average >= 175 ? 'B' : 'C';
+    const key = `isg.best.${route.site?.name ?? 'site'}`;
+    let best = 0;
+    try { best = Number(localStorage.getItem(key)) || 0; } catch { /* storage unavailable */ }
+    const record = mission.score > best;
+    try { if (record) localStorage.setItem(key, String(mission.score)); } catch { /* storage unavailable */ }
+    return {
+      score: [['SCIENCE SCORE', mission.score.toLocaleString('en')], ['RANK', rank], ['BEST', Math.max(best, mission.score).toLocaleString('en')]],
+      note: `Grades ${[...new Set(mission.grades.map((g) => g.station))]
+        .map((id) => `${id}: ${mission.grades.filter((g) => g.station === id).map((g) => g.grade).join(' ')}`).join(' · ')}${record ? ' · New best score!' : ''}`,
+    };
+  }
 
   // ---------------------------------------------------------------- resize
   const resize = () => {
@@ -162,6 +191,7 @@ async function initSurface(plan, scenario, status) {
   let lightsOn = false;
   let roughness = 0;
   let lastPitch = 0;
+  const aimDir = new THREE.Vector3();
   let time = 0;
   const timer = new THREE.Timer();
   timer.connect(document);
@@ -170,7 +200,10 @@ async function initSurface(plan, scenario, status) {
   document.getElementById('habitat').classList.add('hidden');
   audio.start();
   hud.showHud();
-  document.getElementById('boardBtn').focus({ preventScroll: true });
+  // Keep keyboard focus on the 3D view: a focused button would also react to
+  // Enter (hazard briefings) and Space (drill pressure).
+  viewport.tabIndex = -1;
+  viewport.focus({ preventScroll: true });
   mission.start();
   input.resetLook();
   input.keys.clear();
@@ -185,7 +218,7 @@ async function initSurface(plan, scenario, status) {
     for (let t = 0; t < seconds; t += 1 / 30) mission.update(1 / 30, fake, view.pitch);
     return { s: +mission.s.toFixed(1), v: +mission.speed.toFixed(2), state: mission.state };
   };
-  window.__isg = { renderer, input, mission, route, rover, terrain, setLayer, hud, simulate };
+  window.__isg = { renderer, input, mission, route, rover, terrain, setLayer, hud, simulate, tasks };
 
   function frame() {
     timer.update();
@@ -196,9 +229,13 @@ async function initSurface(plan, scenario, status) {
     if (!planningBoard.open && mission.state !== 'brief') {
       for (const l of LAYERS) if (input.hit(l.key)) setLayer(l.id);
       if (input.hit('m')) hud.toggleMap();
-      if (input.hit('escape')) hud.toggleMap(false);
+      if (input.hit('escape')) {
+        if (hud.overlayOpen || !tasks.active) hud.toggleMap(false);
+        else tasks.cancel();
+      }
       if (input.hit('h')) hud.toggleHidden();
       if (input.hit('v')) input.resetLook();
+      if (input.hit('b')) input.lookBack();
       if (input.hit('n')) hud.log(audio.toggleMute() ? 'Audio muted' : 'Audio on', 'info');
       if (input.hit('l')) {
         lightsOn = !lightsOn;
@@ -210,7 +247,10 @@ async function initSurface(plan, scenario, status) {
         hud.log(`Cruise ${mission.cruise ? 'ON' : 'OFF'}`, 'info');
       }
       if (input.hit('enter')) mission.acknowledge();
+      if (input.hit('e')) startTask();
     }
+    // Touch TASK button: a tap starts the task, holding it presses the drill.
+    if (input.hit('touch:action')) startTask();
 
     // ---- simulation
     if (!planningBoard.open) mission.update(dt, input, view.pitch);
@@ -263,17 +303,43 @@ async function initSurface(plan, scenario, status) {
       lookTarget: copilotLook,
     });
 
-    // ---- driver's head
+    // ---- driver's head: a full 360° turn, leaning out of the seat to look aft
+    input.lookLocked = tasks.lockLook;
     if (mission.state === 'brief') {
       look.yaw = Math.sin(time * 0.18) * 0.55;
       look.pitch = -0.05 + Math.sin(time * 0.11) * 0.05;
     } else {
+      if (!planningBoard.open) {
+        // Z / X turn the head. During a task the rover is parked, so WASD / arrows look too.
+        const aiming = tasks.active && !tasks.lockLook;
+        const yawKeys = (input.down('z') || (aiming && input.down('a', 'arrowleft')) ? 1 : 0) - (input.down('x') || (aiming && input.down('d', 'arrowright')) ? 1 : 0);
+        const pitchKeys = aiming ? (input.down('w', 'arrowup') ? 1 : 0) - (input.down('s', 'arrowdown') ? 1 : 0) : 0;
+        const speed = aiming ? 0.9 : 2.4;
+        if (yawKeys || pitchKeys) input.turnHead(yawKeys * speed * dt, pitchKeys * speed * 0.7 * dt);
+      }
       look.yaw += (input.look.yaw - look.yaw) * damp(12, dt);
       look.pitch += (input.look.pitch - look.pitch) * damp(12, dt);
     }
-    camera.rotation.set(-0.1 + look.pitch, look.yaw, 0, 'YXZ');
+    const relYaw = wrapAngle(look.yaw);
+    const lean = smoothstep(0.9, 2.5, Math.abs(relYaw));
+    rover.cameraMount.position.set(EYE.x - Math.sign(relYaw) * 0.14 * lean, EYE.y + 0.07 * lean, EYE.z - 0.06 * lean);
+    // Suit sway while aiming an instrument, drill vibration while drilling.
+    const sway = tasks.sway;
+    const shake = tasks.shake;
+    const swayYaw = sway * (Math.sin(time * 1.1) * 0.75 + Math.sin(time * 2.7 + 1) * 0.3) + shake * (Math.random() - 0.5);
+    const swayPitch = sway * (Math.cos(time * 0.9) * 0.55 + Math.sin(time * 3.3) * 0.25) + shake * (Math.random() - 0.5);
+    camera.rotation.set(-0.1 + look.pitch + swayPitch, look.yaw + swayYaw, 0, 'YXZ');
     camera.updateMatrixWorld(true);
     camera.getWorldPosition(camWorld);
+    lookChip.classList.toggle('hidden', Math.abs(relYaw) < 1.25 || mission.state === 'brief');
+    if (tasks.active && !planningBoard.open) {
+      camera.getWorldDirection(aimDir);
+      tasks.update(dt, {
+        eye: camWorld, dir: aimDir,
+        pressing: input.down(' ') || (input.look.dragging && tasks.lockLook) || input.virtual.action,
+        breathing: input.down('shift'),
+      });
+    }
 
     // ---- environment follows the viewer
     sky.position.copy(camWorld);

@@ -33,6 +33,12 @@ export const FEATURES = {
   basin: { cx: 100, cz: -400, rimRadius: 2600, rimHeight: 300 },
 };
 
+// Station tasks are played first-person from the rover (src/sim/fieldTasks.js):
+//   scan  — hold the instrument reticle on each marked rock (layout: rocks · bed · sky)
+//   pano  — turn to each camera frame and hold still for the shutter
+//   tune  — find the habitat signal by turning your head, then hold the peak
+//   sweep — trace the radar line on the ground at a steady pace
+//   drill — keep drill pressure inside the moving band until the core is cut
 // Hand-planned traverse (control points of a centripetal Catmull-Rom spline).
 export const ROUTE_POINTS = [
   [0, -14],
@@ -66,9 +72,9 @@ export const STATIONS = [
       'OPTICAL: dark, rough texture distinct from the delta deposits',
     ],
     tasks: [
-      { label: 'VNIR spectrometer scan', minutes: 20, result: 'Band at 1.05 µm → olivine-rich (MOCK)' },
-      { label: 'Close-up imaging of outcrop texture', minutes: 15, result: '42 frames · grain size 1–3 mm (MOCK)' },
-      { label: 'Collect rock core #1', minutes: 30, result: 'Core 6.1 cm sealed in tube A1 (MOCK)' },
+      { label: 'VNIR spectrometer scan', kind: 'scan', targets: 1, minutes: 20, result: 'Band at 1.05 µm → olivine-rich (MOCK)' },
+      { label: 'Close-up imaging of outcrop texture', kind: 'scan', targets: 3, minutes: 15, result: '42 frames · grain size 1–3 mm (MOCK)' },
+      { label: 'Collect rock core #1', kind: 'drill', minutes: 30, result: 'Core 6.1 cm sealed in tube A1 (MOCK)' },
     ],
   },
   {
@@ -82,9 +88,9 @@ export const STATIONS = [
       'Base of the scarp is flat; the climb that follows is the main hazard',
     ],
     tasks: [
-      { label: 'Stratigraphic panorama (12 frames)', minutes: 20, result: '≥ 9 beds resolved, 0.2–0.8 m thick (MOCK)' },
-      { label: 'Laser range bed thickness', minutes: 15, result: 'Mean bed 0.46 m (MOCK)' },
-      { label: 'Collect mudstone sample', minutes: 30, result: 'Fine-grained sample in tube A2 (MOCK)' },
+      { label: 'Stratigraphic panorama', kind: 'pano', frames: 4, arc: 120, minutes: 20, result: '≥ 9 beds resolved, 0.2–0.8 m thick (MOCK)' },
+      { label: 'Laser range bed thickness', kind: 'scan', layout: 'bed', targets: 2, minutes: 15, result: 'Mean bed 0.46 m (MOCK)' },
+      { label: 'Collect mudstone sample', kind: 'drill', minutes: 30, result: 'Fine-grained sample in tube A2 (MOCK)' },
     ],
   },
   {
@@ -98,9 +104,9 @@ export const STATIONS = [
       'Rim is steep — stop outside it and work on foot',
     ],
     tasks: [
-      { label: 'Survey ejecta block field', minutes: 20, result: '17 blocks > 0.5 m mapped (MOCK)' },
-      { label: 'Ground-penetrating radar line', minutes: 25, result: 'Reflector at ~3.2 m depth (MOCK)' },
-      { label: 'Collect ejecta sample', minutes: 25, result: 'Pyroxene-rich clast in tube A3 (MOCK)' },
+      { label: 'Survey ejecta block field', kind: 'scan', targets: 3, minutes: 20, result: '17 blocks > 0.5 m mapped (MOCK)' },
+      { label: 'Ground-penetrating radar line', kind: 'sweep', minutes: 25, result: 'Reflector at ~3.2 m depth (MOCK)' },
+      { label: 'Collect ejecta sample', kind: 'drill', minutes: 25, result: 'Pyroxene-rich clast in tube A3 (MOCK)' },
     ],
   },
   {
@@ -114,9 +120,9 @@ export const STATIONS = [
       'Exposed crest: check dosimeter and dust conditions',
     ],
     tasks: [
-      { label: 'Comms relay check with HAB', minutes: 10, result: 'Link margin +7 dB (MOCK)' },
-      { label: 'Dosimeter reading', minutes: 5, result: '0.29 mSv/sol, quiet space weather (MOCK)' },
-      { label: '360° planning panorama', minutes: 20, result: 'Panorama stored · 64 frames (MOCK)' },
+      { label: 'Comms relay check with HAB', kind: 'tune', minutes: 10, result: 'Link margin +7 dB (MOCK)' },
+      { label: 'Dosimeter reading', kind: 'scan', layout: 'sky', targets: 1, minutes: 5, result: '0.29 mSv/sol, quiet space weather (MOCK)' },
+      { label: '360° planning panorama', kind: 'pano', frames: 6, arc: 360, minutes: 20, result: 'Panorama stored · 64 frames (MOCK)' },
     ],
   },
 ];

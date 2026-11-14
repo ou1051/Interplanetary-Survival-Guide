@@ -112,6 +112,20 @@ kbd {
   color: var(--hud);
 }
 .layer-chip em { font-style: normal; color: var(--warn); }
+.look-chip {
+  position: absolute;
+  top: 118px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 4px 12px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hud-strong);
+  background: rgba(4, 10, 12, 0.55);
+  border: 1px solid var(--hud-faint);
+}
 
 .hud-left, .hud-right {
   position: absolute;
@@ -407,6 +421,12 @@ kbd {
 .task .chk { width: 16px; height: 16px; border: 1.5px solid var(--hud-dim); position: relative; z-index: 1; }
 .task .lbl, .task .min { position: relative; z-index: 1; }
 .task .min { font-family: var(--mono); font-size: 11px; color: var(--hud-dim); }
+.task .grade { display: inline-block; min-width: 0; margin-right: 8px; font-family: var(--sans); font-weight: 800; font-size: 13px; color: var(--hud-strong); }
+.task .grade[data-grade='S'] { color: #ffe27a; }
+.task .grade[data-grade='A'] { color: var(--ok); }
+.task .grade[data-grade='C'] { color: var(--warn); }
+.card .score { margin-top: 12px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; color: var(--hud-dim); display: flex; justify-content: space-between; align-items: baseline; }
+.card .score b { font-size: 18px; letter-spacing: 0.04em; color: var(--hud-strong); }
 .task .res { grid-column: 2 / -1; font-family: var(--mono); font-size: 11px; color: var(--ok); position: relative; z-index: 1; }
 .task.done { border-color: rgba(92, 255, 154, 0.4); cursor: default; }
 .task.done .chk { border-color: var(--ok); background: var(--ok); }
@@ -500,6 +520,8 @@ button.ghost {
   color: var(--hud);
   text-transform: uppercase;
 }
+.screen h1 #debriefTitle { display: inline; font: inherit; letter-spacing: inherit; margin: 0; color: inherit; text-transform: none; }
+.debrief-note { font-family: var(--sans); font-size: 15px; line-height: 1.6; color: rgba(255, 242, 230, 0.88); margin: 0 0 18px; max-width: 560px; }
 .lede { font-family: var(--sans); font-size: 16px; line-height: 1.6; color: rgba(255, 242, 230, 0.86); margin: 0 0 22px; }
 .lede b { color: var(--hud); }
 .brief-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }

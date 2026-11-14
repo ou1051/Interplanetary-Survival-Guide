@@ -29,6 +29,7 @@
           </div>
           <div class="layer-chip" id="layerChip"></div>
         </header>
+        <p id="lookChip" class="look-chip hidden" role="status">Looking aft · <kbd>V</kbd> face forward</p>
 
         <aside class="hud-left" id="vitals">
           <div class="panel-title">LIFE SUPPORT</div>
@@ -64,6 +65,7 @@
           <div class="keys" id="keys">
             <span><kbd>W</kbd> drive</span><span><kbd>S</kbd> brake</span><span><kbd>A</kbd><kbd>D</kbd> steer</span>
             <span><kbd>C</kbd> cruise</span><span><kbd>⇧</kbd> time ×3</span><span><kbd>E</kbd> task</span>
+            <span><kbd>Z</kbd><kbd>X</kbd> look</span><span><kbd>B</kbd> look back</span>
             <span><kbd>↵</kbd> confirm</span><span><kbd>M</kbd> map</span><span><kbd>L</kbd> lights</span>
             <span><kbd>H</kbd> HUD</span><span><kbd>V</kbd> recentre view</span>
           </div>
@@ -132,7 +134,8 @@
       <section id="debrief" class="screen hidden">
         <div class="screen-inner">
           <div class="eyebrow">EVA DEBRIEF</div>
-          <h1>TRAVERSE COMPLETE<span id="debriefSub"></span></h1>
+          <h1><span id="debriefTitle">TRAVERSE COMPLETE</span><span id="debriefSub"></span></h1>
+          <p class="debrief-note" id="debriefNote" hidden></p>
           <div class="brief-grid" id="debriefGrid"></div>
           <button id="restartBtn" class="primary">RETURN TO MISSION MAP</button>
         </div>
