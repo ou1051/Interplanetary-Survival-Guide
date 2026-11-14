@@ -81,6 +81,12 @@ export interface Site {
   assignment?: Assignment;
   /** True for the synthetic development fixture: the UI says so. */
   synthetic?: boolean;
+  /**
+   * Optional geographic placement: planetocentric lat / east-positive lon (°) of
+   * the grid centre, grid north-up. When present the site plan shows real
+   * orbital imagery around the grid. (Map-module addition; proposed for src/shared/.)
+   */
+  geo?: { lat: number; lon: number };
 }
 
 export interface RoutePlan {

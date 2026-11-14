@@ -152,3 +152,30 @@ describe('map · route comparison', () => {
     expect(l).toEqual(['a', 'b', 'c']);
   });
 });
+
+describe('map · site backdrop maths', () => {
+  it('finds the HiRISE tiles around a site and a sharp-enough level', async () => {
+    const { tilesFor, levelFor, toDegrees, MARS_M_PER_DEG, levelsLut } = await import('./siteImagery');
+    expect(Math.round(MARS_M_PER_DEG)).toBe(59275);
+    const d = toDegrees(0, 59274, 59274);
+    expect(d.dLon).toBeCloseTo(1, 3);
+    expect(d.dLat).toBeCloseTo(1, 3);
+    expect(levelFor(0.17, -4.7)).toBe(17); // ~0.16 m/px
+    expect(levelFor(0.4, -4.7)).toBe(16);
+    const tiles = tilesFor({ lat: -4.714, lon: 137.357 }, { west: -100, east: 100, south: -100, north: 100 }, 16);
+    expect(tiles.length).toBeGreaterThanOrEqual(4);
+    expect(tiles.length).toBeLessThanOrEqual(9);
+    // a 200 m box at level 16 (~163 m tiles) never needs a tile far away
+    for (const t of tiles) {
+      const span = 180 / 2 ** 16;
+      expect(Math.abs(-180 + (t.x + 0.5) * span - 137.357)).toBeLessThan(0.006);
+    }
+    // levels stretch a dark histogram over most of the range
+    const hist = new Uint32Array(256);
+    for (let v = 30; v <= 90; v++) hist[v] = 10;
+    const lut = levelsLut(hist, 610);
+    expect(lut[30]).toBeLessThan(25);
+    expect(lut[90]).toBeGreaterThan(230);
+
+  });
+});
