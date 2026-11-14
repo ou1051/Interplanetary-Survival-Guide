@@ -544,3 +544,15 @@ button.primary:disabled { opacity: 0.5; cursor: progress; box-shadow: none; }
 }
 
 .pb-launch-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+.sources-dialog { color: #dce5df; border: 1px solid #52635c; background: #101b1d; padding: 46px; width: min(900px, 92vw); max-height: 86vh; font-family: var(--sans); border-radius: 6px; box-shadow: 0 30px 120px #000a; user-select: text; }
+.sources-dialog::backdrop { background: #020b10c9; backdrop-filter: blur(8px); }
+.sources-dialog h2 { font-size: clamp(26px, 3vw, 40px); letter-spacing: -.04em; line-height: 1.15; font-weight: 400; margin: 24px 0; }
+.sources-dialog p, .sources-dialog li { font-size: 12px; line-height: 1.8; color: #afc1bb; }.sources-dialog h3 { font-size: 14px; font-weight: 500; }
+.sources-dialog a { color: #d0e4bc; text-underline-offset: 4px; }.sources-dialog .source-close { position: absolute; top: 12px; right: 18px; border: 0; background: none; color: #dce5df; font-size: 26px; cursor: pointer; }
+.source-note { border-top: 1px solid #ffffff20; padding-top: 14px; }
+@media (max-width: 760px) {
+  .sources-dialog { padding: 30px 23px; }
+}
+button:focus-visible, a:focus-visible { outline: 2px solid #d3edb9; outline-offset: 5px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }

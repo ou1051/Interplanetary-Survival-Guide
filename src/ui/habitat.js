@@ -31,7 +31,11 @@ export function mountHabitat(root, launch) {
       </header>
       <div class="hab-wall">
         <div class="hab-screen">
-          <header class="hab-header"><h1>Mission briefing</h1><span class="hab-eva"><i></i> EVA-01</span><button type="button" data-review-close>← Habitat view</button></header>
+          <header class="hab-header"><h1>Mission briefing</h1><span class="hab-eva"><i></i> EVA-01</span><nav class="hab-nav" aria-label="Mission navigation">
+            <a href="./map.html">Explore Mars</a>
+            <button type="button" id="sourcesBtn">Mission &amp; sources</button>
+            <button type="button" data-review-close>← Habitat view</button>
+          </nav></header>
           <div class="hab-console-grid">
           <div class="hab-layout">
             <aside class="hab-metrics" aria-label="Selected route">
@@ -344,12 +348,13 @@ export function mountHabitat(root, launch) {
   const observation = query('[data-photo-dialog]');
   let launching = false;
   window.addEventListener('keydown', (event) => {
+    if (document.querySelector('dialog[open]')) return;
     if (event.key.toLowerCase() === 'e' && !event.repeat && !event.altKey && !event.ctrlKey &&
-        !event.metaKey && intro.hidden && !root.classList.contains('hidden') && !zoomed && !observation.open) {
+        !event.metaKey && intro.hidden && !root.classList.contains('hidden') && !zoomed) {
       event.preventDefault();
       setZoom(true);
     }
-    if (event.key === 'Escape' && !root.classList.contains('hidden') && zoomed && !observation.open && !event.defaultPrevented) setZoom(false);
+    if (event.key === 'Escape' && !root.classList.contains('hidden') && zoomed && !event.defaultPrevented) setZoom(false);
   });
   query('[data-site-select]').addEventListener('change', event => {
     selected = event.target.value === 'delta' ? original : galeSelection;
