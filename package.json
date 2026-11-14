@@ -7,7 +7,9 @@
     "build": "vite build",
     "build:single": "vite build --mode single",
     "preview": "vite preview",
-    "test": "vitest run",
+    "api": "node server/start.js",
+    "test": "npm run test:routes && vitest run",
+    "test:routes": "node --test src/routes/*.test.js src/physics/*.test.js server/routes.test.js",
     "typecheck": "tsc"
   },
   "repository": {

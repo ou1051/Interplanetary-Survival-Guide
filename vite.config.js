@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
+import { routeApi } from './server/routes.js';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 
@@ -22,19 +23,23 @@ export default defineConfig(({ mode }) => ({
             },
           },
   },
-  plugins:
+  plugins: [
+    {
+      name: 'route-api',
+      configureServer(server) { server.middlewares.use(routeApi); },
+      configurePreviewServer(server) { server.middlewares.use(routeApi); },
+    },
     mode === 'single'
-      ? [viteSingleFile()]
-      : [
+      ? viteSingleFile()
+      : viteStaticCopy({
           // CesiumJS loads its web workers and assets at runtime from ./cesium/
-          viteStaticCopy({
-            targets: ['Workers', 'ThirdParty', 'Assets', 'Widgets'].map((d) => ({
-              src: `${cesium}/${d}`,
-              dest: 'cesium',
-              rename: { stripBase: 4 },
-            })),
-          }),
-        ],
+          targets: ['Workers', 'ThirdParty', 'Assets', 'Widgets'].map((d) => ({
+            src: `${cesium}/${d}`,
+            dest: 'cesium',
+            rename: { stripBase: 4 },
+          })),
+        }),
+  ],
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
