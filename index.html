@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Interplanetary Survival Guide — Martian Map</title>
+    <meta name="description" content="First-person rover traverse planner for a Mars EVA: survival route, hazards and science stations in 3D." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23c1673d'/%3E%3Cpath d='M6 20 Q16 14 26 19' stroke='%239af4ff' stroke-width='2.5' fill='none'/%3E%3C/svg%3E" />
+    <script type="module" crossorigin src="./assets/main-DF7iL1Zt.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/modulepreload-polyfill-P2Xu9kJm.js">
+    <link rel="stylesheet" crossorigin href="./assets/main-B0iRwqaR.css">
+  </head>
+  <body>
+    <div id="app">
+      <div id="viewport"></div>
+      <div id="visor" aria-hidden="true"></div>
+
+      <div id="hud" class="hidden">
+        <div id="markers"></div>
+        <header class="hud-top">
+          <div class="mission">
+            <div class="mission-id"><span id="evaId">EVA-03</span> · <span id="siteName">SITE A</span></div>
+            <div class="mission-clock">
+              <span>MET <b id="met">00:00:00</b></span>
+              <span>LMST <b id="lmst">14:10</b></span>
+              <span>SOL <b id="sol">214</b></span>
+            </div>
+          </div>
+          <div id="compass">
+            <canvas id="compassCanvas" width="520" height="54"></canvas>
+          </div>
+          <div class="layer-chip" id="layerChip"></div>
+        </header>
+
+        <aside class="hud-left" id="vitals">
+          <div class="panel-title">LIFE SUPPORT</div>
+          <div class="vital" id="v-o2"><span class="k">O₂ / EVA</span><b class="v">--</b><i class="bar"><i></i></i></div>
+          <div class="vital" id="v-pwr"><span class="k">ROVER PWR</span><b class="v">--</b><i class="bar"><i></i></i></div>
+          <div class="vital" id="v-dose"><span class="k">DOSE</span><b class="v">--</b></div>
+          <div class="vital" id="v-comms"><span class="k">COMMS</span><b class="v">--</b></div>
+          <div class="vital" id="v-walk"><span class="k">WALKBACK</span><b class="v">--</b><i class="bar"><i></i></i></div>
+          <div class="vital" id="v-temp"><span class="k">EXT TEMP</span><b class="v">-23 °C</b></div>
+        </aside>
+
+        <aside class="hud-right" id="navPanel">
+          <div class="panel-title">NAVIGATION</div>
+          <div class="next">
+            <div class="next-k">NEXT STOP</div>
+            <div class="next-name" id="nextName">--</div>
+            <div class="next-row"><span id="nextDist">--</span><span id="nextEta">--</span></div>
+          </div>
+          <div class="speed">
+            <b id="speedVal">0.0</b><span>km/h</span>
+            <div class="limit" id="speedLimit">LIMIT 16</div>
+          </div>
+          <div class="attitude">
+            <canvas id="attitudeCanvas" width="220" height="92"></canvas>
+          </div>
+          <div class="zone" id="zoneInfo"></div>
+        </aside>
+
+        <div id="alert" class="alert"></div>
+        <div class="hud-bottom">
+          <div id="prompt" class="prompt"></div>
+          <canvas id="progressCanvas" width="760" height="40"></canvas>
+          <div class="keys" id="keys">
+            <span><kbd>W</kbd> drive</span><span><kbd>S</kbd> brake</span><span><kbd>A</kbd><kbd>D</kbd> steer</span>
+            <span><kbd>C</kbd> cruise</span><span><kbd>⇧</kbd> time ×3</span><span><kbd>E</kbd> task</span>
+            <span><kbd>↵</kbd> confirm</span><span><kbd>M</kbd> map</span><span><kbd>L</kbd> lights</span>
+            <span><kbd>H</kbd> HUD</span><span><kbd>V</kbd> recentre view</span>
+          </div>
+        </div>
+
+        <div id="log" class="log"></div>
+
+        <div id="layers" class="layers">
+          <div class="panel-title">DATA LAYERS <small>[1–4]</small></div>
+          <div class="layer-buttons" id="layerButtons"></div>
+          <div class="legend" id="legend"></div>
+        </div>
+
+        <div id="touch" class="touch">
+          <button data-v="left" aria-label="steer left">◀</button>
+          <button data-v="right" aria-label="steer right">▶</button>
+          <button data-v="brake" class="brake">BRAKE</button>
+          <button data-v="throttle" class="throttle">DRIVE</button>
+          <button data-v="action" class="action">TASK</button>
+        </div>
+      </div>
+
+      <section id="card" class="card hidden" aria-live="polite"></section>
+
+      <section id="mapOverlay" class="overlay hidden">
+        <div class="overlay-inner">
+          <div class="overlay-head">
+            <div>
+              <div class="overlay-title">SURVIVAL ROUTE · <span id="mapSite"></span></div>
+              <div class="overlay-sub" id="mapSub"></div>
+            </div>
+            <button id="mapClose" class="ghost">CLOSE [M]</button>
+          </div>
+          <div class="overlay-body">
+            <canvas id="mapCanvas" width="900" height="900"></canvas>
+            <div class="overlay-side">
+              <div class="panel-title">ROUTE ASSESSMENT</div>
+              <div id="routeStats" class="route-stats"></div>
+              <div class="panel-title">HAZARD ZONES</div>
+              <div id="zoneTable" class="zone-table"></div>
+              <div class="disclaimer">
+                Hazards are evaluated from the elevation model along the planned centreline. Resolution limits apply:
+                rocks smaller than the grid cell are not detected. This is a planning aid, not a guarantee of safety.
+              </div>
+            </div>
+          </div>
+          <canvas id="profileCanvas" width="1400" height="170"></canvas>
+        </div>
+      </section>
+
+      <section id="brief" class="screen">
+        <div class="screen-inner">
+          <div class="eyebrow">NASA SPACE APPS · INTERPLANETARY SURVIVAL GUIDE</div>
+          <h1>MARTIAN MAP<span>Rover traverse · first-person</span></h1>
+          <p class="lede">
+            You are driving the pressurised-suit rover on <b id="briefEva">EVA-03</b>. Follow the survival route,
+            stop at hazard gates for a safety briefing, and complete the science tasks at each station before your
+            consumables run low.
+          </p>
+          <div class="brief-grid" id="briefGrid"></div>
+          <div class="brief-controls">
+            <span><kbd>W</kbd> / <kbd>↑</kbd> drive</span>
+            <span><kbd>A</kbd><kbd>D</kbd> steer in corridor</span>
+            <span><kbd>E</kbd> hold for tasks</span>
+            <span><kbd>Enter</kbd> confirm</span>
+            <span><kbd>1–4</kbd> data layers</span>
+            <span>drag to look around</span>
+          </div>
+          <button id="beginBtn" class="primary" disabled>PREPARING TERRAIN…</button>
+          <div class="mock-note">⚠ No NASA data connected yet — terrain and layers are procedural placeholders.</div>
+        </div>
+      </section>
+
+      <section id="debrief" class="screen hidden">
+        <div class="screen-inner">
+          <div class="eyebrow">EVA DEBRIEF</div>
+          <h1>TRAVERSE COMPLETE<span id="debriefSub"></span></h1>
+          <div class="brief-grid" id="debriefGrid"></div>
+          <button id="restartBtn" class="primary">RUN AGAIN</button>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>
