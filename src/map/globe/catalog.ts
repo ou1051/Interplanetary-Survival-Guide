@@ -27,6 +27,10 @@ export interface TileSource {
   alpha?: number;
   /** Make pure-black "no data" pixels transparent. */
   blackIsNoData?: boolean;
+  /** Greyscale product: tint with the Viking colour mosaic (see colorize.ts). */
+  colorize?: boolean;
+  /** Display grading (Cesium ImageryLayer: 1 = unchanged). */
+  tone?: { brightness?: number; contrast?: number; saturation?: number; gamma?: number; hue?: number };
   mission: string;
   instrument: string;
   /** Approx. ground resolution of the source product. */
@@ -43,6 +47,11 @@ export interface ImageryStyle {
 }
 
 const TREK = 'https://trek.nasa.gov/tiles/Mars/EQ';
+// Grading tuned by eye against MRO/Curiosity natural-colour views of Gale:
+// Viking colour gets a little warmer and crisper; colour-matched detail layers
+// carry less chroma than Viking (luminance comes from greyscale), so they need more.
+const VIKING_TONE = { saturation: 1.3, contrast: 1.12 };
+const DETAIL_TONE = { saturation: 2.0, hue: 0.1, contrast: 1.06, brightness: 1.06 };
 const trek = (layer: string, ext: 'png' | 'jpg') => `${TREK}/${layer}/1.0.0//default/default028mm/{z}/{y}/{x}.${ext}`;
 
 export const SOURCES = {
@@ -65,6 +74,7 @@ export const SOURCES = {
     instrument: 'MDIM 2.1 colour mosaic',
     resolution: '232 m/px',
     credit: 'NASA/JPL/USGS · Mars Trek',
+    tone: VIKING_TONE,
   },
   ctxGlobal: {
     id: 'ctx-global',
@@ -74,7 +84,8 @@ export const SOURCES = {
     // resolution); deeper requests 404 without CORS. Verified at Vera Rubin Ridge.
     maxLevel: 12,
     minViewLevel: 7,
-    alpha: 0.78, // keeps a trace of the colour base under the greyscale CTX
+    colorize: true,
+    tone: DETAIL_TONE,
     mission: 'Mars Reconnaissance Orbiter',
     instrument: 'CTX global mosaic (Murray Lab, Caltech)',
     resolution: '5 m/px',
@@ -87,8 +98,9 @@ export const SOURCES = {
     maxLevel: 12,
     bbox: { west: 135.1842593, south: -6.5732988, east: 139.2413012, north: -2.8077809 },
     minViewLevel: 8,
-    alpha: 0.86,
     blackIsNoData: true,
+    colorize: true,
+    tone: DETAIL_TONE,
     mission: 'Mars Reconnaissance Orbiter',
     instrument: 'CTX, Gale block-adjusted mosaic',
     resolution: '6 m/px',
@@ -101,22 +113,43 @@ export const SOURCES = {
     maxLevel: 16,
     bbox: { west: 137.1224669, south: -4.9254743, east: 137.7298129, north: -4.2489588 },
     minViewLevel: 10,
-    alpha: 0.9,
     blackIsNoData: true,
+    colorize: true,
+    tone: DETAIL_TONE,
     mission: 'Mars Reconnaissance Orbiter',
     instrument: 'HiRISE, Curiosity traverse mosaic',
     resolution: '25 cm/px source',
     credit: 'NASA/JPL/University of Arizona · Mars Trek',
   },
+  jezeroHirise: {
+    id: 'jezero-hirise',
+    // Esri's sparse global HiRISE cache (red band, through 2018). Missing tiles
+    // fail without CORS, so it is only requested where coverage was checked:
+    // Jezero crater is fully covered at level 11, and tiles exist to level 17.
+    url: 'https://astro.arcgis.com/arcgis/rest/services/OnMars/HiRISE/MapServer/tile/{z}/{y}/{x}',
+    tileSize: 512,
+    maxLevel: 17,
+    bbox: { west: 77.05, south: 18.15, east: 77.85, north: 18.75 },
+    minViewLevel: 10,
+    colorize: true,
+    tone: DETAIL_TONE,
+    mission: 'Mars Reconnaissance Orbiter',
+    instrument: 'HiRISE, Esri global mosaic',
+    resolution: '25 cm/px source',
+    credit: 'NASA/JPL/University of Arizona/USGS · Esri',
+  },
 } satisfies Record<string, TileSource>;
+
+/** Colour source used to tint the greyscale detail layers. */
+export const COLOR_BASE = { url: SOURCES.viking.url, tileSize: SOURCES.viking.tileSize, maxLevel: SOURCES.viking.maxLevel };
 
 export const IMAGERY: ImageryStyle[] = [
   {
     id: 'best',
-    name: 'Best available',
-    short: 'Best',
-    description: 'Viking colour, sharpening to CTX and HiRISE as you zoom in',
-    stack: [SOURCES.viking, SOURCES.ctxGlobal, SOURCES.galeCtx, SOURCES.curiosityHirise],
+    name: 'Natural colour',
+    short: 'Natural',
+    description: 'Viking colour, sharpening to colour-matched CTX and HiRISE as you zoom in',
+    stack: [SOURCES.viking, SOURCES.ctxGlobal, SOURCES.galeCtx, SOURCES.jezeroHirise, SOURCES.curiosityHirise],
   },
   {
     id: 'relief',
@@ -139,6 +172,13 @@ export const TERRAIN = {
   mission: 'MGS MOLA + Mars Express HRSC',
   resolution: '200 m grid',
   credit: 'Mars 200 m DEM · NASA/JPL/GSFC · ESA/DLR · Esri',
+  /** Stereo DTMs blended in where they exist (Gale crater included). */
+  detail: {
+    url: 'https://astro.arcgis.com/arcgis/rest/services/OnMars/HiRISE_DEM/ImageServer',
+    mission: 'MRO HiRISE stereo DTMs',
+    resolution: '~1 m grid',
+    credit: 'HiRISE DTM mosaic · NASA/JPL/University of Arizona/USGS · Esri',
+  },
 };
 
 export interface Place {

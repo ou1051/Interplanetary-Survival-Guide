@@ -1,65 +1,116 @@
 import { Credit, CustomHeightmapTerrainProvider, Ellipsoid, GeographicTilingScheme } from 'cesium';
-import Lerc from 'lerc';
 import { TERRAIN } from './catalog';
-import { DEM_MAX_LEVEL, DEM_TILE, HEIGHTMAP_SIZE, LruCache, heightmapFor, sourceTileFor, tileRect, type SourceRaster } from './dem';
+import { HEIGHTMAP_SIZE } from './dem';
+import type { HeightmapResult, ReliefSource } from './demSource';
 
 // ---------------------------------------------------------------------------
-// Real Mars relief from Esri's "Mars 200 m DEM" (MOLA + HRSC), served as LERC.
+// Real Mars relief for Cesium: 200 m MOLA/HRSC everywhere, HiRISE stereo DTMs
+// (~1 m) where they exist (the assignment area included).
+//
 // Why a custom provider rather than Cesium's ArcGISTiledElevationTerrainProvider:
-//  - its spatial reference (GCS_Mars_2000_Sphere, wkid 104971) is rejected;
-//  - its metadata URL with a trailing slash answers without CORS headers;
-//  - it has no tile map, and its 513 × 513 heightmaps make each refinement
-//    level rebuild huge meshes (the view stalled around level 9 in testing).
-// We decode the LERC tiles ourselves (Esri's lerc decoder, which reads the
-// service's LERC1 "CntZImage" blobs) and give Cesium 65 × 65 heightmaps
-// resampled from the deepest source tile at every display level.
+//  - the Mars spatial reference (wkid 104971) is rejected;
+//  - the metadata URL with a trailing slash answers without CORS headers;
+//  - its 513 × 513 heightmaps rebuild huge meshes per level (refinement stalled).
+// All fetching, LERC decoding and resampling happens in a Web Worker
+// (demWorker.ts); the main thread only receives 65 × 65 Float32Arrays.
 // ---------------------------------------------------------------------------
 
-const cache = new LruCache<Promise<SourceRaster | null>>(48);
+type Pending = { resolve: (r: HeightmapResult) => void; reject: (e: unknown) => void };
 
-async function loadSource(level: number, y: number, x: number): Promise<SourceRaster | null> {
-  const key = `${level}/${y}/${x}`;
-  const hit = cache.get(key);
-  if (hit) return hit;
-  const p = (async () => {
-    const res = await fetch(`${TERRAIN.url}/tile/${level}/${y}/${x}`);
-    if (!res.ok) return null;
-    const decoded = Lerc.decode(await res.arrayBuffer());
-    return {
-      pixels: decoded.pixels[0],
-      width: decoded.width || DEM_TILE,
-      height: decoded.height || DEM_TILE,
-      mask: decoded.mask ?? null,
-      rect: tileRect(x, y, level),
-    } satisfies SourceRaster;
-  })();
-  cache.set(key, p);
-  // a failed fetch should be retried later, not remembered forever
-  p.then(
-    (v) => v === null && cache.delete(key),
-    () => cache.delete(key),
-  );
-  return p;
+/** Promise-per-tile bridge to the worker, with an in-thread fallback (tests, old browsers). */
+export interface HeightmapSource {
+  heightmap(x: number, y: number, level: number): Promise<HeightmapResult>;
+  dispose(): void;
 }
 
-export async function createMarsTerrain(ellipsoid: Ellipsoid): Promise<CustomHeightmapTerrainProvider> {
+function workerSource(): HeightmapSource {
+  const worker = new Worker(new URL('./demWorker.ts', import.meta.url), { type: 'module' });
+  const pending = new Map<number, Pending>();
+  let next = 1;
+  worker.onmessage = (e: MessageEvent<{ id: number; heights?: Float32Array; source?: ReliefSource; error?: string }>) => {
+    const p = pending.get(e.data.id);
+    if (!p) return;
+    pending.delete(e.data.id);
+    if (e.data.heights) p.resolve({ heights: e.data.heights, source: e.data.source ?? 'mola' });
+    else p.reject(new Error(e.data.error ?? 'relief worker failed'));
+  };
+  return {
+    heightmap(x, y, level) {
+      const id = next++;
+      return new Promise((resolve, reject) => {
+        pending.set(id, { resolve, reject });
+        worker.postMessage({ id, x, y, level });
+      });
+    },
+    dispose() {
+      worker.terminate();
+      pending.forEach((p) => p.reject(new Error('disposed')));
+      pending.clear();
+    },
+  };
+}
+
+async function inThreadSource(): Promise<HeightmapSource> {
+  const [{ default: Lerc }, { createDemSampler, fetchLerc }] = await Promise.all([import('lerc'), import('./demSource')]);
+  const sampler = createDemSampler({
+    fetchTile: fetchLerc,
+    decode: (buf) => {
+      const d = Lerc.decode(buf);
+      return { pixels: d.pixels[0], width: d.width, height: d.height, mask: d.mask ?? null };
+    },
+  });
+  return { heightmap: (x, y, level) => sampler.heightmap(x, y, level), dispose() {} };
+}
+
+export interface MarsTerrain {
+  provider: CustomHeightmapTerrainProvider;
+  /** Finest relief source used for the display tiles around a point (null = not loaded). */
+  sourceAt(lon: number, lat: number): ReliefSource | null;
+  dispose(): void;
+}
+
+export async function createMarsTerrain(ellipsoid: Ellipsoid, opts: { worker?: boolean } = {}): Promise<MarsTerrain> {
+  const useWorker = (opts.worker ?? true) && typeof Worker !== 'undefined';
+  const src = useWorker ? workerSource() : await inThreadSource();
+
   // Probe once so the UI can say "unreachable" instead of showing a flat planet.
-  const probe = await loadSource(0, 0, 1);
-  if (!probe) throw new Error('Mars DEM unreachable');
-  const flat = new Float32Array(HEIGHTMAP_SIZE * HEIGHTMAP_SIZE);
-  return new CustomHeightmapTerrainProvider({
+  const probe = await src.heightmap(1, 0, 0).catch(() => null);
+  if (!probe || probe.source === 'none') {
+    src.dispose();
+    throw new Error('Mars DEM unreachable');
+  }
+
+  // Which tiles got HiRISE relief, for the status read-out.
+  const hirise = new Set<string>();
+  const flat = () => new Float32Array(HEIGHTMAP_SIZE * HEIGHTMAP_SIZE);
+
+  const provider = new CustomHeightmapTerrainProvider({
     width: HEIGHTMAP_SIZE,
     height: HEIGHTMAP_SIZE,
     tilingScheme: new GeographicTilingScheme({ ellipsoid }),
     credit: new Credit(TERRAIN.credit),
     callback: async (x: number, y: number, level: number) => {
-      const s = sourceTileFor(x, y, level, DEM_MAX_LEVEL);
       try {
-        const src = await loadSource(s.level, s.y, s.x);
-        return src ? heightmapFor(src, tileRect(x, y, level)) : flat;
+        const r = await src.heightmap(x, y, level);
+        if (r.source === 'hirise') hirise.add(`${level}/${x}/${y}`);
+        return r.heights;
       } catch {
-        return flat;
+        return flat();
       }
     },
   });
+
+  return {
+    provider,
+    sourceAt(lon, lat) {
+      for (let level = 22; level >= 12; level--) {
+        const span = 180 / 2 ** level;
+        const x = Math.floor((lon + 180) / span);
+        const y = Math.floor((90 - lat) / span);
+        if (hirise.has(`${level}/${x}/${y}`)) return 'hirise';
+      }
+      return 'mola';
+    },
+    dispose: () => src.dispose(),
+  };
 }

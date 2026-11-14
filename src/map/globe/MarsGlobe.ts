@@ -6,6 +6,7 @@ import {
   Cartographic,
   Color,
   Credit,
+  DirectionalLight,
   DistanceDisplayCondition,
   EasingFunction,
   Ellipsoid,
@@ -23,25 +24,39 @@ import {
   Rectangle,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
+  SkyAtmosphere,
+  SkyBox,
   UrlTemplateImageryProvider,
   VerticalOrigin,
   Viewer,
 } from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
-import { IMAGERY, PLACES, type ImageryStyle, type Place, type TileSource } from './catalog';
+import { COLOR_BASE, IMAGERY, PLACES, type ImageryStyle, type Place, type TileSource } from './catalog';
+import { ColorBaseCache, ColorizedImageryProvider } from './colorize';
 import { planFlight } from './flight';
-import { createMarsTerrain } from './elevation';
+import { createMarsTerrain, type MarsTerrain } from './elevation';
+import type { ReliefSource } from './demSource';
 
 // ---------------------------------------------------------------------------
-// 3D Mars globe (CesiumJS) with real orbital imagery and MOLA/HRSC relief.
+// 3D Mars globe (CesiumJS): natural-colour orbital imagery (Viking colour with
+// colour-matched CTX and HiRISE detail) on MOLA/HRSC + HiRISE DTM relief.
 // Click anywhere: the camera flies there quickly. Click a place pin: flies to
 // that place's framing. No Cesium ion services are used.
+//
+// Performance notes (measured in Chrome, Nov 2026):
+//  - relief decoding lives in a Web Worker; before that, flights stalled the
+//    main thread for 100–1000 ms at a time and the heap reached ~650 MB;
+//  - MSAA is skipped on high-DPI screens (the native pixels already resolve
+//    edges); FXAA only on 1× screens where it is cheap and helps;
+//  - the render loop stops while the globe is hidden behind the site plan.
 // ---------------------------------------------------------------------------
 
 export interface CursorInfo {
   lat: number;
   lon: number;
   heightM: number | null;
+  /** Finest relief loaded under the cursor. */
+  relief: ReliefSource | null;
 }
 
 export interface CameraInfo {
@@ -93,6 +108,10 @@ export class MarsGlobe {
   private placeEntities = new Map<string, Entity>();
   private lastCursor = 0;
   private destroyed = false;
+  private terrain: MarsTerrain | null = null;
+  private colors = new ColorBaseCache(COLOR_BASE);
+  private light: DirectionalLight;
+  private cameraQueued = false;
 
   constructor(container: HTMLElement, opts: GlobeOptions = {}) {
     this.events = opts;
@@ -116,32 +135,55 @@ export class MarsGlobe {
       selectionIndicator: false,
       terrainProvider: new EllipsoidTerrainProvider({ ellipsoid: MARS }),
       creditContainer: opts.creditContainer,
-      msaaSamples: 4,
+      msaaSamples: (window.devicePixelRatio || 1) >= 2 ? 1 : 4,
       requestRenderMode: true,
       maximumRenderTimeChange: Infinity,
       useBrowserRecommendedResolution: false,
     });
     const v = this.viewer;
     const scene = v.scene;
-    v.resolutionScale = Math.min(window.devicePixelRatio || 1, 2);
+    const globe = scene.globe;
+    const dpr = window.devicePixelRatio || 1;
+    v.resolutionScale = Math.min(dpr, 2);
+    scene.postProcessStages.fxaa.enabled = dpr < 2;
     scene.backgroundColor = Color.BLACK;
-    scene.globe.baseColor = Color.fromCssColorString('#5a2f1d');
-    scene.globe.enableLighting = false;
-    scene.globe.showGroundAtmosphere = false;
-    scene.globe.maximumScreenSpaceError = 1.5;
-    scene.globe.tileCacheSize = 1200; // oblique views keep many tiles alive; avoid evict-and-refetch
-    scene.globe.depthTestAgainstTerrain = true;
+    globe.baseColor = Color.fromCssColorString('#6b3a22');
+    globe.maximumScreenSpaceError = 2;
+    globe.tileCacheSize = 400;
+    globe.depthTestAgainstTerrain = true;
     scene.fog.enabled = false;
     if (scene.moon) scene.moon.show = false;
-    if (scene.skyAtmosphere) {
-      // thin, dusty Martian limb instead of Earth's blue
-      scene.skyAtmosphere.show = true;
-      scene.skyAtmosphere.hueShift = -0.47;
-      scene.skyAtmosphere.saturationShift = -0.35;
-      scene.skyAtmosphere.brightnessShift = -0.25;
-    }
-    scene.postProcessStages.fxaa.enabled = true;
-    scene.screenSpaceCameraController.minimumZoomDistance = 600;
+    if (scene.sun) scene.sun.show = false; // the light follows the camera (below), not Earth's sun
+
+    // Studio sunlight: from above-left of the viewer, so the disc shows a soft
+    // terminator on the far limb in orbit. Lighting fades out below ~2,000 km,
+    // where the imagery's own shadows take over (as in the real photographs).
+    this.light = new DirectionalLight({ direction: new Cartesian3(0, 0, -1), intensity: 2.2 });
+    scene.light = this.light;
+    globe.enableLighting = true;
+    globe.dynamicAtmosphereLighting = true;
+    globe.dynamicAtmosphereLightingFromSun = false;
+    globe.lightingFadeOutDistance = 2.0e6;
+    globe.lightingFadeInDistance = 6.0e6;
+    // No ground haze: on the Earth-tuned model it greys the whole disc; Mars'
+    // thin atmosphere shows from orbit only as a faint limb (below).
+    globe.showGroundAtmosphere = false;
+    // A pale limb glow against space. Cesium only builds its sky (stars,
+    // atmosphere) for the Earth ellipsoid, so both are created here for Mars.
+    scene.skyBox = SkyBox.createEarthSkyBox(); // Tycho-2 star catalogue; nothing Earth-specific
+    const sky = new SkyAtmosphere(MARS);
+    sky.perFragmentAtmosphere = true;
+    sky.atmosphereLightIntensity = 14;
+    sky.atmosphereRayleighCoefficient = new Cartesian3(16e-6, 10e-6, 6.5e-6); // dust reddens, not blues
+    sky.atmosphereMieCoefficient = new Cartesian3(6e-6, 6e-6, 6e-6);
+    sky.atmosphereRayleighScaleHeight = 11000; // Mars' scale height is ~11 km
+    sky.atmosphereMieScaleHeight = 6000;
+    sky.atmosphereMieAnisotropy = 0.8;
+    sky.saturationShift = -0.15;
+    scene.skyAtmosphere = sky;
+    if (/dev/.test(location.hash)) (window as unknown as Record<string, unknown>).__cesium = { Cartesian3, Color, scene, sky };
+    scene.preRender.addEventListener(() => this.aimLight());
+    scene.screenSpaceCameraController.minimumZoomDistance = 250;
     scene.screenSpaceCameraController.maximumZoomDistance = 40_000_000;
     v.cesiumWidget.screenSpaceEventHandler.removeInputAction(ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
@@ -159,8 +201,8 @@ export class MarsGlobe {
     this.handler.setInputAction((e: { endPosition: Cartesian2 }) => this.onMove(e.endPosition), ScreenSpaceEventType.MOUSE_MOVE);
 
     v.camera.percentageChanged = 0.002;
-    v.camera.changed.addEventListener(() => this.emitCamera());
-    v.camera.moveEnd.addEventListener(() => this.emitCamera());
+    v.camera.changed.addEventListener(() => this.queueCamera());
+    v.camera.moveEnd.addEventListener(() => this.queueCamera());
     scene.globe.tileLoadProgressEvent.addEventListener((n: number) => this.events.onTiles?.(n));
     this.emitCamera();
   }
@@ -182,6 +224,7 @@ export class MarsGlobe {
         minimumTerrainLevel: src.minViewLevel,
         colorToAlpha: src.blackIsNoData ? Color.BLACK : undefined,
         colorToAlphaThreshold: 0.01,
+        ...src.tone,
       });
       coll.add(layer);
       return layer;
@@ -190,7 +233,7 @@ export class MarsGlobe {
   }
 
   private provider(src: TileSource): UrlTemplateImageryProvider {
-    const p = new UrlTemplateImageryProvider({
+    const options = {
       url: src.url,
       tilingScheme: new GeographicTilingScheme({ ellipsoid: MARS }),
       tileWidth: src.tileSize,
@@ -198,7 +241,8 @@ export class MarsGlobe {
       maximumLevel: src.maxLevel,
       rectangle: src.bbox ? Rectangle.fromDegrees(src.bbox.west, src.bbox.south, src.bbox.east, src.bbox.north) : undefined,
       credit: new Credit(src.credit),
-    });
+    };
+    const p = src.colorize ? new ColorizedImageryProvider(options, this.colors) : new UrlTemplateImageryProvider(options);
     p.errorEvent.addEventListener((err: { retry?: boolean; timesRetried?: number }) => {
       // local mosaics legitimately 404 at their edges; count real failures only
       if ((err.timesRetried ?? 0) === 0) {
@@ -213,18 +257,26 @@ export class MarsGlobe {
   async setTerrain(on: boolean): Promise<void> {
     this.terrainOn = on;
     const scene = this.viewer.scene;
+    const previous = this.terrain;
     if (!on) {
       scene.terrainProvider = new EllipsoidTerrainProvider({ ellipsoid: MARS });
+      this.terrain = null;
+      previous?.dispose();
       this.terrainState = 'off';
       this.emitStatus();
       return;
     }
+    if (previous) return;
     this.terrainState = 'loading';
     this.emitStatus();
     try {
-      const provider = await createMarsTerrain(MARS);
-      if (this.destroyed || !this.terrainOn) return;
-      scene.terrainProvider = provider;
+      const terrain = await createMarsTerrain(MARS);
+      if (this.destroyed || !this.terrainOn) {
+        terrain.dispose();
+        return;
+      }
+      this.terrain = terrain;
+      scene.terrainProvider = terrain.provider;
       this.terrainState = 'ready';
     } catch (e) {
       console.warn('[globe] terrain unavailable', e);
@@ -367,8 +419,10 @@ export class MarsGlobe {
     }
     const c = Cartographic.fromCartesian(hit, MARS);
     const ex = this.viewer.scene.verticalExaggeration || 1;
-    const terrain = this.terrainState === 'ready';
-    this.events.onCursor?.({ lat: CMath.toDegrees(c.latitude), lon: CMath.toDegrees(c.longitude), heightM: terrain ? c.height / ex : null });
+    const lat = CMath.toDegrees(c.latitude);
+    const lon = CMath.toDegrees(c.longitude);
+    const t = this.terrainState === 'ready' ? this.terrain : null;
+    this.events.onCursor?.({ lat, lon, heightM: t ? c.height / ex : null, relief: t ? t.sourceAt(lon, lat) : null });
   }
 
   private terrainHeight(lat: number, lon: number): number | undefined {
@@ -386,6 +440,35 @@ export class MarsGlobe {
       const visible = occluder.isPointVisible(p);
       if (e.show !== visible) e.show = visible;
     }
+  }
+
+  /** Aim the light from above-left of the viewer (set every frame before rendering). */
+  private aimLight() {
+    const c = this.viewer.camera;
+    const d = this.light.direction;
+    Cartesian3.multiplyByScalar(c.directionWC, 0.62, d);
+    const r = Cartesian3.multiplyByScalar(c.rightWC, 0.66, new Cartesian3());
+    const u = Cartesian3.multiplyByScalar(c.upWC, -0.42, new Cartesian3());
+    Cartesian3.add(d, r, d);
+    Cartesian3.add(d, u, d);
+    Cartesian3.normalize(d, d);
+  }
+
+  /** Camera read-outs at most once per animation frame (they pick the globe). */
+  private queueCamera() {
+    if (this.cameraQueued) return;
+    this.cameraQueued = true;
+    requestAnimationFrame(() => {
+      this.cameraQueued = false;
+      if (!this.destroyed) this.emitCamera();
+    });
+  }
+
+  /** Stop rendering while hidden (e.g. behind the site plan); resume when shown. */
+  setActive(active: boolean): void {
+    if (this.destroyed) return;
+    this.viewer.useDefaultRenderLoop = active;
+    if (active) this.viewer.scene.requestRender();
   }
 
   private emitCamera() {
@@ -425,6 +508,7 @@ export class MarsGlobe {
   destroy(): void {
     this.destroyed = true;
     this.handler.destroy();
+    this.terrain?.dispose();
     this.viewer.destroy();
   }
 }

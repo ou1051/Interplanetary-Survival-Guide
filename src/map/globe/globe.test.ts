@@ -95,3 +95,24 @@ describe('map · globe flight', () => {
     expect(breadcrumb(PLACES, { lat: 18.5, lon: -133.8, altitudeM: 900_000 })).toEqual(['Mars', 'Olympus Mons']);
   });
 });
+
+describe('map · natural-colour compositing', () => {
+  it('finds the Viking colour patch under a detail tile', async () => {
+    const { colorPatch } = await import('./colorize');
+    const base = { tileSize: 256, maxLevel: 7 };
+    // same level: the whole colour tile
+    expect(colorPatch(5, 3, 4, base)).toEqual({ level: 4, x: 5, y: 3, sx: 0, sy: 0, size: 256 });
+    // level 12 tile → level 7 ancestor, a 8 × 8 px patch at its offset in the ancestor
+    const p = colorPatch(3611, 1078, 12, base);
+    expect(p).toMatchObject({ level: 7, x: 3611 >> 5, y: 1078 >> 5, size: 8 });
+    expect(p.sx).toBe((3611 % 32) * 8);
+    expect(p.sy).toBe((1078 % 32) * 8);
+  });
+
+  it('marks greyscale detail layers for colouring and keeps the colour base plain', async () => {
+    const { SOURCES, IMAGERY } = await import('./catalog');
+    expect((SOURCES.viking as { colorize?: boolean }).colorize).toBeUndefined();
+    for (const s of [SOURCES.ctxGlobal, SOURCES.galeCtx, SOURCES.curiosityHirise, SOURCES.jezeroHirise]) expect(s.colorize).toBe(true);
+    expect(IMAGERY[0].stack[0]).toBe(SOURCES.viking);
+  });
+});

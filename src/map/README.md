@@ -28,22 +28,59 @@ on-foot rehearsal is unavailable in the standalone demo and selecting a route do
 | Global detail | MRO CTX mosaic, Murray Lab (Esri OnMars) | 5 m/px | 12 |
 | Gale detail | MRO CTX block-adjusted mosaic (Mars Trek) | 6 m/px | 12 |
 | Assignment detail | MRO HiRISE Curiosity traverse mosaic (Mars Trek) | 25 cm/px source | 16 |
+| Jezero detail | MRO HiRISE global mosaic (Esri OnMars) | 25 cm/px source | 17 |
 | Relief | Mars 200 m DEM, MOLA + HRSC (Esri OnMars, LERC) | 200 m grid | 7 |
+| Relief detail | HiRISE stereo DTM mosaic (Esri OnMars, LERC) | ~1 m grid, where DTMs exist | 15 |
 
 - **Endpoints and levels.** These were read from each service's WMTS capabilities
   or REST metadata. Every limit was then checked by requesting real tiles at the site.
   The CTX metadata advertises level 17, but tiles stop at 12. Requests past a cache's
-  end come back without CORS headers, so the levels are capped.
-  These are the same Trek layers NASA-funded OpenSpace uses.
+  end come back without CORS headers, so the levels are capped. The Esri HiRISE
+  imagery cache is sparse and has no tile map, so it is only requested inside a
+  checked box (Jezero crater).
+- **Natural colour (`colorize.ts`, `colorWorker.ts`).** CTX and HiRISE are greyscale.
+  Each detail tile keeps its own luminance and takes hue and saturation from the
+  Viking colour under it (canvas `color` blending). This runs in a worker on an
+  `OffscreenCanvas`. On the main thread, uploading canvases as textures froze
+  flights for about 1 s.
+- **Lighting and sky.** A studio light follows the camera and gives the disc a soft
+  terminator in orbit. It fades out below about 2,000 km, where the photographs'
+  own shadows take over. Cesium only builds stars and an atmosphere for Earth, so
+  both are created here, with a thin, dust-reddened Mars limb.
+- **Relief (`elevation.ts`, `demSource.ts`, `demWorker.ts`).** A custom heightmap
+  provider. Fetching, LERC decoding and resampling run in a Web Worker.
+  Display level L reads source level L−3, so one source tile serves 64 display tiles.
+  HiRISE heights are used where valid and within 250 m of MOLA (that check rejects
+  the pyramid's edge artefacts). The tiles are 513 × 513 *posts* (edge-registered).
+  Cesium's ArcGIS provider can't be used: it rejects the Mars spatial reference,
+  the metadata URL fails CORS, and its 513 × 513 meshes stall refinement.
+- **Speed.** Measured in Chrome at 1440 × 900 on a 2× display. Flights used to
+  stall for 100–1000 ms at a time, with a heap of about 650 MB. Now the p95 frame
+  time is 17.6 ms and the heap is about 190 MB. The render loop pauses while the
+  site plan is open. MSAA is skipped on 2× screens.
 - **Clicking.** A click anywhere flies the camera to that point in 0.9–1.8 s. Each
   click moves closer; from orbit the view looks straight down, and near the ground it
   tilts to show the relief. Place pins and the *Places* list fly to framed views.
-- **Relief (`elevation.ts`, `dem.ts`).** Cesium's ArcGIS terrain provider can't use
-  this DEM: it rejects the Mars spatial reference, its metadata URL fails CORS, and
-  it builds 513 × 513 meshes that stall refinement. The DEM's LERC tiles are decoded
-  here with Esri's `lerc` decoder. Each display tile gets a 65 × 65 heightmap,
-  resampled from the deepest source tile.
 - **No Cesium ion.** No ion services and no access token are used.
+
+## Site plan backdrop (`siteImagery.ts`)
+
+A site with `geo` (the grid centre's latitude and longitude) is drawn on real MRO
+HiRISE imagery. The tiles are stitched in metres around the grid, stretched with
+percentile levels and tinted with the Viking colour of that ground. A coarse pass
+loads first, then a sharp pass (about 16 cm/px) around the grid. The fixture places
+its grid on Vera Rubin Ridge. Elevations, pins and stations stay synthetic, and the
+legend says which parts are real.
+
+## Design
+
+`tokens.css` holds one token set for both views, based on Apple's Human Interface
+Guidelines (dark mode). It covers the system font first (SF Pro on Apple devices,
+Inter elsewhere, the same fallback as Puppertino), iOS text styles with SF tracking,
+system colours, a 4 pt spacing grid, 44 pt rows, and translucent materials. Blur is
+kept to a few small surfaces because it is costly over WebGL. The layout follows
+Apple Maps: a centred segmented control, a left sidebar, map controls on the right,
+and popovers instead of always-open panels.
 
 ## Using it
 
@@ -104,9 +141,11 @@ rule (open while `turn ≤ lastOpenTurn`, one turn per new observation) until `s
 | File | Role |
 | --- | --- |
 | `contracts.ts` | Stand-ins for the shared types plus the map's own `MapAction` / `MapInput` |
-| `MissionScreen.ts` | App bar, globe view, site-plan view |
+| `MissionScreen.ts` | Toolbar, globe view, site-plan view |
+| `tokens.css` · `screen.css` · `map.css` | Design tokens (Apple HIG) and the two views' styles |
+| `siteImagery.ts` | Real HiRISE backdrop for geo-referenced sites |
 | `MissionMap.ts` | The site planning component (DOM + canvas) |
-| `globe/` | `MarsGlobe` (CesiumJS), data catalogue, flight maths, DEM resampling |
+| `globe/` | `MarsGlobe` (CesiumJS), data catalogue, flight maths, relief worker, colour worker |
 | `render.ts` | Stateless canvas renderer |
 | `grid.ts` · `scouting.ts` · `compare.ts` | Pure logic (slope, reachability, scout preview, route view models) |
 | `dev/fixture.ts` | The **synthetic** 9 × 7 shared example from the plan (no NASA data) |
