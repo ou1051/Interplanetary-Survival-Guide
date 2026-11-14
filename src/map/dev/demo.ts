@@ -13,8 +13,9 @@ import { standInPlanRoutes } from './standinPlanner';
 //   - "Rehearse route" pretends the sandbox (Person 4) returned a pass
 // ---------------------------------------------------------------------------
 
-const params = new URLSearchParams(location.search);
-let site: Site = params.get('fixture') === 'gap' ? SYNTHETIC_SITE_BARRIER : SYNTHETIC_SITE;
+// Variant via #gap (works on static hosts and sandboxed previews); ?fixture=gap also accepted.
+const wantsGap = () => location.hash === '#gap' || new URLSearchParams(location.search).get('fixture') === 'gap';
+let site: Site = wantsGap() ? SYNTHETIC_SITE_BARRIER : SYNTHETIC_SITE;
 let run: Run = initialRun(site);
 let routes: RoutePlan[] = [];
 
@@ -79,10 +80,7 @@ dev.addEventListener('click', (e) => {
   const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
   if (!b) return;
   if (b.dataset.fixture) {
-    const u = new URL(location.href);
-    if (b.dataset.fixture === 'gap') u.searchParams.set('fixture', 'gap');
-    else u.searchParams.delete('fixture');
-    location.href = u.toString();
+    location.hash = b.dataset.fixture === 'gap' ? 'gap' : '';
   } else if (b.dataset.reset !== undefined) {
     run = initialRun(site);
     replan();
@@ -92,6 +90,17 @@ dev.addEventListener('click', (e) => {
 dev.querySelectorAll<HTMLButtonElement>('[data-fixture]').forEach((b) =>
   b.classList.toggle('on', (b.dataset.fixture === 'gap') === (site === SYNTHETIC_SITE_BARRIER)),
 );
+
+window.addEventListener('hashchange', () => {
+  const next = wantsGap() ? SYNTHETIC_SITE_BARRIER : SYNTHETIC_SITE;
+  if (next === site) return;
+  site = next;
+  map.setSite(site);
+  run = initialRun(site);
+  replan();
+  push();
+  dev.querySelectorAll<HTMLButtonElement>('[data-fixture]').forEach((b) => b.classList.toggle('on', (b.dataset.fixture === 'gap') === (site === SYNTHETIC_SITE_BARRIER)));
+});
 
 replan();
 push();
