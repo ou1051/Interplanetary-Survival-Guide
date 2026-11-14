@@ -1,6 +1,6 @@
 // Mars relief pipeline (no Cesium import): fetches LERC elevation tiles from
 // Esri's Mars image services, decodes them, and builds N × N heightmaps for
-// display tiles. Runs inside a Web Worker in the app (see demWorker.ts) so the
+// display tiles. Runs inside the globe worker (see marsWorker.ts) so the
 // main thread never decodes megabyte-sized float rasters.
 //
 // Two sources, both geographic 2 × 1 tilings (origin -180/90), 513 × 513 posts:
@@ -136,6 +136,8 @@ export function createDemSampler(io: DemIO, n = HEIGHTMAP_SIZE) {
       }
       return { heights: base, source: used > (n * n) / 4 ? 'hirise' : 'mola' };
     },
+    /** Decoded MOLA/HRSC source tile (null when unavailable). */
+    mola: (level: number, y: number, x: number) => load('mola', level, y, x),
     /** For tests and diagnostics. */
     cacheSizes: () => ({ mola: caches.mola.size, hirise: caches.hirise.size }),
   };

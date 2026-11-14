@@ -155,7 +155,7 @@ describe('map · route comparison', () => {
 
 describe('map · site backdrop maths', () => {
   it('finds the HiRISE tiles around a site and a sharp-enough level', async () => {
-    const { tilesFor, levelFor, toDegrees, MARS_M_PER_DEG, levelsLut, gradeColor } = await import('./siteImagery');
+    const { tilesFor, levelFor, toDegrees, MARS_M_PER_DEG, levelsLut } = await import('./siteImagery');
     expect(Math.round(MARS_M_PER_DEG)).toBe(59275);
     const d = toDegrees(0, 59274, 59274);
     expect(d.dLon).toBeCloseTo(1, 3);
@@ -176,9 +176,6 @@ describe('map · site backdrop maths', () => {
     const lut = levelsLut(hist, 610);
     expect(lut[30]).toBeLessThan(25);
     expect(lut[90]).toBeGreaterThan(230);
-    // grading keeps a warm hue and never oversaturates
-    const [r, g, b] = gradeColor(180, 120, 100);
-    expect(r).toBeGreaterThan(g);
-    expect(g).toBeGreaterThan(b);
+
   });
 });

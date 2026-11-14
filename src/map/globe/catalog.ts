@@ -27,8 +27,10 @@ export interface TileSource {
   alpha?: number;
   /** Make pure-black "no data" pixels transparent. */
   blackIsNoData?: boolean;
-  /** Greyscale product: tint with the Viking colour mosaic (see colorize.ts). */
+  /** Greyscale product: tint with the painted surface's colour (see colorize.ts). */
   colorize?: boolean;
+  /** Generated in the worker (marsPaint.ts), not fetched from `url`. */
+  painted?: boolean;
   /** Display grading (Cesium ImageryLayer: 1 = unchanged). */
   tone?: { brightness?: number; contrast?: number; saturation?: number; gamma?: number; hue?: number };
   mission: string;
@@ -47,14 +49,24 @@ export interface ImageryStyle {
 }
 
 const TREK = 'https://trek.nasa.gov/tiles/Mars/EQ';
-// Grading tuned by eye against MRO/Curiosity natural-colour views of Gale:
-// Viking colour gets a little warmer and crisper; colour-matched detail layers
-// carry less chroma than Viking (luminance comes from greyscale), so they need more.
+// Raw Viking (its own style) is graded a little warmer and crisper. Detail
+// layers need no grading: they are pan-sharpened onto the painted surface.
 const VIKING_TONE = { saturation: 1.3, contrast: 1.12 };
-const DETAIL_TONE = { saturation: 2.0, hue: 0.1, contrast: 1.06, brightness: 1.06 };
+const DETAIL_TONE = {};
 const trek = (layer: string, ext: 'png' | 'jpg') => `${TREK}/${layer}/1.0.0//default/default028mm/{z}/{y}/{x}.${ext}`;
 
 export const SOURCES = {
+  painted: {
+    id: 'painted-mars',
+    url: 'painted',
+    tileSize: 256,
+    maxLevel: 8,
+    painted: true,
+    mission: 'Viking Orbiter · MGS MOLA',
+    instrument: 'Painted surface: Viking albedo, true-colour palette, MOLA relief',
+    resolution: '232 m/px',
+    credit: 'Viking MDIM 2.1: NASA/JPL/USGS · MOLA/HRSC: NASA/GSFC, ESA/DLR · colour design: Field Office',
+  },
   colorRelief: {
     id: 'mola-hrsc-color',
     url: trek('Mars_MOLA_blend200ppx_HRSC_ClrShade_clon0dd_200mpp_lzw', 'jpg'),
@@ -148,8 +160,8 @@ export const IMAGERY: ImageryStyle[] = [
     id: 'best',
     name: 'Natural colour',
     short: 'Natural',
-    description: 'Viking colour, sharpening to colour-matched CTX and HiRISE as you zoom in',
-    stack: [SOURCES.viking, SOURCES.ctxGlobal, SOURCES.galeCtx, SOURCES.jezeroHirise, SOURCES.curiosityHirise],
+    description: 'True-colour surface with shaded relief, sharpening to CTX and HiRISE as you zoom in',
+    stack: [SOURCES.painted, SOURCES.ctxGlobal, SOURCES.galeCtx, SOURCES.jezeroHirise, SOURCES.curiosityHirise],
   },
   {
     id: 'relief',
@@ -160,9 +172,9 @@ export const IMAGERY: ImageryStyle[] = [
   },
   {
     id: 'viking',
-    name: 'Viking colour',
+    name: 'Viking mosaic',
     short: 'Viking',
-    description: 'Approximate true colour, 1970s Viking orbiters',
+    description: 'The unprocessed 1970s Viking colour mosaic',
     stack: [SOURCES.viking],
   },
 ];

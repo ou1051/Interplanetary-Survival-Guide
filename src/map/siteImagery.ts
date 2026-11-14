@@ -1,8 +1,10 @@
+import { albedo } from './globe/marsPaint';
+
 // ---------------------------------------------------------------------------
 // Real orbital backdrop for the site plan.
 // Given the grid's geographic centre, fetch MRO HiRISE tiles (Esri's Mars
 // HiRISE cache, 512 px, geographic 2 × 1 tiling) around it, tint them with the
-// Viking colour of that ground (HiRISE red band is greyscale), and stitch them
+// globe's painted colour of that ground (HiRISE red band is greyscale), and stitch them
 // into one canvas whose extent is known in metres east/north of the centre.
 // Loads coarse first (whole context) and sharp second (around the grid).
 // ---------------------------------------------------------------------------
@@ -89,34 +91,6 @@ export function levelsLut(hist: Uint32Array, total: number): Uint8ClampedArray {
   return lut;
 }
 
-/** Saturated, slightly warmed version of a sampled colour (matches the globe's detail grading). */
-export function gradeColor(r: number, g: number, b: number): [number, number, number] {
-  const max = Math.max(r, g, b) / 255;
-  const min = Math.min(r, g, b) / 255;
-  const l = (max + min) / 2;
-  let h = 0;
-  let s = 0;
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    const rn = r / 255, gn = g / 255, bn = b / 255;
-    h = max === rn ? (gn - bn) / d + (gn < bn ? 6 : 0) : max === gn ? (bn - rn) / d + 2 : (rn - gn) / d + 4;
-    h /= 6;
-  }
-  h = (h + 0.045) % 1; // ≈ +16°, from Viking's rose towards Gale's ochre
-  s = Math.min(0.58, s * 2.1);
-  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-  const p = 2 * l - q;
-  const f = (t: number) => {
-    t = (t + 1) % 1;
-    if (t < 1 / 6) return p + (q - p) * 6 * t;
-    if (t < 1 / 2) return q;
-    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-    return p;
-  };
-  return [f(h + 1 / 3), f(h), f(h - 1 / 3)].map((v) => Math.round(v * 255)) as [number, number, number];
-}
-
 async function bitmap(url: string): Promise<ImageBitmap | null> {
   try {
     const r = await fetch(url);
@@ -129,6 +103,7 @@ async function bitmap(url: string): Promise<ImageBitmap | null> {
 
 /** Average Viking colour around a point (level 7, 3 × 3 px). */
 async function groundColor(lat: number, lon: number): Promise<[number, number, number]> {
+  // same designed palette as the globe's painted surface (globe/marsPaint.ts)
   const level = 7;
   const span = 180 / 2 ** level;
   const x = Math.floor((lon + 180) / span);
@@ -144,7 +119,7 @@ async function groundColor(lat: number, lon: number): Promise<[number, number, n
   let r = 0, gg = 0, b = 0;
   for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; }
   const n = d.length / 4;
-  return gradeColor(r / n, gg / n, b / n);
+  return albedo(r / n, gg / n, b / n, lat).map(Math.round) as [number, number, number];
 }
 
 /**

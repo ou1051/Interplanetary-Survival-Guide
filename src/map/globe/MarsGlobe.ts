@@ -22,6 +22,7 @@ import {
   Math as CMath,
   NearFarScalar,
   Rectangle,
+  RequestScheduler,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
   SkyAtmosphere,
@@ -31,8 +32,8 @@ import {
   Viewer,
 } from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
-import { COLOR_BASE, IMAGERY, PLACES, type ImageryStyle, type Place, type TileSource } from './catalog';
-import { ColorBaseCache, ColorizedImageryProvider } from './colorize';
+import { IMAGERY, PLACES, SOURCES, type ImageryStyle, type Place, type TileSource } from './catalog';
+import { PaintedMarsProvider, TintedImageryProvider, workerSupported } from './colorize';
 import { planFlight } from './flight';
 import { createMarsTerrain, type MarsTerrain } from './elevation';
 import type { ReliefSource } from './demSource';
@@ -109,7 +110,7 @@ export class MarsGlobe {
   private lastCursor = 0;
   private destroyed = false;
   private terrain: MarsTerrain | null = null;
-  private colors = new ColorBaseCache(COLOR_BASE);
+  private providers: { dispose(): void }[] = [];
   private light: DirectionalLight;
   private cameraQueued = false;
 
@@ -119,6 +120,9 @@ export class MarsGlobe {
     this.terrainOn = opts.terrain ?? true;
 
     Ion.defaultAccessToken = ''; // never reach Cesium ion
+    // both data hosts speak HTTP/2; Cesium's default of 18 parallel requests is conservative
+    RequestScheduler.requestsByServer['trek.nasa.gov:443'] = 32;
+    RequestScheduler.requestsByServer['astro.arcgis.com:443'] = 32;
     Ellipsoid.default = MARS;
 
     this.viewer = new Viewer(container, {
@@ -144,7 +148,10 @@ export class MarsGlobe {
     const scene = v.scene;
     const globe = scene.globe;
     const dpr = window.devicePixelRatio || 1;
-    v.resolutionScale = Math.min(dpr, 2);
+    // useBrowserRecommendedResolution: false already renders at native device
+    // pixels; a resolutionScale > 1 on top supersampled 2–4× (11.7 Mpx per frame
+    // at 1440 × 900 on a 2× screen) for no visible gain. Native it is.
+    v.resolutionScale = 1;
     scene.postProcessStages.fxaa.enabled = dpr < 2;
     scene.backgroundColor = Color.BLACK;
     globe.baseColor = Color.fromCssColorString('#6b3a22');
@@ -218,6 +225,8 @@ export class MarsGlobe {
     this.styleId = style.id;
     const coll = this.viewer.imageryLayers;
     for (const l of this.layers) coll.remove(l, true);
+    this.providers.forEach((p) => p.dispose());
+    this.providers = [];
     this.layers = style.stack.map((src) => {
       const layer = new ImageryLayer(this.provider(src), {
         alpha: src.alpha ?? 1,
@@ -233,6 +242,13 @@ export class MarsGlobe {
   }
 
   private provider(src: TileSource): UrlTemplateImageryProvider {
+    const viaWorker = workerSupported();
+    if (src.painted) {
+      if (!viaWorker) return this.provider(SOURCES.viking); // old browsers: the raw mosaic
+      const painted = new PaintedMarsProvider(MARS, src.credit);
+      this.providers.push(painted);
+      return painted;
+    }
     const options = {
       url: src.url,
       tilingScheme: new GeographicTilingScheme({ ellipsoid: MARS }),
@@ -242,7 +258,12 @@ export class MarsGlobe {
       rectangle: src.bbox ? Rectangle.fromDegrees(src.bbox.west, src.bbox.south, src.bbox.east, src.bbox.north) : undefined,
       credit: new Credit(src.credit),
     };
-    const p = src.colorize ? new ColorizedImageryProvider(options, this.colors) : new UrlTemplateImageryProvider(options);
+    let p: UrlTemplateImageryProvider;
+    if (src.colorize && viaWorker) {
+      const tinted = new TintedImageryProvider(options, { url: src.url, tileSize: src.tileSize, blackIsNoData: !!src.blackIsNoData });
+      this.providers.push(tinted);
+      p = tinted;
+    } else p = new UrlTemplateImageryProvider(options);
     p.errorEvent.addEventListener((err: { retry?: boolean; timesRetried?: number }) => {
       // local mosaics legitimately 404 at their edges; count real failures only
       if ((err.timesRetried ?? 0) === 0) {
@@ -509,6 +530,7 @@ export class MarsGlobe {
     this.destroyed = true;
     this.handler.destroy();
     this.terrain?.dispose();
+    this.providers.forEach((p) => p.dispose());
     this.viewer.destroy();
   }
 }

@@ -30,6 +30,8 @@ export interface MissionMapOptions {
   showClock?: boolean;
   /** Pixels reserved at the top by a host app bar. */
   topInset?: number;
+  /** Wait for loadBackdrop() before fetching imagery (host shows the map later). */
+  deferBackdrop?: boolean;
 }
 
 type Tab = 'scout' | 'plan';
@@ -75,7 +77,7 @@ export class MissionMap {
   constructor(container: HTMLElement, options: MissionMapOptions) {
     this.site = options.site;
     this.slopes = slopeGrid(this.site);
-    this.opts = { draw: options.draw ?? true, initialTab: options.initialTab ?? 'scout', maxWaypoints: options.maxWaypoints ?? 6, connectivity: options.connectivity ?? 8, showClock: options.showClock ?? true, topInset: options.topInset ?? 0, onAction: options.onAction };
+    this.opts = { draw: options.draw ?? true, initialTab: options.initialTab ?? 'scout', maxWaypoints: options.maxWaypoints ?? 6, connectivity: options.connectivity ?? 8, showClock: options.showClock ?? true, topInset: options.topInset ?? 0, deferBackdrop: options.deferBackdrop ?? false, onAction: options.onAction };
     this.tab = this.opts.initialTab;
     // small screens: start with the assignment folded so the map stays visible
     this.jobCollapsed = typeof window !== 'undefined' && window.innerWidth <= 900 && window.innerWidth > 0 && this.opts.draw;
@@ -845,12 +847,19 @@ export class MissionMap {
 
   private loadTexture() {
     this.texture = null;
-    this.loadBackdrop();
+    if (!this.opts.deferBackdrop || this.backdropWanted) this.loadBackdrop();
     if (!this.opts.draw || !this.site.textureUrl) return;
     const img = new Image();
     img.onload = () => this.draw();
     img.src = this.site.textureUrl;
     this.texture = img;
+  }
+
+  private backdropWanted = false;
+  /** Fetch the real imagery now (hosts using deferBackdrop call this when the map is about to show). */
+  prefetchBackdrop(): void {
+    this.backdropWanted = true;
+    this.loadBackdrop();
   }
 
   /** Real orbital imagery around geo-referenced sites (coarse first, then sharp). */

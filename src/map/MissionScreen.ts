@@ -108,6 +108,7 @@ export class MissionScreen {
       showClock: false,
       initialTab: 'scout',
       draw: opts.drawMap ?? true,
+      deferBackdrop: true, // the globe's data goes first; see prefetch below
     });
 
     this.root.addEventListener('click', (e) => this.onClick(e));
@@ -143,7 +144,10 @@ export class MissionScreen {
     (this.q('.ms-site') as HTMLElement).inert = view !== 'site';
     if (view === 'globe' && this.opts.globe !== false) void this.ensureGlobe();
     this.globe?.setActive(view === 'globe');
-    if (view === 'site') window.dispatchEvent(new Event('resize')); // let the map re-measure
+    if (view === 'site') {
+      this.map.prefetchBackdrop();
+      window.dispatchEvent(new Event('resize')); // let the map re-measure
+    }
     this.renderCrumbs();
     if (!initial) this.q(view === 'globe' ? '.ms-switch [data-view="globe"]' : '.ms-switch [data-view="site"]').focus();
   }
@@ -221,7 +225,12 @@ export class MissionScreen {
     const el = this.q('[data-s="stream"]');
     el.hidden = n === 0;
     (el.querySelector('b') as HTMLElement).textContent = String(n);
-    if (n === 0) this.root.classList.add('tiles-idle');
+    if (n === 0 && !this.root.classList.contains('tiles-idle')) {
+      this.root.classList.add('tiles-idle');
+      // the globe has what it needs: warm up the site plan's imagery in idle time
+      const idle = (window as Window & { requestIdleCallback?: (f: () => void) => void }).requestIdleCallback ?? ((f: () => void) => setTimeout(f, 300));
+      idle(() => this.map.prefetchBackdrop());
+    }
   }
 
   private ripple(x: number, y: number) {

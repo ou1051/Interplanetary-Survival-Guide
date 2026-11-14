@@ -2,6 +2,7 @@ import { Credit, CustomHeightmapTerrainProvider, Ellipsoid, GeographicTilingSche
 import { TERRAIN } from './catalog';
 import { HEIGHTMAP_SIZE } from './dem';
 import type { HeightmapResult, ReliefSource } from './demSource';
+import { marsWorker, workerSupported } from './workerBridge';
 
 // ---------------------------------------------------------------------------
 // Real Mars relief for Cesium: 200 m MOLA/HRSC everywhere, HiRISE stereo DTMs
@@ -11,43 +12,19 @@ import type { HeightmapResult, ReliefSource } from './demSource';
 //  - the Mars spatial reference (wkid 104971) is rejected;
 //  - the metadata URL with a trailing slash answers without CORS headers;
 //  - its 513 × 513 heightmaps rebuild huge meshes per level (refinement stalled).
-// All fetching, LERC decoding and resampling happens in a Web Worker
-// (demWorker.ts); the main thread only receives 65 × 65 Float32Arrays.
+// All fetching, LERC decoding and resampling happens in the globe's worker
+// (marsWorker.ts); the main thread only receives 65 × 65 Float32Arrays.
 // ---------------------------------------------------------------------------
 
-type Pending = { resolve: (r: HeightmapResult) => void; reject: (e: unknown) => void };
-
-/** Promise-per-tile bridge to the worker, with an in-thread fallback (tests, old browsers). */
+/** Promise-per-tile relief source: the shared worker, or in-thread (tests, old browsers). */
 export interface HeightmapSource {
   heightmap(x: number, y: number, level: number): Promise<HeightmapResult>;
   dispose(): void;
 }
 
 function workerSource(): HeightmapSource {
-  const worker = new Worker(new URL('./demWorker.ts', import.meta.url), { type: 'module' });
-  const pending = new Map<number, Pending>();
-  let next = 1;
-  worker.onmessage = (e: MessageEvent<{ id: number; heights?: Float32Array; source?: ReliefSource; error?: string }>) => {
-    const p = pending.get(e.data.id);
-    if (!p) return;
-    pending.delete(e.data.id);
-    if (e.data.heights) p.resolve({ heights: e.data.heights, source: e.data.source ?? 'mola' });
-    else p.reject(new Error(e.data.error ?? 'relief worker failed'));
-  };
-  return {
-    heightmap(x, y, level) {
-      const id = next++;
-      return new Promise((resolve, reject) => {
-        pending.set(id, { resolve, reject });
-        worker.postMessage({ id, x, y, level });
-      });
-    },
-    dispose() {
-      worker.terminate();
-      pending.forEach((p) => p.reject(new Error('disposed')));
-      pending.clear();
-    },
-  };
+  const w = marsWorker();
+  return { heightmap: (x, y, level) => w.heightmap(x, y, level), dispose: () => w.release() };
 }
 
 async function inThreadSource(): Promise<HeightmapSource> {
@@ -70,7 +47,7 @@ export interface MarsTerrain {
 }
 
 export async function createMarsTerrain(ellipsoid: Ellipsoid, opts: { worker?: boolean } = {}): Promise<MarsTerrain> {
-  const useWorker = (opts.worker ?? true) && typeof Worker !== 'undefined';
+  const useWorker = (opts.worker ?? true) && workerSupported();
   const src = useWorker ? workerSource() : await inThreadSource();
 
   // Probe once so the UI can say "unreachable" instead of showing a flat planet.
