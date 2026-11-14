@@ -23,7 +23,7 @@ export function mountHabitat(root, launch) {
   let approachChoice;
   let mode = 'orbital';
   root.innerHTML = `
-    <div class="hab-stage hab-before-entry" inert>
+    <div class="hab-stage">
       <canvas class="hab-room" data-room aria-hidden="true"></canvas>
       <header class="hab-overlay">
         <span>EVA-01 <b>·</b> <span data-site-name>DELTA FRONT</span></span>
@@ -31,7 +31,11 @@ export function mountHabitat(root, launch) {
       </header>
       <div class="hab-wall">
         <div class="hab-screen">
-          <header class="hab-header"><h1>Mission briefing</h1><span class="hab-eva"><i></i> EVA-01</span><button type="button" data-review-close>← Habitat view</button></header>
+          <header class="hab-header"><h1>Mission briefing</h1><span class="hab-eva"><i></i> EVA-01</span><nav class="hab-nav" aria-label="Mission navigation">
+            <a href="./map.html">Explore Mars</a>
+            <button type="button" id="sourcesBtn">Mission &amp; sources</button>
+            <button type="button" data-review-close>Habitat view</button>
+          </nav></header>
           <div class="hab-console-grid">
           <div class="hab-layout">
             <aside class="hab-metrics" aria-label="Selected route">
@@ -62,7 +66,7 @@ export function mountHabitat(root, launch) {
             <span class="hab-key" data-route-key><i></i> Route · ▲ Hazard gate</span>
           </div>
           </div>
-          <section class="hab-brief" aria-label="Choose a route" inert>
+          <section class="hab-brief" aria-label="Choose a route">
             <label class="hab-scenario">Mission site
               <select data-site-select><option value="delta">Original Delta Traverse</option><option value="gale"${plans.length ? '' : ' disabled'}>Gale Crater · Vera Rubin Ridge</option></select>
             </label>
@@ -98,20 +102,11 @@ export function mountHabitat(root, launch) {
             <button type="button" data-launch class="hab-launch">Go outside <span>→</span></button>
             <p class="hab-note" data-status role="status">Oxygen and weather are simulated.</p>
           </section>
-          <button type="button" data-screen-open class="hab-screen-open" aria-label="Zoom in to mission map"></button>
+          <button type="button" data-screen-open hidden class="hab-screen-open" aria-label="Zoom in to mission map"></button>
         </div>
       </div>
-      <button type="button" data-review-open class="hab-review"><kbd>E</kbd> Review route</button>
+      <button type="button" data-review-open hidden class="hab-review"><kbd>E</kbd> Review route</button>
     </div>
-    <section class="hab-intro" data-intro aria-labelledby="hab-intro-title">
-      <div class="hab-intro-card">
-        <p class="hab-eyebrow">Interplanetary Survival Guide</p>
-        <h1 id="hab-intro-title">Mars Surface<br>Operations</h1>
-        <p>Plan a rover traverse from the habitat console. Visit the science stops and get back to the habitat with oxygen to spare.</p>
-        <ol><li>Choose the original Delta Traverse or explore Gale Crater.</li><li>Drive the route and use your wrist navigator.</li><li>Complete the science tasks and return to the airlock.</li></ol>
-        <button type="button" data-intro-enter>Enter habitat <span aria-hidden="true">→</span></button>
-      </div>
-    </section>
     <div class="hab-airlock" data-airlock hidden>
       <div class="hab-hatch" aria-hidden="true"></div>
       <div class="hab-airlock-status" role="status" tabindex="-1">
@@ -293,29 +288,14 @@ export function mountHabitat(root, launch) {
 
   const stage = query('.hab-stage');
   const wall = query('.hab-wall');
-  const intro = query('[data-intro]');
-  const enter = query('[data-intro-enter]');
   const airlock = query('[data-airlock]');
   const motionReduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const room = mountHabitatRoom(query('[data-room]'), (bounds) => {
-    for (const [key, value] of Object.entries(bounds)) stage.style.setProperty(`--screen-${key}`, `${value}%`);
-  });
-  stage.classList.toggle('hab-has-room', Boolean(room));
-  const enterHabitat = () => {
-    intro.hidden = true;
-    stage.inert = false;
-    stage.classList.remove('hab-before-entry');
-    if (!motionReduced()) stage.animate([
-      { opacity: .38, transform: 'scale(1.07)' },
-      { opacity: 1, transform: 'scale(1)' },
-    ], { duration: 580, easing: 'cubic-bezier(.18,.7,.21,1)' });
-    screenOpen.focus({ preventScroll: true });
-  };
+  let room;
   const brief = query('.hab-brief');
   const screenOpen = query('[data-screen-open]');
   const reviewOpen = query('[data-review-open]');
   const reviewClose = query('[data-review-close]');
-  let zoomed = false;
+  let zoomed = true;
   let zoomAnimation;
   function setZoom(open, trigger = reviewOpen) {
     if (zoomed === open || launching) return;
@@ -325,6 +305,12 @@ export function mountHabitat(root, launch) {
     zoomed = open;
     if (open) lastZoomTrigger = trigger;
     root.classList.toggle('hab-zoomed', open);
+    if (!open && room === undefined) {
+      room = mountHabitatRoom(query('[data-room]'), (bounds) => {
+        for (const [key, value] of Object.entries(bounds)) stage.style.setProperty(`--screen-${key}`, `${value}%`);
+      });
+      stage.classList.toggle('hab-has-room', Boolean(room));
+    }
     brief.inert = !open;
     screenOpen.hidden = reviewOpen.hidden = open;
     reviewClose.hidden = !open;
@@ -344,12 +330,13 @@ export function mountHabitat(root, launch) {
   const observation = query('[data-photo-dialog]');
   let launching = false;
   window.addEventListener('keydown', (event) => {
+    if (document.querySelector('dialog[open]')) return;
     if (event.key.toLowerCase() === 'e' && !event.repeat && !event.altKey && !event.ctrlKey &&
-        !event.metaKey && intro.hidden && !root.classList.contains('hidden') && !zoomed && !observation.open) {
+        !event.metaKey && !root.classList.contains('hidden') && !zoomed) {
       event.preventDefault();
       setZoom(true);
     }
-    if (event.key === 'Escape' && !root.classList.contains('hidden') && zoomed && !observation.open && !event.defaultPrevented) setZoom(false);
+    if (event.key === 'Escape' && !root.classList.contains('hidden') && zoomed && !event.defaultPrevented) setZoom(false);
   });
   query('[data-site-select]').addEventListener('change', event => {
     selected = event.target.value === 'delta' ? original : galeSelection;
@@ -359,7 +346,6 @@ export function mountHabitat(root, launch) {
   root.addEventListener('click', async (event) => {
     const button = event.target.closest('button');
     if (!button || launching) return;
-    if (button === enter) enterHabitat();
     if (button === reviewOpen || button === screenOpen) setZoom(true, button);
     if (button === reviewClose) setZoom(false);
     if (button.hasAttribute('data-s1') || button.hasAttribute('data-s1-back')) {
@@ -388,14 +374,9 @@ export function mountHabitat(root, launch) {
       root.scrollTop = 0;
       query('.hab-airlock-status').focus({ preventScroll: true });
       const progress = query('[data-airlock-progress]');
-      const cycle = motionReduced() ? Promise.resolve() : airlock.animate(
-        [{ opacity: .15 }, { opacity: 1 }], { duration: 570, easing: 'ease-out' }).finished;
       for (const control of root.querySelectorAll('button, select')) control.disabled = true;
       try {
-        await cycle;
         await launch(selected === original ? approachChoice : selected, selected === original ? 'clear' : query('[data-scenario]').value, message => { progress.textContent = message; });
-        if (!motionReduced()) document.getElementById('viewport').animate(
-          [{ opacity: 0 }, { opacity: 1 }], { duration: 370, easing: 'ease-out' });
         room?.dispose();
       } catch (error) {
         console.error(error);
@@ -409,6 +390,5 @@ export function mountHabitat(root, launch) {
     }
     update();
   });
-  reviewClose.hidden = true;
   update();
 }

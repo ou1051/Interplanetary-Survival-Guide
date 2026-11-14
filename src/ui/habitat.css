@@ -185,7 +185,9 @@
 .hab-console-grid { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto auto; }
 .hab-screen-open { position: absolute; inset: 0; border: 0; border-radius: inherit; background: transparent; }
 #habitat .hab-screen-open:hover { box-shadow: inset 0 0 0 2px #80e3ef, inset 0 0 28px #55ddeb28; }
-.hab-screen [data-review-close] { background: #192e35; border: 1px solid #496971; padding: 5px 9px; }
+.hab-nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: end; gap: 8px; font-size: 12px; }
+#habitat:not(.hab-zoomed) .hab-nav { display: none; }
+.hab-nav button { background: #192e35; border: 1px solid #496971; padding: 5px 9px; }
 .hab-stage [hidden], .hab-stage .hab-brief[inert] { display: none !important; }
 .hab-zoomed .hab-stage { display: block; padding: clamp(10px, 2vw, 28px); }
 .hab-zoomed .hab-stage::before { inset: 0; width: 100%; transform: scale(1.2); filter: blur(7px) brightness(.45); }
@@ -217,41 +219,14 @@
 .hab-zoomed .hab-mapframe canvas { pointer-events: auto; }
 
 .hab-room { position: absolute; z-index: -1; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.hab-zoomed .hab-room { filter: blur(5px) brightness(.38); }
-.hab-stage:not(.hab-has-room) { align-content: center; gap: 22px; padding: 65px 12px 28px; }
 .hab-stage:not(.hab-has-room) .hab-room { display: none; }
-.hab-stage:not(.hab-has-room) .hab-wall { max-width: 720px; }
+.hab-zoomed .hab-room { filter: blur(5px) brightness(.38); }
+#habitat:not(.hab-zoomed) .hab-stage:not(.hab-has-room) { align-content: center; gap: 22px; padding: 65px 12px 28px; }
+#habitat:not(.hab-zoomed) .hab-stage:not(.hab-has-room) .hab-wall { max-width: 720px; }
 @media (max-width: 699px), (max-aspect-ratio: 6/5) {
   .hab-room { height: min(52vw, 280px); }
   .hab-zoomed .hab-room { height: 100%; }
 }
-.hab-intro {
-  position: absolute;
-  z-index: 3;
-  inset: 0;
-  display: grid;
-  align-items: center;
-  justify-items: start;
-  min-height: 100dvh;
-  padding: clamp(16px, 8vw, 115px);
-  overflow: auto;
-  background: linear-gradient(90deg, #100c0aef 3%, #120d0bd9 29%, #150c0852 70%, #1b100b55);
-}
-.hab-intro[hidden] { display: none; }
-.hab-intro-card { max-width: 540px; }
-.hab-intro .hab-eyebrow { color: #ffb17e; }
-.hab-intro h1 { margin: 13px 0 14px; color: #fff3e6; font: 700 clamp(38px, 7vw, 84px)/.94 var(--sans); letter-spacing: -.045em; }
-.hab-intro p:not(.hab-eyebrow), .hab-intro li { color: #e6d9ce; }
-.hab-intro p:not(.hab-eyebrow) { max-width: 46ch; }
-.hab-intro ol { margin: 18px 0 24px; padding-left: 23px; }
-.hab-intro li { padding-left: 3px; margin: 5px 0; }
-#habitat .hab-intro button { display: inline-flex; align-items: center; gap: 23px; padding: 12px 17px; border: 1px solid #a9eff4; background: #b9f2f3; color: #102528; font-weight: 800; }
-
-.hab-before-entry .hab-overlay, .hab-before-entry .hab-review { visibility: hidden; }
-@media (max-width: 699px), (max-aspect-ratio: 6/5) {
-  .hab-intro { background: linear-gradient(180deg, #170f0b8c, #140e0bf5 52%, #140e0b); }
-}
-
 .hab-stage .hab-wall {
   background: #141f26;
   border-color: #435c68;
