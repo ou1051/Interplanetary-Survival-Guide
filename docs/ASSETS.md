@@ -1,6 +1,18 @@
-# Asset credits
+# Journey assets and provenance
 
-The [project overview](../README.md) credits the Gale Crater elevation, orbital imagery and Curiosity field reference. The [Mars globe catalog](../src/map/globe/catalog.ts) lists the orbital map layers.
+The launch complex, crew access arm, spacecraft cockpit, gloves, control panels,
+Mars planet and landing landscape are original procedural models in
+`src/journey/journey.js`. They are educational illustrations, not surveyed geometry.
+
+`public/textures/earth-atmosphere.jpg` is `earth_atmos_2048.jpg` from the
+[Three.js examples](https://github.com/mrdoob/three.js/blob/dev/examples/textures/planets/earth_atmos_2048.jpg),
+blob `4275ab0836b482e4fbe1d5081976f3f2ffb41ffa`. Resolution: 2048×1024.
+It is bundled locally, so the journey does not require a third-party image server.
+Three.js distributes its repository under the MIT license, reproduced below.
+The app retains an explicitly illustrative procedural fallback if loading fails.
+
+The Mars surface simulation remains synthetic. Orbital map data sources and resolutions
+are documented in `src/map/globe/catalog.ts` and `src/map/README.md`.
 
 ## Three.js MIT license
 
