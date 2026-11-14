@@ -13,7 +13,7 @@ const MARS_R = 3396190;
 const DEG = 180 / Math.PI;
 const LIFT = 8; // metres above ground for lines and markers, so they sit together
 
-export async function mountConsoleMap3D(container) {
+export async function mountConsoleMap3D(container, { onReady } = {}) {
   const [{ MarsGlobe }, C] = await Promise.all([import('../map/globe/MarsGlobe.ts'), import('cesium')]);
   const credits = document.createElement('div');
   credits.className = 'hab-map3d-credit';
@@ -21,14 +21,35 @@ export async function mountConsoleMap3D(container) {
   const globe = new MarsGlobe(container, { creditContainer: credits, exaggeration: 1.6 });
   const viewer = globe.viewer;
   const scene = viewer.scene;
+  // Console-sized view: the globe defaults are tuned for full-screen exploring. Here a coarser detail
+  // target means far fewer NASA tiles to stream, and the sky is never in frame, so skip drawing it.
+  scene.globe.maximumScreenSpaceError = 6;
+  scene.globe.preloadSiblings = false;
+  scene.skyBox.show = false;
+  if (scene.skyAtmosphere) scene.skyAtmosphere.show = false;
+  // Render at CSS pixels (not 2-3x retina pixels), no multisampling, 30 fps: a console-sized map
+  // looks the same, and the GPU does a fraction of the work while the view turns.
+  viewer.useBrowserRecommendedResolution = true;
+  viewer.resolutionScale = 1;
+  scene.msaaSamples = 1;
+  scene.postProcessStages.fxaa.enabled = true;
+  viewer.targetFrameRate = 30;
+  // The globe's "Natural colour" style stacks five NASA layers. At Gale only three show: the painted
+  // base (fills in while loading), the Gale CTX mosaic and the Curiosity HiRISE mosaic. Hidden layers
+  // are never downloaded.
+  const keep = /painted|Gale_CTX|curiosity_hirise/;
+  const layers = Array.from({ length: viewer.imageryLayers.length }, (_, i) => viewer.imageryLayers.get(i));
+  if (layers.some((l) => keep.test(String(l.imageryProvider?.url)))) {
+    for (const l of layers) l.show = keep.test(String(l.imageryProvider?.url));
+  }
   globe.handler?.removeInputAction(C.ScreenSpaceEventType.LEFT_CLICK); // no fly-to-click inside the console
   // the globe's own place pins (Vera Rubin Ridge etc.) would cover the site
   for (const e of [...viewer.entities.values]) if (String(e.id).startsWith('place:')) viewer.entities.remove(e);
 
   let entities = [];
-  let previous = []; // last draw's entities, excluded from height sampling until removed
   let lastPlan = null;
   let spinning = true;
+  let speed = 0.12; // rad/s: a slow drift in the room view, faster when the console is zoomed in
   let pausedUntil = 0;
   let heading = 0.4;
   let center = null;
@@ -40,13 +61,6 @@ export async function mountConsoleMap3D(container) {
     ANCHOR.lat - ((z - origin.z) / MARS_R) * DEG,
   ];
   const groundHeight = (lon, lat) => scene.globe.getHeight(C.Cartographic.fromDegrees(lon, lat));
-  // height of the ground as it is actually drawn right now (finest loaded tiles), ignoring our own lines
-  const drawnHeight = (lon, lat) => {
-    const carto = C.Cartographic.fromDegrees(lon, lat);
-    const h = scene.sampleHeightSupported ? scene.sampleHeight(carto, previous) : undefined;
-    return h ?? scene.globe.getHeight(carto);
-  };
-
   function frameCamera() {
     if (!center) return;
     const [lon, lat] = center;
@@ -66,46 +80,30 @@ export async function mountConsoleMap3D(container) {
     const now = performance.now();
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
-    if (spinning && now > pausedUntil && center) {
-      heading = (heading + dt * 0.12) % (Math.PI * 2);
+    if (spinning && ready && now > pausedUntil && center) {
+      heading = (heading + dt * speed) % (Math.PI * 2);
       frameCamera();
     }
   });
   viewer.clock.onTick.addEventListener(() => spinning && scene.requestRender());
 
   function lineFrom(points, color, width, dashed) {
-    // getHeight is cheap but reads a coarser terrain level than what is drawn; sampleHeight reads the
-    // drawn ground but costs a small render per call. Use getHeight for the shape at every point and
-    // correct it with ~40 drawn-ground samples, interpolated along the line.
     const lonlat = points.map(([x, z]) => toLonLat(x, z));
-    const coarse = lonlat.map(([lon, lat]) => groundHeight(lon, lat));
-    const step = Math.max(1, Math.ceil(points.length / 40));
-    const keys = [];
-    for (let i = 0; i < points.length; i += step) keys.push(i);
-    if (keys.at(-1) !== points.length - 1) keys.push(points.length - 1);
-    const fix = keys.map((i) => {
-      const drawn = drawnHeight(...lonlat[i]);
-      return drawn !== undefined && coarse[i] !== undefined ? Math.max(0, drawn - coarse[i]) : 0;
-    });
-    const heights = coarse.map((h, j) => {
-      const k = Math.min(keys.length - 2, Math.max(0, Math.floor(j / step)));
-      const i0 = keys[k]; const i1 = keys[k + 1] ?? i0;
-      const t = i1 === i0 ? 0 : (j - i0) / (i1 - i0);
-      return h === undefined ? undefined : h + fix[k] + ((fix[k + 1] ?? fix[k]) - fix[k]) * t;
-    });
-    // a little above the ground so finer terrain tiles loading in later don't swallow the line
+    const heights = lonlat.map(([lon, lat]) => groundHeight(lon, lat));
     const positions = lonlat.map(([lon, lat], i) => C.Cartesian3.fromDegrees(lon, lat, (heights[i] ?? -6900) + LIFT, C.Ellipsoid.MARS));
     const col = C.Color.fromCssColorString(color);
     entities.push(viewer.entities.add({
       polyline: {
         // dynamic, so a re-seated line shows on the next frame instead of being rebuilt in a worker
-        positions: new C.CallbackProperty(() => positions, true),
+        positions: new C.CallbackProperty(() => positions, false),
         arcType: C.ArcType.NONE,
         width,
         material: dashed
           ? new C.PolylineDashMaterialProperty({ color: col, dashLength: 12 })
           : new C.PolylineGlowMaterialProperty({ glowPower: 0.18, color: col }),
-        depthFailMaterial: col.withAlpha(0.45),
+        // a planning map: where the route dips behind a ridge or under sharper terrain tiles that stream in
+        // later, it still draws in the same colour, so no costly per-point ground sampling is needed
+        depthFailMaterial: dashed ? new C.PolylineDashMaterialProperty({ color: col, dashLength: 12 }) : col,
       },
     }));
   }
@@ -133,7 +131,7 @@ export async function mountConsoleMap3D(container) {
    */
   function draw(plan) {
     lastPlan = plan;
-    previous = entities;
+    const previous = entities;
     entities = [];
     const all = plan.lines.flatMap((l) => l.points).concat(plan.markers.map((m) => m.at));
     const xs = all.map((p) => p[0]);
@@ -144,17 +142,28 @@ export async function mountConsoleMap3D(container) {
     origin = newOrigin;
     center = toLonLat(origin.x, origin.z);
     range = extent * 1.9;
-    if (reframe) frameCamera(); // move first, so the ground under the route is in view for sampling
+    if (reframe) frameCamera();
     for (const l of plan.lines) lineFrom(l.points, l.color, l.width ?? 4, l.dashed);
     for (const m of plan.markers) marker(m.at, m.text, m.color);
     for (const e of previous) viewer.entities.remove(e);
-    previous = [];
     scene.requestRender();
   }
   let reseat;
+  // "ready" = the ground under the site has finished its first load; until then the 2D map shows
+  let ready = false;
+  let sawLoading = false;
+  const markReady = () => {
+    if (ready) return;
+    ready = true;
+    clearTimeout(readyFallback);
+    onReady?.();
+  };
+  const readyFallback = setTimeout(() => lastPlan && markReady(), 12000); // slow network: show what we have
   // re-seat the lines each time a batch of (sharper) ground tiles finishes loading
   scene.globe.tileLoadProgressEvent.addEventListener((n) => {
-    if (n !== 0 || !lastPlan) return;
+    if (!lastPlan) return;
+    if (n > 0) { sawLoading = true; return; }
+    if (sawLoading) markReady(); // the queue for the site view (not the start-up globe) has drained
     clearTimeout(reseat);
     reseat = setTimeout(() => lastPlan && draw(lastPlan), 700); // tiles stream in while turning; settle first
   });
@@ -162,8 +171,10 @@ export async function mountConsoleMap3D(container) {
   return {
     draw,
     setSpin(on) { spinning = on; pausedUntil = 0; scene.requestRender(); },
+    setSpeed(radPerSec) { speed = radPerSec; },
     get spinning() { return spinning; },
+    get ready() { return ready; },
     setActive(on) { globe.setActive(on); },
-    destroy() { clearTimeout(reseat); lastPlan = null; globe.destroy(); },
+    destroy() { clearTimeout(reseat); clearTimeout(readyFallback); lastPlan = null; globe.destroy(); },
   };
 }

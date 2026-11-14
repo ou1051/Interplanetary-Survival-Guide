@@ -1,5 +1,6 @@
 import { deltaPlan, buildDeltaTraverse, buildDeltaApproaches } from '../data/deltaTraverse.js';
 import { makeDeltaOverview } from './deltaOverview.js';
+import { AREA_HAZARDS } from '../config/mission.js';
 import { mountHabitatRoom } from './habitatRoom.js';
 import { mountHabitatExterior } from './habitatExterior.js';
 import { mountConsoleMap3D } from './consoleMap3D.js';
@@ -91,6 +92,7 @@ export function mountHabitat(root, launch) {
                 <button type="button" class="hab-step" data-s1-back>← Full traverse</button>
                 <h3>Habitat → S1 · Crater Floor Unit</h3>
                 <div class="hab-routes hab-approaches" data-approaches role="group" aria-label="Approaches to S1"></div>
+                <div class="hab-unknowns" data-unknowns hidden></div>
               </div>
             </section>
             <div data-gale-only>
@@ -229,6 +231,7 @@ export function mountHabitat(root, launch) {
       deltaMap = makeDeltaOverview(route, canvas.width, canvas.height, approaches);
       query('[data-approaches]').innerHTML = approaches.map(option => `<button type="button" data-approach="${option.id}" style="--route-color:${option.color}">
         <b>${option.label}</b><span>${fmt(option.distance)} m</span><small>${option.detail} · ${option.maxTilt.toFixed(1)}° max tilt</small>
+        <i class="hab-risk${option.unknowns.length ? ' is-unknown' : ''}">${option.unknowns.length ? '⚠ ' : ''}${option.risk}</i>
       </button>`).join('');
       const stations = route.stations.filter(stop => !stop.final);
       const gates = route.stops.filter(stop => stop.kind === 'gate').length;
@@ -261,6 +264,13 @@ export function mountHabitat(root, launch) {
       const pin = query('.hab-s1');
       pin.style.left = `${map.s1[0] / canvas.width * 100}%`;
       pin.style.top = `${map.s1[1] / canvas.height * 100}%`;
+      // the shortest line is not fully mapped: say what could be out there before the crew commits to it
+      const unknowns = s1Focused ? approachChoice?.unknowns ?? [] : [];
+      query('[data-unknowns]').hidden = !unknowns.length;
+      query('[data-unknowns]').innerHTML = unknowns.map(zone => `<b>⚠ ${zone.type.toLowerCase().replace(/^./, c => c.toUpperCase())} · ${fmt(zone.s1 - zone.s0)} m</b>
+        <p>No high-resolution map covers this stretch. It may hide:</p>
+        <ul>${zone.obstacles.map(item => `<li>${item}</li>`).join('')}</ul>
+        <small>Rover stops for a briefing, then creeps through at ≤ ${(zone.limit * 3.6).toFixed(0)} km/h.</small>`).join('');
       for (const button of root.querySelectorAll('[data-approach]')) {
         button.setAttribute('aria-pressed', String(button.dataset.approach === approachChoice?.id));
       }
@@ -318,15 +328,19 @@ export function mountHabitat(root, launch) {
   // ---------------------------------------------------------------- 3D map
   function ensureMap3D() {
     if (map3d || map3dLoading || !view3d) return;
+    // the 2D map stays on screen while the 3D terrain streams in; it fades over once the site has loaded
     query('[data-map3d-status]').hidden = false;
-    map3dLoading = mountConsoleMap3D(query('[data-map3d]'))
-      .then((m) => { map3d = m; query('[data-map3d-status]').hidden = true; update(); })
+    map3dLoading = mountConsoleMap3D(query('[data-map3d]'), { onReady: () => { query('[data-map3d-status]').hidden = true; update(); } })
+      .then((m) => { map3d = m; m.setSpeed(zoomed ? 0.35 : 0.12); update(); })
       .catch((error) => { console.error(error); view3d = false; query('[data-map3d-status]').hidden = true; update(); });
   }
   function draw3D(delta) {
     const frame = query('.hab-mapframe');
-    frame.classList.toggle('is-3d', view3d);
+    const shown = view3d && Boolean(map3d?.ready);
+    frame.classList.toggle('is-3d', shown);
     query('[data-map3d]').hidden = !view3d;
+    query('[data-map3d]').classList.toggle('is-ready', shown);
+    query('[data-map3d-status]').hidden = !view3d || shown;
     for (const b of root.querySelectorAll('[data-view3d]')) b.setAttribute('aria-pressed', String((b.dataset.view3d === '3d') === view3d));
     query('[data-spin]').hidden = !view3d;
     if (!view3d || !map3d) return;
@@ -347,6 +361,7 @@ export function mountHabitat(root, launch) {
         lines.push({ points: pts, color: option.color, width: on ? 6 : 3, dashed: !on && !!approachChoice });
       }
       route.stations.forEach((st, i) => markers.push({ at: [st.x, st.z], text: st.final ? 'HAB' : `S${i + 1}`, color: st.final ? '#ffffff' : '#9fe7ff' }));
+      for (const hz of AREA_HAZARDS.filter(h => h.unsurveyed)) markers.push({ at: [hz.cx, hz.cz], text: '? Unsurveyed', color: '#ffc178' });
     } else {
       for (const plan of plans) {
         const on = plan === selected;
@@ -419,6 +434,12 @@ export function mountHabitat(root, launch) {
     zoomed = open;
     if (open) lastZoomTrigger = trigger;
     root.classList.toggle('hab-zoomed', open);
+    // zooming in shows the terrain model turning (~18 s a lap); back in the room it drifts slowly
+    if (map3d) {
+      map3d.setSpeed(open ? 0.35 : 0.12);
+      if (open) map3d.setSpin(true);
+      query('[data-spin]').setAttribute('aria-pressed', String(map3d.spinning));
+    }
     brief.inert = !open;
     screenOpen.hidden = reviewOpen.hidden = open;
     reviewClose.hidden = !open;

@@ -90,11 +90,18 @@ it('restores the original delta loop with four science stations and five hazard 
 it('offers three ordered approaches and preserves the original path after S1', () => {
   const original = buildDeltaTraverse();
   const [shortest, intermediate, longer] = buildDeltaApproaches(original);
+  // a real trade-off: each longer option is gentler, and only the shortest crosses unsurveyed ground
   expect(shortest.distance).toBeLessThan(intermediate.distance);
   expect(intermediate.distance).toBeLessThan(longer.distance);
-  expect(intermediate.traverse.route).toBe(original.route);
+  expect(shortest.maxTilt).toBeGreaterThan(intermediate.maxTilt);
+  expect(intermediate.maxTilt).toBeGreaterThan(longer.maxTilt);
+  expect(shortest.unknowns.map(zone => zone.id)).toEqual(['H-UNSURVEYED']);
+  expect(intermediate.unknowns).toEqual([]);
+  expect(longer.unknowns).toEqual([]);
+  expect(shortest.traverse.route.stops.filter(stop => stop.kind === 'gate')).toHaveLength(6);
+  expect(intermediate.traverse.route.stops.filter(stop => stop.kind === 'gate')).toHaveLength(5);
   const s1 = original.route.stations[0];
-  for (const option of [shortest, longer]) {
+  for (const option of [shortest, intermediate, longer]) {
     const route = option.traverse.route;
     expect(route.stations[0].s).toBe(option.distance);
     for (const offset of [0, 20, 250, 1000]) {

@@ -1,3 +1,5 @@
+import { AREA_HAZARDS } from '../config/mission.js';
+
 // Render the actual rover route and stops over elevation sampled from its terrain.
 export function makeDeltaOverview(route, width, height, approaches, focused = false) {
   const first = route.stations[0];
@@ -43,8 +45,41 @@ export function makeDeltaOverview(route, width, height, approaches, focused = fa
     }
     return { option, path };
   });
+  // Ground with no high-resolution survey: hatched, with a "?" (what is there is unknown, not mapped as safe).
+  function drawUnsurveyed(ctx, highlight) {
+    for (const hz of AREA_HAZARDS.filter(h => h.unsurveyed)) {
+      const [x, y] = point(hz.cx, hz.cz);
+      const r = hz.radius * scale;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = highlight ? 'rgba(255, 176, 92, .26)' : 'rgba(20, 28, 34, .38)';
+      ctx.fill();
+      ctx.clip();
+      ctx.strokeStyle = highlight ? 'rgba(255, 196, 120, .55)' : 'rgba(220, 230, 235, .28)';
+      ctx.lineWidth = 1.5;
+      for (let k = -r * 2; k < r * 2; k += 7) { ctx.beginPath(); ctx.moveTo(x + k - r, y - r); ctx.lineTo(x + k + r, y + r); ctx.stroke(); }
+      ctx.restore();
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = highlight ? '#ffc178' : 'rgba(225, 235, 240, .7)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.font = `bold ${focused ? 22 : 16}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = highlight ? '#ffd29a' : '#e6eef2';
+      ctx.fillText('?', x, y + (focused ? 8 : 6));
+      if (focused) {
+        ctx.font = 'bold 11px monospace';
+        ctx.fillText('UNSURVEYED', x, y + r + 14);
+      }
+    }
+  }
   function draw(ctx, mode, selected) {
     ctx.drawImage(layers[mode === 'slope' ? 1 : 0], 0, 0, width, height);
+    drawUnsurveyed(ctx, selected?.unknowns?.length > 0);
     if (!focused) {
       ctx.beginPath();
       for (let i = Math.ceil(first.s / route.step); i < route.count; i += 2) {

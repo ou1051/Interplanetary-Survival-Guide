@@ -2,7 +2,7 @@
 
 NASA Space Apps Challenge · *Interplanetary Survival Guide: Martian Map*
 
-The app opens on **Mars Surface Operations**. Select **Enter habitat**, then **Review route** to open the planner. **Original Delta Traverse** is selected by default. Select **S1** to compare the three approaches from the habitat. **Intermediate** follows the original 1.8 km loop. Shortest and Longer change only the approach to S1. Choose **Go outside** to drive the selected route.
+The app opens on **Mars Surface Operations**. Select **Enter habitat**, then **Review route** to open the planner. **Original Delta Traverse** is selected by default. Select **S1** to compare three approaches from the habitat, each trading distance against risk: **Shortest** (293 m) takes the direct line across *unsurveyed ground* that the map cannot resolve (possible boulders, soft sand, small ledges), so the rover stops for a briefing and creeps through it; **Intermediate** (322 m) bends around that patch over mapped ground; **Longer** (419 m) is a western detour over the gentlest slopes. All three join the original 1.8 km loop at S1. Choose **Go outside** to drive the selected route.
 
 Select **Gale Crater · Vera Rubin Ridge** to compare a gentler route and a shorter route to a layered outcrop, consult a Curiosity observation, and collect paired samples. Select **Dust front ahead** before launch to try an early return in Gale. Press **P** or click **Wrist navigator** in either mission for the next stop, nearby hazards, and estimated oxygen on return.
 

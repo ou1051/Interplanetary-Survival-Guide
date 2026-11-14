@@ -149,6 +149,27 @@ export const AREA_HAZARDS = [
     ],
     basis: 'Low thermal inertia → fine, loose material (mock)',
   },
+  {
+    // On the direct line from the habitat to S1. Only coarse orbital data covers it, so anything
+    // smaller than the map grid is unknown until the crew drives in.
+    id: 'H-UNSURVEYED',
+    type: 'UNSURVEYED GROUND',
+    cx: -87, cz: -132, radius: 32,
+    limit: 1.2,
+    severity: 'danger',
+    unsurveyed: true,
+    obstacles: [
+      'Boulders under 1 m (smaller than the map grid)',
+      'Soft sand pockets (wheel sinkage)',
+      'Small ledges and buried crater rims',
+    ],
+    procedure: [
+      'Creep at ≤ 1.2 m/s (4 km/h); no high-resolution map here',
+      'Crew member 2 scouts ahead with the mast camera',
+      'Stop and back out if a wheel starts to sink',
+    ],
+    basis: 'No high-resolution orbital coverage; only the coarse regional elevation model (mock)',
+  },
 ];
 
 export const ROVER = {

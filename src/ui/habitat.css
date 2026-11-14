@@ -497,19 +497,32 @@
 }
 
 /* ---------------- 3D console map (team Mars globe) ---------------- */
-.hab-map3d { position: absolute; inset: 0; z-index: 1; }
+.hab-map3d { position: absolute; inset: 0; z-index: 1; opacity: 0; pointer-events: none; transition: opacity .5s ease; }
+.hab-map3d.is-ready { opacity: 1; pointer-events: auto; } /* stays mounted (not display:none) so tiles load behind the 2D map */
 .hab-map3d .cesium-viewer, .hab-map3d .cesium-widget, .hab-map3d canvas { width: 100%; height: 100%; display: block; }
 .hab-map3d .cesium-viewer-bottom, .hab-map3d .cesium-widget-credits { display: none !important; }
 .hab-map3d-credit { position: absolute; right: 6px; bottom: 4px; z-index: 2; max-width: 70%; text-align: right; pointer-events: none;
   font: 500 9px "Helvetica Neue", Arial, sans-serif; color: #c7d4ead0; text-shadow: 0 1px 2px #000; }
 .hab-map3d-credit * { color: inherit !important; font-size: inherit !important; display: inline !important; }
 .hab-map3d-credit img { display: none !important; }
-.hab-map3d-status { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;
-  font: 600 12px "Helvetica Neue", Arial, sans-serif; letter-spacing: .12em; text-transform: uppercase; color: #c7d4ea; }
-.hab-mapframe.is-3d > img, .hab-mapframe.is-3d > canvas, .hab-mapframe.is-3d .hab-pin,
+.hab-map3d-status { position: absolute; right: 44px; top: 8px; z-index: 3; padding: 3px 8px; border-radius: 3px; background: #071022cc;
+  font: 600 10px "Helvetica Neue", Arial, sans-serif; letter-spacing: .12em; text-transform: uppercase; color: #c7d4ea; }
+/* the 2D image stays underneath (covered by the 3D layer) so the cross-fade never shows an empty frame */
+.hab-mapframe.is-3d .hab-pin,
 .hab-mapframe.is-3d .hab-base, .hab-mapframe.is-3d .hab-scale, .hab-mapframe.is-3d .hab-north { visibility: hidden; }
 .hab-mapframe.is-3d::after { z-index: 2; }
 #habitat .hab-mapbar { gap: 10px; }
 #habitat .hab-viewmode { margin-left: auto; }
 .hab-mapframe.is-3d { cursor: grab; }
 .hab-mapframe.is-3d:active { cursor: grabbing; }
+
+/* Approach risk tags and the unsurveyed-ground warning (Delta, leg to S1) */
+.hab-approaches .hab-risk { display: block; margin-top: 3px; font: 600 10px "Helvetica Neue", Arial, sans-serif; font-style: normal;
+  letter-spacing: .06em; text-transform: uppercase; color: #9fb4c8; }
+.hab-approaches .hab-risk.is-unknown { color: #ffc178; }
+.hab-unknowns { margin-top: 10px; padding: 10px 12px; border: 1px solid #ffc17866; border-left: 3px solid #ffc178; border-radius: 3px;
+  background: #2a1d0f99; color: #f3e6d6; font: 400 12px/1.4 "Helvetica Neue", Arial, sans-serif; }
+.hab-unknowns b { display: block; color: #ffc178; font-size: 12px; margin-bottom: 4px; }
+.hab-unknowns p { margin: 0 0 4px; }
+.hab-unknowns ul { margin: 0 0 6px; padding-left: 16px; }
+.hab-unknowns small { color: #d9c3a6; }
