@@ -11,9 +11,14 @@ import { Input } from './sim/input.js';
 import { RoverAudio } from './sim/audio.js';
 import { MapRenderer, bearingTo } from './ui/mapRenderer.js';
 import { Hud } from './ui/hud.js';
+import { PlanningBoard } from './ui/planningBoard.js';
 import { clamp, damp, DEG } from './core/math.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
+
+// Mode 1 · Planning Board (2D overlay; independent of the 3D engine)
+const planningBoard = new PlanningBoard();
+document.getElementById('boardBtn')?.addEventListener('click', () => planningBoard.toggle(true));
 
 async function init() {
   const T0 = performance.now();
