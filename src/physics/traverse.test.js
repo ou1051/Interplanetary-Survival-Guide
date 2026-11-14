@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { segmentEstimate, consumptionEstimate } from './physics.js';
+import { segmentEstimate, consumptionEstimate } from './traverse.js';
 import { Mission } from '../sim/mission.js';
 import { ROVER, SLOPE_CLASSES, LIFE_SUPPORT } from '../config/mission.js';
 

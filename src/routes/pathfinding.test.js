@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { planRoute, rerouteForHazard } from './pathfinding.js';
-import { segmentEstimate } from './physics.js';
+import { segmentEstimate } from '../physics/traverse.js';
 
 const cell = (col, row) => ({ col, row });
 const flat = (width = 5, height = 3) => ({ width, height, cellSizeM: 10, elevationM: Array(width * height).fill(0) });

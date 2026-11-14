@@ -1,6 +1,6 @@
 import { ROVER, LIFE_SUPPORT, HAB, SITE } from '../config/mission.js';
 import { clamp, DEG } from '../core/math.js';
-import { consumptionEstimate } from '../routes/physics.js';
+import { consumptionEstimate } from '../physics/traverse.js';
 
 // ---------------------------------------------------------------------------
 // Traverse state machine + consumables.

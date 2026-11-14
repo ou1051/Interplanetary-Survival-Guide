@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "api": "node server/start.js",
     "test": "node --test",
-    "test:routes": "node --test src/routes/*.test.js server/routes.test.js"
+    "test:routes": "node --test src/routes/*.test.js src/physics/*.test.js server/routes.test.js"
   },
   "repository": {
     "type": "git",

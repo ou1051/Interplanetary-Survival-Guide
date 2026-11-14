@@ -1,5 +1,5 @@
 import { ROVER } from '../config/mission.js';
-import { segmentEstimate } from './physics.js';
+import { segmentEstimate } from '../physics/traverse.js';
 
 class MinHeap {
   items = [];
