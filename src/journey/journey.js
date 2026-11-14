@@ -318,7 +318,7 @@ export class Journey {
       f.mars.scale.setScalar(1); f.mars.position.set(mix(15, 0, p), mix(5, -17, p), mix(-220, -80, p));
     } else if (stage.id === 'land') {
       f.scene.fog = new THREE.Fog('#ba8f74', 100, 900);
-      f.terrain.position.y = mix(-140, -5, p); f.terrain.position.z = mix(-180, -280, p);
+      f.terrain.position.y = mix(-140, -5, p); f.terrain.position.z = mix(-180, 0, p);
     }
     this.renderer.render(f.scene, this.camera); return true;
   }

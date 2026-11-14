@@ -5,6 +5,11 @@ import assert from 'node:assert/strict';
 await mkdir('test-results', { recursive: true });
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const errors = [];
+for (let attempt = 0; attempt < 100; attempt++) {
+  try { if ((await fetch('http://localhost:4173')).ok) break; } catch {}
+  if (attempt === 99) throw new Error('Preview server did not start');
+  await new Promise(resolve => setTimeout(resolve, 100));
+}
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
   page.on('pageerror', e => errors.push(e.message));
