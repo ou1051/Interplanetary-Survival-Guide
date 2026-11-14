@@ -1,5 +1,6 @@
 import { ROVER, LIFE_SUPPORT, HAB, SITE } from '../config/mission.js';
 import { clamp, DEG } from '../core/math.js';
+import { consumptionEstimate } from '../routes/physics.js';
 
 // ---------------------------------------------------------------------------
 // Traverse state machine + consumables.
@@ -100,13 +101,12 @@ export class Mission {
     return false;
   }
 
-  _consume(seconds, { work = false, moving = 0, pitch = 0 } = {}) {
+  _consume(seconds, options = {}) {
+    const consumed = consumptionEstimate(seconds, options);
     this.met += seconds;
-    this.o2Used += (seconds / 60) * (work ? 1.25 : 1);
+    this.o2Used += consumed.oxygenMinutes;
     this.dose += LIFE_SUPPORT.doseRateUsvH * (seconds / 3600);
-    const hotel = 110 * (seconds / 3600);
-    const drive = moving * 0.09 * (1 + 9 * Math.max(0, Math.sin(pitch)));
-    this.batteryWh = Math.max(0, this.batteryWh - hotel - drive);
+    this.batteryWh = Math.max(0, this.batteryWh - consumed.batteryWh);
   }
 
   update(dt, input, roverPitchDeg) {

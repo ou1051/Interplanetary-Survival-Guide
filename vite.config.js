@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { routeApi } from './server/routes.js';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 
 // `npm run build`         → dist/ (multi-file, for GitHub Pages or any static host)
@@ -9,5 +10,12 @@ export default defineConfig(({ mode }) => ({
     outDir: mode === 'single' ? 'dist-single' : 'dist',
     chunkSizeWarningLimit: 1500,
   },
-  plugins: mode === 'single' ? [viteSingleFile()] : [],
+  plugins: [
+    {
+      name: 'route-api',
+      configureServer(server) { server.middlewares.use(routeApi); },
+      configurePreviewServer(server) { server.middlewares.use(routeApi); },
+    },
+    ...(mode === 'single' ? [viteSingleFile()] : []),
+  ],
 }));
