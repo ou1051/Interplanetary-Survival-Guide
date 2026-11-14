@@ -284,7 +284,11 @@ async function init() {
   requestAnimationFrame(frame);
 }
 
-init().catch((err) => {
+const rehearsal = new URLSearchParams(location.search).has('rehearsal');
+const start = rehearsal
+  ? import('./sandbox/demo.js').then(({ openDemo }) => openDemo(document.getElementById('app')))
+  : init();
+start.catch((err) => {
   console.error(err);
   const b = document.getElementById('beginBtn');
   if (b) b.textContent = `ERROR: ${err.message}`;

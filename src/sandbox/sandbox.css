@@ -1,0 +1,86 @@
+.walk-shell, .walk-planning {
+  --panel: #162123;
+  --line: #344245;
+  --mint: #a7e4cd;
+  --muted: #bdcbc9;
+  box-sizing: border-box;
+  background: #10191b;
+  color: #f3f2e9;
+  font: 16px/1.45 Inter, system-ui, sans-serif;
+  height: 100%;
+  overflow: auto;
+  user-select: text;
+  color-scheme: dark;
+}
+.walk-shell *, .walk-planning * { box-sizing: border-box; }
+.walk-shell small, .walk-planning small {
+  display: block;
+  color: var(--mint);
+  font: 600 .74rem/1.5 ui-monospace, monospace;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+.walk-shell :is(h1,h2,p), .walk-planning :is(h1,h2,p,figure) { margin: 0; }
+.walk-shell button, .walk-planning :is(button,select) {
+  font: inherit;
+  border-radius: 5px;
+  padding: .5rem .85rem;
+  cursor: pointer;
+  min-height: 40px;
+}
+.walk-secondary, .walk-planning select {
+  background: #243234;
+  border: 1px solid #576768;
+  color: #f0f3e8;
+}
+.walk-primary { color: #0f221c; background: var(--mint); border: 0; font-weight: 650 !important; }
+.walk-secondary:disabled { opacity: .57; cursor: default; }
+.walk-shell :focus-visible, .walk-planning :focus-visible { outline: 3px solid #ffe1a5; outline-offset: 2px; }
+.walk-shell a, .walk-planning a { color: var(--mint); }
+.walk-shell { display: flex; flex-direction: column; }
+.walk-header { display: flex; justify-content: space-between; align-items: center; padding: .85rem 1.35rem; border-bottom: 1px solid var(--line); }
+.walk-header h1 { font-size: clamp(1.35rem, 3vw, 1.85rem); font-weight: 560; }
+.walk-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(230px, 290px); flex: 1; min-height: 0; }
+.walk-world { position: relative; min-width: 0; }
+.walk-viewport { position: absolute; inset: 0; }
+.walk-viewport:focus-visible { outline-offset: -3px; }
+.walk-hint, .walk-telemetry { position: absolute; left: 1rem; color: white; background: #111c20ec; padding: .6rem .85rem; border-radius: 4px; pointer-events: none; }
+.walk-hint { bottom: 1rem; right: 1rem; width: fit-content; max-width: calc(100% - 2rem); }
+.walk-telemetry { top: 1rem; display: flex; gap: 1rem; font: .8rem/1.4 ui-monospace, monospace; }
+.walk-rail { border-left: 1px solid var(--line); overflow-y: auto; background: var(--panel); padding: 1.1rem; }
+.walk-rail section + section { border-top: 1px solid var(--line); padding-top: 1rem; margin-top: 1rem; }
+.walk-rail h2 { font-size: 1rem; font-weight: 620; }
+.walk-map { width: 100%; height: auto; display: block; margin: .4rem 0; }
+.walk-station { display: grid; align-items: center; grid-template-columns: 1fr auto; gap: .45rem; margin-top: .85rem; }
+.walk-station strong { font-size: .91rem; }
+.walk-station :is(button,details) { grid-column: 1 / -1; }
+.walk-station details { font-size: .86rem; }
+.walk-station summary { color: var(--mint); cursor: pointer; }
+.walk-station img { display: block; width: 100%; margin: .6rem 0; }
+.walk-station details p + p { margin-top: .5rem; }
+.walk-station > span, .walk-conditions, .walk-keys p, .walk-planning figcaption { font-size: .82rem; color: var(--muted); }
+.walk-keys p { line-height: 1.9; margin-top: .45rem; }
+.walk-keys kbd { color: white; background: #263435; border: 1px solid var(--line); border-radius: 3px; padding: .05rem .3rem; }
+.walk-planning { padding: clamp(1rem, 4vw, 4rem) max(1.25rem, calc((100vw - 1000px) / 2)); }
+.walk-planning header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
+.walk-planning header a { font-size: .9rem; }
+.walk-brief { display: grid; grid-template-columns: 1fr .85fr; gap: clamp(1rem, 5vw, 4rem); align-items: center; padding: clamp(1.5rem,4vw,4rem) 0; }
+.walk-planning h1 { font-size: clamp(2rem, 4.3vw, 3.8rem); letter-spacing: -.045em; line-height: 1.05; margin: .6rem 0 1rem; }
+.walk-planning p { color: var(--muted); max-width: 56ch; }
+.walk-brief dl { display: flex; flex-wrap: wrap; gap: 1.65rem; margin: 1.5rem 0; }
+.walk-brief dt { color: var(--muted); font-size: .8rem; }
+.walk-brief dd { margin: 0; font-size: 1.2rem; font-weight: 600; }
+.walk-brief label { display: block; margin-bottom: .7rem; font-size: .86rem; }
+.walk-brief select { display: block; width: 100%; margin-top: .25rem; }
+.walk-brief canvas { width: 100%; display: block; border: 1px solid var(--line); }
+.walk-brief figcaption { margin-top: .6rem; }
+.walk-result { padding: 1.25rem; border-left: 3px solid var(--mint); background: var(--panel); margin-bottom: 1rem; }
+.walk-result h2 { font-size: 1.45rem; margin: .3rem 0; }
+.walk-result p + p { margin-top: .35rem; }
+@media (max-width: 660px) {
+  .walk-layout, .walk-brief { grid-template-columns: 1fr; }
+  .walk-layout { overflow: auto; display: block; }
+  .walk-world { height: 54vh; min-height: 240px; }
+  .walk-rail { border-left: 0; }
+  .walk-map { max-width: 260px; }
+}
