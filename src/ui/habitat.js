@@ -4,6 +4,7 @@ import { mountHabitatRoom } from './habitatRoom.js';
 import { mountHabitatExterior } from './habitatExterior.js';
 import { mountConsoleMap3D } from './consoleMap3D.js';
 import { base, outcrop, gridPosition, imagery, observationSource, terrainSource, siteWidth, terrainSlope, planGaleRoutes } from '../data/galeSite.js';
+import { SLOPE_CLASSES } from '../config/mission.js';
 import './habitat.css';
 
 const fmt = (n) => Math.round(n).toLocaleString('en');
@@ -11,6 +12,8 @@ const oxygen = (n) => {
   const minutes = Math.round(n);
   return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
 };
+const { caution, danger } = SLOPE_CLASSES;
+const slopeKey = `Green <${caution}° · Amber ${caution}–${danger}° · Red ≥${danger}°`;
 const routeName = (id) => id === 'recommended' ? 'Recommended' : 'Shortest';
 
 export function mountHabitat(root, launch) {
@@ -174,7 +177,7 @@ export function mountHabitat(root, launch) {
   const shade = slope.getContext('2d');
   for (let y = 0; y < 160; y++) for (let x = 0; x < 160; x++) {
     const value = terrainSlope(x * 4 - 318, y * 4 - 318);
-    shade.fillStyle = value >= 17 ? '#ff7958ad' : value >= 9 ? '#f3b65386' : '#68c69a48';
+    shade.fillStyle = value >= danger ? '#ff7958ad' : value >= caution ? '#f3b65386' : '#68c69a48';
     shade.fillRect(x, y, 1, 1);
   }
 
@@ -264,7 +267,7 @@ export function mountHabitat(root, launch) {
       for (const button of root.querySelectorAll('[data-approach]')) {
         button.setAttribute('aria-pressed', String(button.dataset.approach === approachChoice?.id));
       }
-      query('[data-layer-note]').textContent = mode === 'slope' ? 'Green <9° · Amber 9–15° · Red ≥15°' : s1Focused ? 'Approach to S1 · Simulated terrain' : 'Original loop · Three approaches to S1';
+      query('[data-layer-note]').textContent = mode === 'slope' ? slopeKey : s1Focused ? 'Approach to S1 · Simulated terrain' : 'Original loop · Three approaches to S1';
     } else {
       if (mode === 'slope') ctx.drawImage(slope, crop.x / 4, crop.y / 4, crop.span / 4, cropHeight / 4, 0, 0, canvas.width, canvas.height);
       ctx.save();
@@ -298,7 +301,7 @@ export function mountHabitat(root, launch) {
         ctx.strokeStyle = '#9eeaff'; ctx.lineWidth = 2; ctx.stroke();
       }
       query('[data-layer-note]').textContent = mode === 'slope'
-        ? 'Green <9° · Amber 9–17° · Red ≥17° · derived from 4 m DEM'
+        ? `${slopeKey} · derived from 4 m DEM`
         : `Orbital imagery · ${crop.span} m across`;
     }
     draw3D(delta);

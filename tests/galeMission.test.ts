@@ -1,6 +1,7 @@
 import { buildDeltaTraverse, buildDeltaApproaches } from '../src/data/deltaTraverse.js';
 import { describe, expect, it } from 'vitest';
-import { planGaleRoutes, missionHeight, outcrop, worldPosition, sampleMinutes } from '../src/data/galeSite.js';
+import { planGaleRoutes, missionHeight, outcrop, worldPosition, sampleMinutes, terrainSlope, gridPosition } from '../src/data/galeSite.js';
+import { LIFE_SUPPORT, SLOPE_CLASSES } from '../src/config/mission.js';
 import { Route } from '../src/world/route.js';
 import { Mission } from '../src/sim/mission.js';
 import { fieldGuidance } from '../src/sim/fieldGuidance.js';
@@ -39,6 +40,24 @@ describe('Gale habitat-to-field handoff', () => {
         expect(point.x).toBeCloseTo(x, 4);
         expect(point.z).toBeCloseTo(z, 4);
       });
+    }
+  });
+
+  it('keeps the recommended route off ground the rover classes as danger', () => {
+    const [recommended] = plans;
+    for (const cell of recommended.path) expect(terrainSlope(...gridPosition(cell))).toBeLessThan(SLOPE_CLASSES.danger);
+  });
+
+  it('leaves the oxygen the route card promised, including suit-up and ingress', () => {
+    for (const plan of plans) {
+      const mission = makeMission(plan);
+      expect(mission.route.stations.at(-1)?.tasks[0].minutes).toBe(LIFE_SUPPORT.ingressMinutes);
+      mission.start();
+      finish(mission);
+      expect(mission.state).toBe('complete');
+      // The card plans at constant speed; live acceleration, stops and task holds add a little.
+      expect(Math.abs(mission.o2Remaining - plan.returnOxygen)).toBeLessThan(10);
+      expect(mission.o2Remaining).toBeLessThanOrEqual(plan.returnOxygen);
     }
   });
 

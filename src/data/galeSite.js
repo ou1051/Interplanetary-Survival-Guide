@@ -2,9 +2,8 @@ import raster from './gale/elevation.json';
 import orbital from './gale/orbital.jpg?inline';
 import mastcam from './gale/mastcam.jpg?inline';
 import { planRoute } from '../routes/pathfinding.js';
-import { consumptionEstimate } from '../physics/traverse.js';
-import { ingressMinutes } from '../sim/fieldGuidance.js';
-import { LIFE_SUPPORT } from '../config/mission.js';
+import { evaBudget } from '../physics/traverse.js';
+import { SLOPE_CLASSES } from '../config/mission.js';
 
 export const imagery = { orbital, mastcam };
 export const terrainSource = 'https://www.uahirise.org/dtm/dtm.php?ID=PSP_009149_1750';
@@ -53,7 +52,8 @@ export function planGaleRoutes(start = base, target = outcrop) {
   const slopes = cells.map(slopeAtCell);
   const grid = { width: gridSize, height: gridSize, cellSizeM,
     elevationM: cells.map(cell => heightAtGale(...gridPosition(cell))) };
-  const gentler = { ...grid, blockedCells: cells.filter((_, i) => slopes[i] > 17),
+  // Never plan the recommended route through ground the rover classes as danger.
+  const gentler = { ...grid, blockedCells: cells.filter((_, i) => slopes[i] >= SLOPE_CLASSES.danger),
     hazardCost: slopes.map(slope => (slope / 10) ** 3) };
 
   return [['recommended', gentler, 'time'], ['shortest', grid, 'distance']].flatMap(([id, input, policy]) => {
@@ -61,10 +61,9 @@ export function planGaleRoutes(start = base, target = outcrop) {
     if (!outbound) return [];
     const path = outbound.path;
     const surfaceSlope = Math.max(...path.map(slopeAtCell));
-    const travel = outbound.oxygenMinutes * 2;
-    const work = consumptionEstimate((sampleMinutes + ingressMinutes) * 60, { work: true }).oxygenMinutes;
+    const budget = evaBudget({ driveSeconds: outbound.durationSeconds * 2, workMinutes: sampleMinutes });
     return [{ id, path, points: [...path, ...path.slice(0, -1).reverse()].map(worldPosition),
-      distanceM: outbound.distanceM * 2, surfaceSlope, travel,
-      returnOxygen: LIFE_SUPPORT.evaHours * 60 - travel - work }];
+      distanceM: outbound.distanceM * 2, surfaceSlope, travel: budget.drive,
+      returnOxygen: budget.remaining }];
   });
 }

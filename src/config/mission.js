@@ -165,8 +165,12 @@ export const ROVER = {
 };
 
 export const LIFE_SUPPORT = {
-  evaHours: 8,
+  evaHours: 8, // suit oxygen capacity; oxygen is counted in minutes at the riding rate
   reserveMinutes: 30,
+  // Airlock phases are charged at the working rate, like station tasks (see evaBudget).
+  egressMinutes: 20, // suit-up + airlock out, before the rover moves
+  ingressMinutes: 20, // stow samples, dust-off + airlock in
+  workFactor: 1.25, // oxygen use while working vs. riding
   walkSpeedKmh: 2.0,
   doseRateUsvH: 28, // ~0.67 mSv/sol, typical MSL/RAD surface value
 };

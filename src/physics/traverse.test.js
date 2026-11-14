@@ -1,10 +1,79 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { segmentEstimate, consumptionEstimate } from './traverse.js';
+import { segmentEstimate, consumptionEstimate, evaBudget } from './traverse.js';
 import { Mission } from '../sim/mission.js';
+import { fieldGuidance } from '../sim/fieldGuidance.js';
+import { predict, defaultSuit } from '../sim/suit.js';
 import { ROVER, SLOPE_CLASSES, LIFE_SUPPORT } from '../config/mission.js';
 
 const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-10, `${actual} != ${expected}`);
+const { egressMinutes, ingressMinutes, workFactor, reserveMinutes, evaHours } = LIFE_SUPPORT;
+
+test('evaBudget charges egress, driving, work and ingress against the suit capacity', () => {
+  const budget = evaBudget({ driveSeconds: 600, workMinutes: 40 });
+  close(budget.egress, egressMinutes * workFactor);
+  close(budget.drive, 10);
+  close(budget.work, 40 * workFactor);
+  close(budget.ingress, ingressMinutes * workFactor);
+  close(budget.required, budget.egress + budget.drive + budget.work + budget.ingress);
+  close(budget.remaining, evaHours * 60 - budget.required);
+  assert.equal(budget.reserve, reserveMinutes);
+  assert.equal(budget.belowReserve, false);
+  assert.equal(budget.insufficient, false);
+
+  const outside = evaBudget({ driveSeconds: 600, egress: false, usedMinutes: 100 });
+  assert.equal(outside.egress, 0);
+  close(outside.remaining, evaHours * 60 - 100 - 10 - ingressMinutes * workFactor);
+
+  const heavy = evaBudget({ driveSeconds: 600, workMinutes: 40, rateFactor: 1.2 });
+  close(heavy.required, budget.required * 1.2);
+
+  const tight = evaBudget({ usedMinutes: evaHours * 60 - reserveMinutes });
+  assert.equal(tight.belowReserve, true);
+  assert.equal(tight.insufficient, true);
+});
+
+test('the live traverse charges egress when it starts, as the planning budget does', () => {
+  const mission = new Mission({ length: 0, stops: [], stations: [] }, {}, {});
+  mission.start();
+  close(mission.o2Used, evaBudget().egress);
+  assert.equal(mission.met, egressMinutes * 60);
+  assert.equal(mission.state, 'drive');
+});
+
+test('field guidance budgets the return from the oxygen actually used, with ingress still ahead', () => {
+  const route = {
+    length: 1000, retracesOutbound: true, stops: [], zones: [],
+    sample: () => ({ tx: 0, tz: -1 }),
+    stations: [
+      { id: 'S1', done: false, tasks: [{ minutes: 30, done: false }, { minutes: 10, done: true }] },
+      { id: 'HAB', final: true, done: false, tasks: [{ minutes: ingressMinutes, done: false }] },
+    ],
+  };
+  const mission = new Mission(route, {}, {});
+  mission.start();
+  mission.s = 250;
+  mission._consume(600);
+  const guidance = fieldGuidance(mission);
+  const metresToSeconds = (m) => m / ROVER.dangerSlopeSpeed;
+  close(guidance.returnOxygen, evaHours * 60 - mission.o2Used - metresToSeconds(250) / 60 - ingressMinutes * workFactor);
+  assert.equal(guidance.advice, 'Continue');
+
+  // The planned loop (750 m + 30 min of unfinished work) must leave the reserve; burn oxygen until it can't.
+  const planned = evaBudget({ driveSeconds: metresToSeconds(750), workMinutes: 30, egress: false, usedMinutes: mission.o2Used });
+  mission._consume((planned.remaining - reserveMinutes + 1) * 60);
+  assert.equal(fieldGuidance(mission).advice, 'Return to habitat');
+});
+
+test('the suit planner uses the same budget, scaled by suit mass', () => {
+  const route = { oxygen_cost: 2, battery_drain: 10, hazard_warnings: [] };
+  const plain = predict(route, { insulation: 0, shielding: 0, abrasion: 0 }, 60);
+  const budget = evaBudget({ driveSeconds: 120, workMinutes: 60 });
+  close(plain.o2.used, budget.required);
+  close(plain.o2.left, budget.remaining);
+  const suited = predict(route, defaultSuit(), 60);
+  assert.ok(suited.o2.used > plain.o2.used);
+});
 
 test('flat traverse has a numeric time, oxygen and battery estimate', () => {
   const result = segmentEstimate(270, 0);

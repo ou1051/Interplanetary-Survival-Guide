@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ROUTE_POINTS, STATIONS, AREA_HAZARDS, HAB, ROVER, SLOPE_CLASSES } from '../config/mission.js';
+import { ROUTE_POINTS, STATIONS, AREA_HAZARDS, HAB, ROVER, SLOPE_CLASSES, LIFE_SUPPORT } from '../config/mission.js';
 import { clamp, DEG } from '../core/math.js';
 
 // ---------------------------------------------------------------------------
@@ -165,7 +165,7 @@ export class Route {
       final: true,
       objective: 'Return to the habitat, stow samples and complete dust-off before ingress.',
       why: ['End of traverse', 'Samples must be stowed inside the hab'],
-      tasks: [{ label: 'Stow samples & dust-off', minutes: 20, result: 'Samples stowed · EVA complete', progress: 0, done: false }],
+      tasks: [{ label: 'Stow samples & dust-off', minutes: LIFE_SUPPORT.ingressMinutes, result: 'Samples stowed · EVA complete', progress: 0, done: false }],
       done: false,
     });
     for (const st of this.stations) {
