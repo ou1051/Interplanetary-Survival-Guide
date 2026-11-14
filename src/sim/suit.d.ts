@@ -32,9 +32,6 @@ export const SUIT_PRESETS: { id: string; name: string; tagline: string; suit: Su
 export const BASE: Site;
 export const DESTINATIONS: (Site & { id: string; note: string })[];
 export const EVA: {
-  egressMin: number;
-  ingressMin: number;
-  workFactor: number;
   siteMinutes: { min: number; max: number; step: number; value: number };
   shieldingHalfMm: number;
   radiationSpikeFactor: number;

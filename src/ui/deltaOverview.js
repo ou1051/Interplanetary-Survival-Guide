@@ -1,3 +1,5 @@
+import { SLOPE_CLASSES } from '../config/mission.js';
+
 // Render the actual rover route and stops over elevation sampled from its terrain.
 export function makeDeltaOverview(route, width, height, approaches, focused = false) {
   const first = route.stations[0];
@@ -24,8 +26,8 @@ export function makeDeltaOverview(route, width, height, approaches, focused = fa
       const dz = (terrain.heightAt(wx, wz + 4) - terrain.heightAt(wx, wz - 4)) / 8;
       const slope = Math.atan(Math.hypot(dx, dz)) * 180 / Math.PI;
       const shade = 24 + 80 * Math.max(0, Math.min(1, .63 + dx * .9 + dz * .8));
-      const rgb = showSlope && slope >= 15 ? [shade + 80, shade * .7, shade * .6]
-        : showSlope && slope >= 9 ? [shade + 55, shade + 25, shade * .6]
+      const rgb = showSlope && slope >= SLOPE_CLASSES.danger ? [shade + 80, shade * .7, shade * .6]
+        : showSlope && slope >= SLOPE_CLASSES.caution ? [shade + 55, shade + 25, shade * .6]
           : showSlope ? [shade * .57, shade + 22, shade * .9] : [shade + 36, shade + 10, shade * .84];
       pixels.data.set([...rgb, 255], (y * layer.width + x) * 4);
     }

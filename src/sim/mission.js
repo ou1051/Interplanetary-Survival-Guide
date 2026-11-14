@@ -4,6 +4,8 @@ import { consumptionEstimate } from '../physics/traverse.js';
 
 // ---------------------------------------------------------------------------
 // Traverse state machine + consumables.
+// Oxygen follows evaBudget (physics/traverse.js): egress is charged in start(),
+// ingress is the habitat stop's dust-off task.
 //
 //   brief ─▶ drive ─▶ gate (acknowledge hazard briefing) ─▶ drive
 //                 └─▶ station (hold to run tasks) ─▶ stationDone ─▶ drive
@@ -70,7 +72,10 @@ export class Mission {
   }
 
   start() {
+    // Suit-up and airlock egress happen before the rover moves (same rule as evaBudget).
+    this._consume(LIFE_SUPPORT.egressMinutes * 60, { work: true });
     this.state = 'drive';
+    this.emit('log', { text: `Egress complete · ${LIFE_SUPPORT.egressMinutes} min suit-up and airlock`, tone: 'info' });
     this.emit('log', { text: `${SITE.eva} started · traverse ${Math.round(this.route.length)} m · ${this.route.stations.length - 1} stations`, tone: 'info' });
     this.emit('state', { state: this.state });
   }

@@ -1,4 +1,5 @@
 import { LIFE_SUPPORT, ROVER } from '../config/mission.js';
+import { evaBudget } from '../physics/traverse.js';
 
 // ---------------------------------------------------------------------------
 // Planning Board model: suit materials + a planned route → predicted EVA
@@ -64,10 +65,8 @@ export const DESTINATIONS = [
   { id: 'hotspot', name: 'Radiation hotspot', note: 'Sample site inside a radiation spike', cell: [13, 6] },
 ];
 
+// Airlock times and the working rate live in LIFE_SUPPORT and are applied by evaBudget.
 export const EVA = {
-  egressMin: 20, // suit up + airlock out
-  ingressMin: 20, // airlock in + dust-off
-  workFactor: 1.25, // oxygen use while working vs. riding
   siteMinutes: { min: 0, max: 180, step: 10, value: 60 },
   shieldingHalfMm: 10, // every 10 mm of polyethylene halves the dose (assumption)
   radiationSpikeFactor: 1.5, // route passes a "Radiation Spike" cell
@@ -90,13 +89,11 @@ export function suitMass(suit) {
 export function predict(route, suit, siteMinutes = EVA.siteMinutes.value) {
   const massKg = suitMass(suit);
   const o2Factor = 1 + (massKg - SUIT.baseMassKg) * SUIT.o2PerExtraKg;
+  // oxygen_cost is riding-rate oxygen minutes, i.e. minutes of driving.
   const driveMin = route ? route.oxygen_cost : 0;
-  const idleMin = EVA.egressMin + EVA.ingressMin;
+  const idleMin = LIFE_SUPPORT.egressMinutes + LIFE_SUPPORT.ingressMinutes;
   const totalMin = driveMin + idleMin + siteMinutes;
-
-  const o2UsedMin = (driveMin + idleMin + siteMinutes * EVA.workFactor) * o2Factor;
-  const o2BudgetMin = LIFE_SUPPORT.evaHours * 60;
-  const o2ReserveMin = LIFE_SUPPORT.reserveMinutes;
+  const o2 = evaBudget({ driveSeconds: driveMin * 60, workMinutes: siteMinutes, rateFactor: o2Factor });
 
   // rover hotel load (110 W, same as the shared physics model) while parked
   const batteryWh = (route ? route.battery_drain : 0) + 110 * ((idleMin + siteMinutes) / 60);
@@ -121,16 +118,15 @@ export function predict(route, suit, siteMinutes = EVA.siteMinutes.value) {
   }
   if (suit.insulation < EVA.coldInsulationLayers) warnings.push({ level: 'warn', text: 'Cold stress: add insulation layers' });
 
-  const o2Left = o2BudgetMin - o2UsedMin;
   let verdict = 'GO';
   if (!route) verdict = 'NO ROUTE';
-  else if (o2Left < 0 || batteryWh > ROVER.batteryWh) verdict = 'NO-GO';
-  else if (o2Left < o2ReserveMin || warnings.length) verdict = 'CAUTION';
+  else if (o2.insufficient || batteryWh > ROVER.batteryWh) verdict = 'NO-GO';
+  else if (o2.belowReserve || warnings.length) verdict = 'CAUTION';
 
   return {
     massKg,
     totalMin,
-    o2: { used: o2UsedMin, budget: o2BudgetMin, reserve: o2ReserveMin, left: o2Left },
+    o2: { used: o2.required, budget: o2.capacity, reserve: o2.reserve, left: o2.remaining },
     battery: { used: batteryWh, budget: ROVER.batteryWh },
     dose: { usv: doseUsv },
     warnings,
