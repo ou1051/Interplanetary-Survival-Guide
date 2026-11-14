@@ -760,6 +760,9 @@ export class MissionMap {
   }
 
   private planFooter(): string {
+    if (this.input!.rehearsalAvailable === false) {
+      return '<footer class="mm-foot"><span class="mm-status">Rehearsal unavailable in this demo</span></footer>';
+    }
     const run = this.run;
     const selected = !this.input!.routesPending && this.input!.routes.some((r) => r.id === run.selectedRouteId);
     const last = run.latestRehearsal;

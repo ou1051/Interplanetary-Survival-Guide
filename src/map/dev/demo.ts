@@ -2,7 +2,7 @@ import { MissionScreen } from '../index';
 import type { MapAction, RoutePlan, Run, Site } from '../contracts';
 import { standInClock } from '../scouting';
 import { SYNTHETIC_SITE, SYNTHETIC_SITE_BARRIER, SYNTHETIC_WINDOWS, initialRun } from './fixture';
-import { standInPlanRoutes } from './standinPlanner';
+import { planRoutes } from '../planRoutes';
 
 // ---------------------------------------------------------------------------
 // Demo harness for the map module. A STAND-IN for game flow (Person 6):
@@ -10,7 +10,6 @@ import { standInPlanRoutes } from './standinPlanner';
 //   - scouting a new observation adds one turn; reopening is free
 //   - any edit to waypoints, station order or chosen route bumps the plan
 //     revision and clears surface approval
-//   - "Rehearse route" pretends the sandbox (Person 4) returned a pass
 // ---------------------------------------------------------------------------
 
 // Variant via #gap (works on static hosts and sandboxed previews); ?fixture=gap also accepted.
@@ -24,7 +23,7 @@ const screen = new MissionScreen(host, { site, onAction, initialView: location.h
 const map = screen.map;
 
 function replan() {
-  routes = standInPlanRoutes(site, run.waypoints, run.stationOrder, run.revealedObservationIds);
+  routes = planRoutes(site, run.waypoints, run.stationOrder, run.revealedObservationIds);
   if (run.selectedRouteId && !routes.some((r) => r.id === run.selectedRouteId)) run.selectedRouteId = null;
 }
 
@@ -52,27 +51,12 @@ function onAction(a: MapAction) {
     case 'chooseRoute':
       editPlan({ selectedRouteId: a.routeId });
       break;
-    case 'startRehearsal':
-      run = {
-        ...run,
-        latestRehearsal: {
-          planRevision: a.planRevision,
-          windowId: 'win-b',
-          visibility: 'clear',
-          observedStationIds: run.stationOrder.slice(),
-          returnedToBase: true,
-          elapsedSeconds: 240,
-          distanceWalkedM: routes.find((r) => r.id === a.routeId)?.distanceM ?? 0,
-        },
-        surfaceApproved: true,
-      };
-      break;
   }
   push();
 }
 
 function push() {
-  screen.update({ run, routes, windows: SYNTHETIC_WINDOWS, clock: standInClock(run.turn, SYNTHETIC_WINDOWS) });
+  screen.update({ run, routes, rehearsalAvailable: false, windows: SYNTHETIC_WINDOWS, clock: standInClock(run.turn, SYNTHETIC_WINDOWS) });
 }
 
 // tiny dev switch: fixture variant + reset

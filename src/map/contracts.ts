@@ -146,6 +146,8 @@ export interface MapInput {
   routes: RoutePlan[];
   windows: LaunchWindow[];
   clock?: ClockPreview;
+  /** False when the host cannot start an on-foot rehearsal. */
+  rehearsalAvailable?: boolean;
   /** True while the planner is computing. */
   routesPending?: boolean;
 }

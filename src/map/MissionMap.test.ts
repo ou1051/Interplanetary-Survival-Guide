@@ -159,6 +159,16 @@ describe('map · planning', () => {
     expect(actions).toEqual([{ type: 'startRehearsal', routeId: 'route-terrain', planRevision: 3 }]);
   });
 
+  it('keeps a selected route unapproved when the host has no rehearsal', () => {
+    const run = planRun({ selectedRouteId: 'route-terrain' });
+    openPlan(run);
+    map.update({ ...input(run), rehearsalAvailable: false });
+    expect($('[data-act="rehearse"]')).toBeNull();
+    expect($('.mm-status').textContent).toContain('Rehearsal unavailable in this demo');
+    expect($('.mm-route[aria-checked="true"]')).not.toBeNull();
+    expect(actions).toEqual([]);
+  });
+
   it('a stale selection (route no longer offered) cannot be rehearsed', () => {
     openPlan(planRun({ selectedRouteId: 'gone' }));
     expect(($('[data-act="rehearse"]') as HTMLButtonElement).disabled).toBe(true);

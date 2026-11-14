@@ -72,6 +72,7 @@ export function reachableFrom(site: Site, start: Cell, connectivity: Connectivit
     const c = queue.shift()!;
     for (const [dc, dr] of NEIGHBOURS[connectivity]) {
       const n = { col: c.col + dc, row: c.row + dr };
+      if (dc && dr && (!isMapped(site, { col: c.col + dc, row: c.row }) || !isMapped(site, { col: c.col, row: c.row + dr }))) continue;
       const k = cellKey(n);
       if (!seen.has(k) && isMapped(site, n)) {
         seen.add(k);

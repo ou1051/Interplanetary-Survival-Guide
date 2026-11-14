@@ -11,8 +11,9 @@ npm run typecheck
 
 Open `/map.html#site` for the synthetic planning grid, or `/map.html#gap` for the
 disconnected-site fixture. The globe streams real orbital imagery and terrain.
-The site demo uses a local planner and simulates a successful rehearsal; it does
-not call the routing API or start an on-foot session.
+The site demo runs the same pathfinder as the [routing API](../../docs/api/routing.md)
+in the browser, so it also works on a static host. You can select a round trip;
+on-foot rehearsal is unavailable in the standalone demo and selecting a route does not approve it.
 
 ## Using it
 
@@ -37,6 +38,7 @@ The map never changes game state. It **emits** actions and waits for the next `u
 | --- | --- |
 | `site` (constructor) | Person 1 · data pack (`site.json`) |
 | `routes: RoutePlan[]`, `routesPending?` | Host supplies complete round-trip options |
+| `rehearsalAvailable?` | Set to false if the host cannot start an on-foot rehearsal |
 | `run`, `windows`, `clock: ClockPreview` | Person 6 · session and game clock |
 
 `clock.turnAfter(cost)` and `clock.closingAt(turn)` come from game flow, so the preview
@@ -53,7 +55,10 @@ rule (open while `turn ≤ lastOpenTurn`, one turn per new observation) until `s
 - **Missing data** is drawn hatched on every layer, can't hold a waypoint and is never shown
   as flat ground.
 - **Routes:** one card per option with distance, max segment slope and low-coverage
-  distance. The best value per measure is highlighted only when there is a real choice.
+  distance. The shortest route minimizes surface distance. The terrain-aware route
+  minimizes estimated rover travel time, with a 25% penalty for entering a cell that
+  no revealed observation characterizes. This penalty does not inflate displayed metres.
+  The best value per measure is highlighted only when there is a real choice.
   A single route is shown as "both policies agree". After a scout changes the comparison,
   the card names the observation that changed it.
 - **Unreachable stops:** with no routes, the panel names the disconnected stops and rings
@@ -72,16 +77,15 @@ rule (open while `turn ≤ lastOpenTurn`, one turn per new observation) until `s
 | `render.ts` | Stateless canvas renderer |
 | `grid.ts` · `scouting.ts` · `compare.ts` | Pure logic (slope, reachability, scout preview, route view models) |
 | `dev/fixture.ts` | The **synthetic** 9 × 7 shared example from the plan (no NASA data) |
-| `dev/standinPlanner.ts` | Demo-only planner for comparing distance and terrain policies |
+| `planRoutes.ts` | Joins legs through waypoints and stations back to base; compares shortest surface distance with terrain-aware travel time |
 | `dev/demo.ts`, `/map.html` | Demo harness (stand-in for game flow) |
 
 ## Swapping in teammates' work
 
 1. **Shared types (Person 6):** replace the bodies in `contracts.ts` with re-exports from `src/shared/`.
-2. **Planner (Person 2):** the [routing API](../../docs/api/routing.md) plans one leg at a time. Integration needs to join legs through waypoints and stations back to base, and supply the policy and coverage metrics used for comparison.
+2. **Rehearsal:** handle `startRehearsal` in game flow and use the actual walk result to update approval.
 3. **Real site (Person 1):** pass the loaded `site.json`, or call `map.setSite(site)`.
    Fill `kind` on each source so the viewer labels archived vs derived correctly.
 
-The demo uses eight-neighbour movement. Its reachability check allows diagonals
-across missing-data corners; the routing API forbids those moves. Match these
-rules when connecting the site plan to the API.
+The site plan and routing API both allow eight-neighbour moves. A diagonal is legal
+only if both adjacent side cells are passable.

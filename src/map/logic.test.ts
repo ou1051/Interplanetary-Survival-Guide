@@ -3,7 +3,7 @@ import { slopeGrid, reachableFrom, unreachableStops, elevationAt, isMapped } fro
 import { previewScout, standInClock, openWindows } from './scouting';
 import { routeCards, observationThatChanged, planStops, planKey, moveItem, routeLabel } from './compare';
 import { SYNTHETIC_SITE as SITE, SYNTHETIC_SITE_BARRIER as GAP, SYNTHETIC_WINDOWS as WINS, initialRun } from './dev/fixture';
-import type { RoutePlan } from './contracts';
+import type { RoutePlan, Site } from './contracts';
 
 const at = (col: number, row: number) => row * SITE.width + col;
 
@@ -48,6 +48,24 @@ describe('map · grid', () => {
     const stops = planStops(GAP, initialRun(GAP));
     expect(unreachableStops(GAP, stops).map((s) => s.id)).toEqual(['st-ridge', 'st-rock']);
     expect(unreachableStops(SITE, planStops(SITE, initialRun(SITE)))).toEqual([]);
+  });
+  it('keeps a station disconnected when only a diagonal crosses missing terrain', () => {
+    const site: Site = {
+      ...SITE, width: 2, height: 2, base: { col: 0, row: 0 }, elevationM: [0, null, null, 0],
+      stations: [{ ...SITE.stations[0], cell: { col: 1, row: 1 } }, SITE.stations[1]],
+    };
+    const run = { ...initialRun(site), stationOrder: [site.stations[0].id] };
+    expect(reachableFrom(site, site.base).has('1,1')).toBe(false);
+    expect(unreachableStops(site, planStops(site, run)).map((stop) => stop.id)).toEqual(run.stationOrder);
+  });
+  it('keeps a station reachable via a mapped orthogonal detour', () => {
+    const site: Site = {
+      ...SITE, width: 2, height: 2, base: { col: 0, row: 0 }, elevationM: [0, null, 0, 0],
+      stations: [{ ...SITE.stations[0], cell: { col: 1, row: 1 } }, SITE.stations[1]],
+    };
+    const run = { ...initialRun(site), stationOrder: [site.stations[0].id] };
+    expect(reachableFrom(site, site.base).has('1,1')).toBe(true);
+    expect(unreachableStops(site, planStops(site, run))).toEqual([]);
   });
   it('reports an unreachable waypoint by its own label', () => {
     const run = { ...initialRun(GAP), waypoints: [{ col: 2, row: 1 }, { col: 8, row: 6 }] };
