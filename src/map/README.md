@@ -5,12 +5,14 @@ waypoints and the route choice that leads into rehearsal.
 
 ```bash
 npm run dev            # open http://localhost:5173/map.html
-npm test -- map        # 41 checks (logic + DOM, jsdom)
+npm test               # routing, physics, API and map checks
 npm run typecheck
 ```
 
-The demo page has a small **DEV** switch: *Fixture*, *Data gap* (a column of missing
-elevation that cuts both stations off), and *Reset*.
+Open `/map.html#site` for the synthetic planning grid, or `/map.html#gap` for the
+disconnected-site fixture. The globe streams real orbital imagery and terrain.
+The site demo uses a local planner and simulates a successful rehearsal; it does
+not call the routing API or start an on-foot session.
 
 ## Using it
 
@@ -34,7 +36,7 @@ The map never changes game state. It **emits** actions and waits for the next `u
 | Consumes (`MapInput`) | From |
 | --- | --- |
 | `site` (constructor) | Person 1 · data pack (`site.json`) |
-| `routes: RoutePlan[]`, `routesPending?` | Person 2 · `planRoutes(...)` |
+| `routes: RoutePlan[]`, `routesPending?` | Host supplies complete round-trip options |
 | `run`, `windows`, `clock: ClockPreview` | Person 6 · session and game clock |
 
 `clock.turnAfter(cost)` and `clock.closingAt(turn)` come from game flow, so the preview
@@ -70,15 +72,16 @@ rule (open while `turn ≤ lastOpenTurn`, one turn per new observation) until `s
 | `render.ts` | Stateless canvas renderer |
 | `grid.ts` · `scouting.ts` · `compare.ts` | Pure logic (slope, reachability, scout preview, route view models) |
 | `dev/fixture.ts` | The **synthetic** 9 × 7 shared example from the plan (no NASA data) |
-| `dev/standinPlanner.ts` | Demo-only planner until `src/routes/` exists |
+| `dev/standinPlanner.ts` | Demo-only planner for comparing distance and terrain policies |
 | `dev/demo.ts`, `/map.html` | Demo harness (stand-in for game flow) |
 
 ## Swapping in teammates' work
 
 1. **Shared types (Person 6):** replace the bodies in `contracts.ts` with re-exports from `src/shared/`.
-2. **Planner (Person 2):** in `dev/demo.ts`, swap `standInPlanRoutes` for `planRoutes`.
+2. **Planner (Person 2):** the [routing API](../../docs/api/routing.md) plans one leg at a time. Integration needs to join legs through waypoints and stations back to base, and supply the policy and coverage metrics used for comparison.
 3. **Real site (Person 1):** pass the loaded `site.json`, or call `map.setSite(site)`.
    Fill `kind` on each source so the viewer labels archived vs derived correctly.
 
-Reachability for the empty state uses 8-neighbour moves over mapped cells. If the planner
-settles on 4-neighbour moves, pass `connectivity: 4` to `new MissionMap(...)`.
+The demo uses eight-neighbour movement. Its reachability check allows diagonals
+across missing-data corners; the routing API forbids those moves. Match these
+rules when connecting the site plan to the API.

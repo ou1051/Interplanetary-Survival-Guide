@@ -164,6 +164,19 @@ describe('map · planning', () => {
     expect(($('[data-act="rehearse"]') as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('blocks rehearsal while selected routes are being recalculated', () => {
+    const run = planRun({ selectedRouteId: 'route-terrain', planRevision: 4 });
+    openPlan(run);
+    map.update({ ...input(run), routesPending: true });
+    expect(text()).toContain('Planning routes…');
+    const btn = $('[data-act="rehearse"]') as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+    click(btn);
+    expect(actions).toEqual([]);
+    map.update(input(run));
+    expect(($('[data-act="rehearse"]') as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it('shows the approval state for the current revision', () => {
     const rehearsal = { planRevision: 2, windowId: 'win-b', visibility: 'clear' as const, observedStationIds: ['st-ridge'], returnedToBase: true, elapsedSeconds: 200, distanceWalkedM: 120 };
     openPlan(planRun({ planRevision: 2, latestRehearsal: rehearsal }));
@@ -212,6 +225,33 @@ describe('map · planning', () => {
     key(canvas, 'ArrowLeft'); // from (3,1) → (2,1)
     key(canvas, 'Enter');
     expect(actions.pop()).toEqual({ type: 'setWaypoints', waypoints: [{ col: 2, row: 1 }, { col: 3, row: 5 }] });
+  });
+
+  it.each(['add', 'move'] as const)('clears %s mode after a synchronous waypoint update', (mode) => {
+    map.destroy();
+    let run = planRun({ waypoints: mode === 'move' ? [{ col: 3, row: 1 }] : [] });
+    map = new MissionMap(host, {
+      site: SITE, draw: false,
+      onAction: (action) => {
+        actions.push(action);
+        if (action.type === 'setWaypoints') {
+          run = { ...run, waypoints: action.waypoints };
+          map.update(input(run));
+        }
+      },
+    });
+    openPlan(run);
+    click($(`[data-act="wp-${mode}"]`));
+    const canvas = $('.mm-canvas');
+    key(canvas, mode === 'add' ? 'ArrowUp' : 'ArrowLeft');
+    key(canvas, 'Enter');
+    expect(actions).toHaveLength(1);
+    expect(run.waypoints).toEqual([mode === 'add' ? { col: 1, row: 2 } : { col: 2, row: 1 }]);
+    expect($('[data-act="wp-add"]').getAttribute('aria-pressed')).toBe('false');
+    expect($('[data-act="wp-add"]').textContent).toContain('Add waypoint');
+    expect($('.mm-stop.moving')).toBeNull();
+    expect($('.mm-legend').textContent).not.toMatch(/Click a cell/);
+    expect(canvas.classList.contains('placing')).toBe(false);
   });
 
   it('Escape cancels waypoint placement', () => {

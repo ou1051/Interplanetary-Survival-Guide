@@ -8,13 +8,17 @@ import { TERRAIN } from './catalog';
  * geographic grid; the tiles, tiling scheme and LERC decoding are Cesium's own.
  */
 class MarsGeographicResource extends Resource {
+  override clone(result?: Resource): Resource {
+    return super.clone(result ?? new MarsGeographicResource({ url: this.url }));
+  }
+
   override getDerivedResource(options: Parameters<Resource['getDerivedResource']>[0]): Resource {
     const derived = super.getDerivedResource(options);
     const q = options?.queryParameters as Record<string, unknown> | undefined;
     if (q?.f === 'pjson') {
-      const fetchJson = derived.fetchJson.bind(derived);
-      derived.fetchJson = (async (...args: Parameters<Resource['fetchJson']>) => {
-        const meta = (await fetchJson(...args)) as Record<string, any> | undefined;
+      const metadata = new Resource({ url: TERRAIN.url.replace(/\/+$/, ''), queryParameters: { f: 'pjson' } });
+      derived.fetchJson = (async () => {
+        const meta = (await metadata.fetchJson()) as Record<string, any> | undefined;
         if (meta?.spatialReference) meta.spatialReference = { wkid: 4326, marsWkid: meta.spatialReference.wkid };
         return meta;
       }) as Resource['fetchJson'];
@@ -24,5 +28,9 @@ class MarsGeographicResource extends Resource {
 }
 
 export async function createMarsTerrain(ellipsoid: Ellipsoid): Promise<ArcGISTiledElevationTerrainProvider> {
-  return ArcGISTiledElevationTerrainProvider.fromUrl(new MarsGeographicResource({ url: TERRAIN.url }), { ellipsoid });
+  const provider = await ArcGISTiledElevationTerrainProvider.fromUrl(new MarsGeographicResource({ url: TERRAIN.url }), { ellipsoid });
+  // shortcut: Cesium only exposes the DEM's LOD limit internally; revisit when its terrain API changes.
+  const maxLevel = (provider as ArcGISTiledElevationTerrainProvider & { _lodCount: number })._lodCount;
+  provider.getTileDataAvailable = (_x, _y, level) => level <= maxLevel;
+  return provider;
 }

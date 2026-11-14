@@ -227,9 +227,8 @@ export class MissionMap {
       return false;
     }
     const list = index === null ? [...run.waypoints, { ...cell }] : replaceAt(run.waypoints, index, cell);
+    this.setMode({ kind: 'select' });
     this.emit({ type: 'setWaypoints', waypoints: list });
-    this.mode = { kind: 'select' };
-    this.canvas.classList.remove('placing');
     this.announce(index === null ? `Waypoint ${list.length} added` : `Waypoint ${index + 1} moved`);
     return true;
   }
@@ -457,7 +456,7 @@ export class MissionMap {
         this.focusKey(`route:${d.id}`);
         break;
       case 'rehearse':
-        if (run?.selectedRouteId && this.input!.routes.some((r) => r.id === run.selectedRouteId)) {
+        if (run?.selectedRouteId && !this.input!.routesPending && this.input!.routes.some((r) => r.id === run.selectedRouteId)) {
           this.emit({ type: 'startRehearsal', routeId: run.selectedRouteId, planRevision: run.planRevision });
         }
         break;
@@ -762,7 +761,7 @@ export class MissionMap {
 
   private planFooter(): string {
     const run = this.run;
-    const selected = this.input!.routes.some((r) => r.id === run.selectedRouteId);
+    const selected = !this.input!.routesPending && this.input!.routes.some((r) => r.id === run.selectedRouteId);
     const last = run.latestRehearsal;
     let status = '<span class="mm-status">Not rehearsed</span>';
     if (run.surfaceApproved) status = '<span class="mm-status ok">Approved</span>';

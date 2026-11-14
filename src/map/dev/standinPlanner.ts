@@ -2,10 +2,7 @@ import type { Cell, RoutePlan, Site } from '../contracts';
 import { cellKey, elevationAt, isMapped } from '../grid';
 
 // ---------------------------------------------------------------------------
-// STAND-IN PLANNER for the map demo only. Person 2 owns the real planner in
-// src/routes/ (planRoutes). This mirrors its agreed signature so the demo
-// harness can swap it out with a one-line import change. Not used by tests of
-// the map component itself — those feed saved RoutePlan outputs.
+// The demo compares two round-trip policies. The routing API plans one leg at a time.
 // ---------------------------------------------------------------------------
 
 type Policy = 'distance' | 'terrain';

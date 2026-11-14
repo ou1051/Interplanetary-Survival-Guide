@@ -9,8 +9,8 @@ site. The route is evaluated against the terrain: steep stretches and hazardous 
 the crew can run their tasks. Consumables (O₂, rover power, radiation dose, comms, walk-back limit)
 update as you go.
 
-> ⚠️ **No NASA data is connected yet.** Terrain and data layers are procedural placeholders so the
-> UI can be built first. Everything is structured so real datasets can be dropped in (see below).
+> The rover terrain and site planning grid use synthetic data. The separate scouting globe
+> streams real Mars imagery and elevation.
 
 ## Run it
 
@@ -23,6 +23,8 @@ npm run build:single # one self-contained file: dist-single/index.html
 
 A GitHub Actions workflow (`.github/workflows/deploy.yml`) publishes `dist/` to GitHub Pages on
 every push to `main`. Enable it once under **Settings → Pages → Source: GitHub Actions**.
+
+Open `/map.html` for the Mars globe, or `/map.html#site` to go straight to the [scouting demo](src/map/README.md).
 
 ## Routing API
 
