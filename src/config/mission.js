@@ -13,6 +13,7 @@ export const SITE = {
   eva: 'EVA-03',
   sol: 214,
   lmstStart: 14 * 60 + 10, // local mean solar time at EVA start, minutes
+  outsideTemperatureC: -35, // simulated ambient temperature for this EVA
   note: 'Procedural placeholder terrain — no NASA data connected yet',
 };
 

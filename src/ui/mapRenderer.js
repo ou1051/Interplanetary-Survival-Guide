@@ -135,7 +135,7 @@ export class MapRenderer {
     // gates
     for (const z of this.route.zones) {
       if (z.severity !== 'danger') continue;
-      const p = this.route.sample(z.s0);
+      const p = this.route.sample(z.gateS ?? z.s0);
       const [px, py] = toPx(p.x, p.z);
       g.save();
       g.translate(px, py);

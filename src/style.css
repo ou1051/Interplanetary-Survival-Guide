@@ -542,3 +542,5 @@ button.primary:disabled { opacity: 0.5; cursor: progress; box-shadow: none; }
   .brief-grid { grid-template-columns: repeat(2, 1fr); }
   .overlay-body { grid-template-columns: 1fr; }
 }
+
+.pb-launch-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
