@@ -9,7 +9,7 @@ export class Input {
     this.dom = dom;
 
     window.addEventListener('keydown', (e) => {
-      if (e.target && ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      if (e.target.closest?.('#habitat, #sourcesDialog, input, textarea, select')) return;
       const k = e.key.toLowerCase();
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
       if (!this.keys.has(k)) this.pressed.add(k);

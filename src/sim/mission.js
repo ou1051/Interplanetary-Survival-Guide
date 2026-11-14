@@ -53,7 +53,7 @@ export class Mission {
     return this.route.stops[this.stopIndex] || null;
   }
   get nextStation() {
-    return this.route.stations.find((s) => !s.done) || null;
+    return this.route.stations.find((station) => !station.done && (!this.aborted || station.final)) || null;
   }
   get currentStation() {
     const st = this.nextStop;

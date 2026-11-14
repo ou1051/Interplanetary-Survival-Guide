@@ -2,7 +2,7 @@
 
 NASA Space Apps Challenge · *Interplanetary Survival Guide: Martian Map*
 
-Enter the textured 3D habitat from the opening screen, then click the console to zoom into the mission map. **Original Delta Traverse** is selected by default. Select **S1** to compare the three approaches from the habitat. **Intermediate** follows the original 1.8 km loop. Shortest and Longer change only the approach to S1. Choose **Go outside** to drive the selected route.
+Board the rocket or choose **Skip to surface**. At touchdown, enter the 3D habitat and click the console to zoom into the mission map. **Original Delta Traverse** is selected by default. Select **S1** to compare the three approaches from the habitat. **Intermediate** follows the original 1.8 km loop. Shortest and Longer change only the approach to S1. Choose **Go outside** to drive the selected route.
 
 Select **Gale Crater · Vera Rubin Ridge** to compare a gentler route and a shorter route to a layered outcrop, consult a Curiosity observation, and collect paired samples. Select **Dust front ahead** before launch to try an early return in Gale. Press **P** or click **Wrist navigator** in either mission for the next stop, nearby hazards, and estimated oxygen on return.
 
@@ -11,6 +11,32 @@ For Gale Crater, the wall map and rover terrain share a crop of an archived Mars
 - **Orbital and elevation**: [HiRISE DTEEC_009149_1750_009294_1750_U01 and PSP_009149_1750_RED_A_01_ORTHO](https://www.uahirise.org/dtm/dtm.php?ID=PSP_009149_1750), NASA/JPL-Caltech/University of Arizona, [USGS Analysis Ready Data](https://stac.astrogeology.usgs.gov/docs/data/mars/hirise_dtms/). The local assets are made from a 640 m crop in Mars 2015 equirectangular coordinates, with elevation resampled to 4 m and slopes derived from that grid. The wall display frames a 320 m portion. Outside the crop the simulation extends the edge elevations.
 - **Science reference**: [Curiosity Mastcam Sol 1790, PIA21851](https://science.nasa.gov/photojournal/looking-up-at-layers-of-vera-rubin-ridge-on-sol-1790/), NASA/JPL-Caltech/MSSS. This is a regional reference for the visible bedding, not a photograph from the exact simulated station.
 - **Globe**: [JPL Mars Trek](https://trek.nasa.gov/mars/) continues to provide imagery for the separate scouting map.
+
+## Earth → Mars experience
+
+The entry screen now begins at an original 3D Earth launch complex. Select **Board the rocket**
+for an 84-second, first-person sequence: crew access arm → launch → Earth orbit → transfer →
+Mars approach → powered descent. After landing, choose a traverse at the habitat console. The rover reuses the flight canvas.
+Drag to look around; pause, advance a chapter, change playback speed, reduce camera motion,
+or skip directly to the surface. Sound is opt-in. The full orbital map remains available from
+**Explore Mars**. **Mission & sources** explains data provenance and limitations.
+
+The rocket, cabin, planets and landing scene are illustrative, generated reconstructions.
+No trajectory solver, live telemetry or human-rated vehicle model is implied. The Delta terrain and environmental layers are synthetic. Gale uses archived HiRISE terrain. The separate Cesium globe retains its
+NASA/USGS imagery and elevation sources. Rendering uses antialiasing, up to 2× device pixel
+ratio, 2048-pixel shadows and 2048×1024 planet textures. Earth uses the Three.js example Earth texture; Mars is illustrative. See [asset credits](docs/ASSETS.md).
+The launch sequence disposes its GPU assets after landing.
+
+### References studied
+
+- [Gale Marswalk Planner](https://github.com/sohaib1083/gale-marswalk-planner): separation of terrain evidence, routing and rehearsal assumptions.
+- [Sol-3](https://github.com/PhewwcCoder/nasa-space-app-challenge): first-person exploration, mission chapters and source-linked learning.
+- [NASA AMMOS 3DTilesRendererJS](https://github.com/NASA-AMMOS/3DTilesRendererJS): multiscale terrain architecture and resolution-aware rendering.
+- [NASA Mars facts](https://science.nasa.gov/mars/facts/) and [Perseverance](https://science.nasa.gov/mission/mars-2020-perseverance/): scientific context.
+
+The journey implementation is original. No application code or models from the
+reference projects have been copied. The Earth texture is redistributed from Three.js examples under its MIT license. Three.js and Cesium retain their existing package licenses.
+This project is independent and is not endorsed by NASA.
 
 ## Run it
 
@@ -121,3 +147,4 @@ src/
 - **今の状態:** NASAデータ未接続。地形・データレイヤーはすべて手続き生成のダミーです。
 - **遊び方:** `W` を押し続けるとルートに沿って前進します。危険ゲートで停止したら `Enter` で安全確認、科学ステーションでは `E` を長押ししてタスクを完了します。
 - **実データの差し替え先:** 標高は `src/world/terrain.js` の `rawHeight`、各レイヤーは `src/data/layers.js` のサンプラー、ルートや地点は `src/config/mission.js`。
+

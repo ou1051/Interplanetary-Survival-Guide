@@ -62,12 +62,14 @@ describe('Gale habitat-to-field handoff', () => {
     expect(guidance.next).toBe('Habitat');
     expect(guidance.canReturn).toBe(true);
     expect(mission.returnToHabitat()).toBe(true);
+    expect(mission.nextStation?.final).toBe(true);
     const after = mission.route.sample(mission.s);
     expect(after.x).toBeCloseTo(before.x, 4);
     expect(after.z).toBeCloseTo(before.z, 4);
     finish(mission);
     expect(mission.state).toBe('complete');
     expect(mission.samples).toBe(0);
+    expect(mission.nextStation).toBeNull();
   });
 });
 

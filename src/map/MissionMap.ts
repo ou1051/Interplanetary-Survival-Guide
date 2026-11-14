@@ -5,6 +5,7 @@ import { previewScout, sourceFor, sourceKind, KIND_LABEL } from './scouting';
 import { cellAt, computeView, render, ROUTE_COLORS, type Layers, type Mode, type View } from './render';
 import { ICON } from './icons';
 import { clockMarkup } from './clock';
+import { loadBackdrop, type Backdrop } from './siteImagery';
 
 // ---------------------------------------------------------------------------
 // Mission map & scouting screen (Person 3).
@@ -29,6 +30,8 @@ export interface MissionMapOptions {
   showClock?: boolean;
   /** Pixels reserved at the top by a host app bar. */
   topInset?: number;
+  /** Wait for loadBackdrop() before fetching imagery (host shows the map later). */
+  deferBackdrop?: boolean;
 }
 
 type Tab = 'scout' | 'plan';
@@ -62,17 +65,19 @@ export class MissionMap {
   private ctx: CanvasRenderingContext2D | null = null;
   private view: View | null = null;
   private texture: HTMLImageElement | null = null;
+  private backdrop: Backdrop | null = null;
+  private backdropFor: Site | null = null;
   private raf = 0;
   private ro: ResizeObserver | null = null;
   private toastTimer = 0;
   private disposers: (() => void)[] = [];
 
-  private el: Record<'job' | 'clock' | 'layers' | 'panel' | 'legend' | 'tip' | 'modal' | 'toast' | 'live' | 'stage', HTMLElement>;
+  private el: Record<'side' | 'job' | 'clock' | 'layers' | 'panel' | 'legend' | 'tip' | 'modal' | 'toast' | 'live' | 'stage', HTMLElement>;
 
   constructor(container: HTMLElement, options: MissionMapOptions) {
     this.site = options.site;
     this.slopes = slopeGrid(this.site);
-    this.opts = { draw: options.draw ?? true, initialTab: options.initialTab ?? 'scout', maxWaypoints: options.maxWaypoints ?? 6, connectivity: options.connectivity ?? 8, showClock: options.showClock ?? true, topInset: options.topInset ?? 0, onAction: options.onAction };
+    this.opts = { draw: options.draw ?? true, initialTab: options.initialTab ?? 'scout', maxWaypoints: options.maxWaypoints ?? 6, connectivity: options.connectivity ?? 8, showClock: options.showClock ?? true, topInset: options.topInset ?? 0, deferBackdrop: options.deferBackdrop ?? false, onAction: options.onAction };
     this.tab = this.opts.initialTab;
     // small screens: start with the assignment folded so the map stays visible
     this.jobCollapsed = typeof window !== 'undefined' && window.innerWidth <= 900 && window.innerWidth > 0 && this.opts.draw;
@@ -85,11 +90,13 @@ export class MissionMap {
           aria-label="Mission map. Arrow keys move the cell cursor, Enter selects, Escape cancels."></canvas>
         <div class="mm-tip" hidden></div>
       </div>
-      <header class="mm-job"></header>
+      <div class="mm-side">
+        <header class="mm-job"></header>
+        <aside class="mm-panel" aria-label="Scouting and route planning"></aside>
+      </div>
       <div class="mm-clock" aria-label="Preparation clock"></div>
       <nav class="mm-layers" aria-label="Map layers"></nav>
       <div class="mm-legend"></div>
-      <aside class="mm-panel" aria-label="Scouting and route planning"></aside>
       <div class="mm-modal" hidden></div>
       <div class="mm-toast" role="status" aria-live="polite"></div>
       <div class="mm-sr" aria-live="polite"></div>`;
@@ -98,6 +105,7 @@ export class MissionMap {
     container.appendChild(this.root);
     const q = (s: string) => this.root.querySelector(s) as HTMLElement;
     this.el = {
+      side: q('.mm-side'),
       stage: q('.mm-stage'),
       job: q('.mm-job'),
       clock: q('.mm-clock'),
@@ -632,7 +640,8 @@ export class MissionMap {
       if (this.site.elevationM.some((e) => e === null)) parts.push('<span><i class="sw nodata"></i>No data</span>');
       const t = this.site.sources.find((s) => s.id === this.site.terrainSourceId);
       const kind = sourceKind(this.site, t, 'derived');
-      parts.push(`<span class="mm-src">${KIND_LABEL[kind]}${t && !this.site.synthetic ? ` · ${esc(t.mission)} ${esc(t.scale)}` : ''} · ${this.site.cellSizeM} m cells</span>`);
+      if (this.layers.imagery && this.backdrop) parts.push('<span class="mm-src real">Imagery · MRO HiRISE</span>');
+      parts.push(`<span class="mm-src">Terrain · ${KIND_LABEL[kind]}${t && !this.site.synthetic ? ` · ${esc(t.mission)} ${esc(t.scale)}` : ''} · ${this.site.cellSizeM} m cells</span>`);
     }
     this.el.legend.innerHTML = parts.join('');
   }
@@ -838,11 +847,39 @@ export class MissionMap {
 
   private loadTexture() {
     this.texture = null;
+    if (!this.opts.deferBackdrop || this.backdropWanted) this.loadBackdrop();
     if (!this.opts.draw || !this.site.textureUrl) return;
     const img = new Image();
     img.onload = () => this.draw();
     img.src = this.site.textureUrl;
     this.texture = img;
+  }
+
+  private backdropWanted = false;
+  /** Fetch the real imagery now (hosts using deferBackdrop call this when the map is about to show). */
+  prefetchBackdrop(): void {
+    this.backdropWanted = true;
+    this.loadBackdrop();
+  }
+
+  /** Real orbital imagery around geo-referenced sites (coarse first, then sharp). */
+  private loadBackdrop() {
+    const site = this.site;
+    if (this.backdropFor === site) return;
+    this.backdropFor = site;
+    this.backdrop = null;
+    if (!this.opts.draw || !site.geo) return;
+    const hw = (site.width * site.cellSizeM) / 2;
+    const hh = (site.height * site.cellSizeM) / 2;
+    const R = Math.max(hw, hh) * 3.4;
+    const context = { west: -R, east: R, south: -R, north: R };
+    const sharp = { west: -hw * 1.8, east: hw * 1.8, south: -hh * 2, north: hh * 2 };
+    void loadBackdrop(site.geo, context, sharp, (b) => {
+      if (this.backdropFor !== site) return;
+      this.backdrop = b;
+      this.renderLegend();
+      this.draw();
+    }).catch((e) => console.warn('[map] backdrop imagery unavailable', e));
   }
 
   private resize() {
@@ -867,16 +904,15 @@ export class MissionMap {
       const r = el.getBoundingClientRect();
       return { l: r.left - root.left, t: r.top - root.top, r: r.right - root.left, b: r.bottom - root.top, w: r.width, h: r.height };
     };
-    const job = rect(this.el.job);
+    const side = rect(this.el.side);
     const rail = rect(this.el.layers);
-    const panel = rect(this.el.panel);
     const clock = rect(this.el.clock);
-    if (!panel.w || !job.w) return { l: 24, r: 24, t: 24, b: 24 };
-    const sheet = panel.t > h * 0.3; // narrow layout: panel is a bottom sheet
-    if (sheet) {
-      return { l: 12, r: 12, t: job.b + 12, b: h - Math.min(panel.t, rail.t || panel.t, clock.t || panel.t) + 12 };
-    }
-    return { l: Math.max(24, rail.r + 20), r: Math.max(24, w - panel.l + 24), t: Math.max(job.b, clock.b) + 20, b: 64 };
+    const top = this.opts.topInset;
+    if (!side.w) return { l: 24, r: 24, t: top + 24, b: 24 };
+    const sheet = side.t > top + h * 0.3; // narrow layout: the sidebar is a bottom sheet
+    if (sheet) return { l: 16, r: rail.w ? w - rail.l + 12 : 16, t: top + 40, b: h - side.t + 16 };
+    const right = rail.w ? w - rail.l + 24 : 32;
+    return { l: side.r + 40, r: Math.max(56, right), t: Math.max(top + 56, clock.h ? clock.b + 24 : 0), b: 72 };
   }
 
   private draw() {
@@ -893,6 +929,7 @@ export class MissionMap {
         routes: this.input!.routes,
         layers: this.layers,
         texture: this.texture,
+        backdrop: this.backdrop,
         hover: this.hover,
         cursor: this.cursor,
         showCursor: this.showCursor,
