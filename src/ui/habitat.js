@@ -52,7 +52,6 @@ export function mountHabitat(root, launch) {
             <button type="button" data-hab-tab="briefing" aria-pressed="true">Route Briefing</button>
             <button type="button" data-hab-tab="topology" aria-pressed="false">Site Topology</button>
           </nav><span class="hab-eva"><i></i> EVA-01</span><nav class="hab-nav" aria-label="Mission navigation">
-            <a href="./map.html">Explore Mars</a>
             <button type="button" id="sourcesBtn">Mission &amp; sources</button>
             <button type="button" id="collectionBtn">Collection</button>
             <button type="button" data-review-close>← Habitat view</button>
@@ -519,15 +518,14 @@ export function mountHabitat(root, launch) {
   stage.classList.toggle('hab-has-room', Boolean(room));
   // Outside first: the habitat at dusk. Entering flies to the lit window, cuts
   // inside through a warm flash, then pushes into the console screen.
-  const directBriefing = location.hash === '#briefing';
-  const exterior = directBriefing ? null : mountHabitatExterior(query('[data-exterior]'));
+  const exterior = mountHabitatExterior(query('[data-exterior]'));
   const cut = query('[data-cut]');
   let entering = false;
   const enterHabitat = async () => {
     if (entering) return;
     entering = true;
     enter.disabled = true;
-    const still = directBriefing || motionReduced();
+    const still = motionReduced();
     if (!still) {
       query('.hab-intro-card').animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(-28px)' }],
         { duration: 260, easing: 'ease-in', fill: 'forwards' });
@@ -735,5 +733,4 @@ export function mountHabitat(root, launch) {
   });
   reviewClose.hidden = true;
   update();
-  if (directBriefing) enterHabitat().then(() => setZoom(true));
 }

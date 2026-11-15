@@ -45,7 +45,10 @@ try {
   await forecast.click();
   assert.equal(await page.getByLabel('Simulation conditions').inputValue(), 'variable');
   assert.equal(await page.locator('#viewport canvas').count(), 0);
-  assert.equal(await page.getByRole('link', { name: 'Explore Mars' }).getAttribute('href'), './map.html');
+  await page.getByRole('button', { name: 'Site Topology' }).click();
+  await page.getByRole('region', { name: 'Habitat mission control' }).getByLabel('Interactive 3D Mars Globe with 5 landing sites').waitFor();
+  await page.getByRole('button', { name: 'Route Briefing' }).click();
+  await page.getByLabel('Mission site').waitFor();
   await page.getByRole('button', { name: 'Mission & sources' }).click();
   assert.equal(await page.locator('#sourcesDialog').evaluate(el => el.open), true);
   await page.getByRole('button', { name: 'Close mission information' }).click();

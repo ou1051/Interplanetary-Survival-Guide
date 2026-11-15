@@ -416,11 +416,11 @@
 #habitat .hab-header > span, #habitat .hab-eva { color: #d6e2f7; font: 600 11px var(--ops-font); letter-spacing: .12em; }
 #habitat .hab-eva i { background: var(--ops-go); box-shadow: 0 0 5px var(--ops-go); border-radius: 50%; }
 #habitat .hab-nav { gap: 6px; }
-#habitat .hab-nav a, #habitat .hab-nav button {
-  font: 600 11px var(--ops-font); letter-spacing: .06em; color: #fff; text-decoration: none;
+#habitat .hab-nav button {
+  font: 600 11px var(--ops-font); letter-spacing: .06em; color: #fff;
   background: transparent; border: 1px solid #7fa2e0; border-radius: 3px; padding: 4px 10px;
 }
-#habitat .hab-nav a:hover, #habitat .hab-nav button:hover { background: #ffffff1f; filter: none; }
+#habitat .hab-nav button:hover { background: #ffffff1f; filter: none; }
 /* map */
 #habitat .hab-stage .hab-mapframe { border: 1px solid var(--ops-line); box-shadow: none; background: #0a1426; border-radius: 2px; }
 #habitat .hab-mapframe::after {
@@ -595,7 +595,7 @@
 }
 #habitat.hab-zoomed .hab-console-tabs { margin: 0; }
 #habitat.hab-zoomed .hab-nav { margin-inline-start: auto; }
-#habitat.hab-zoomed .hab-header :is(button, a) {
+#habitat.hab-zoomed .hab-header button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -721,7 +721,7 @@
 
 @media (max-width: 800px) {
   #habitat.hab-zoomed .hab-nav { flex-basis: 100%; justify-content: flex-start; }
-  #habitat.hab-zoomed .hab-header :is(button, a) { min-block-size: 36px; }
+  #habitat.hab-zoomed .hab-header button { min-block-size: 36px; }
   #habitat.hab-topology-mode.hab-zoomed .hab-stage .hab-screen {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto;
@@ -735,7 +735,7 @@
   #habitat.hab-zoomed .hab-nav {
     display: grid; grid-template-columns: repeat(2, minmax(0,1fr));
   }
-  #habitat.hab-zoomed .hab-nav :is(a, button) {
+  #habitat.hab-zoomed .hab-nav button {
     padding-inline: 4px; letter-spacing: .02em; text-align: center;
   }
 }

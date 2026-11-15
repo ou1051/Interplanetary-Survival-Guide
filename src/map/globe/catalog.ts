@@ -40,16 +40,8 @@ export interface TileSource {
   credit: string;
 }
 
-export interface ImageryStyle {
-  id: string;
-  name: string;
-  short: string;
-  description: string;
-  stack: TileSource[];
-}
-
 const TREK = 'https://trek.nasa.gov/tiles/Mars/EQ';
-// Raw Viking (its own style) is graded a little warmer and crisper. Detail
+// The raw Viking fallback is graded a little warmer and crisper. Detail
 // layers need no grading: they are pan-sharpened onto the painted surface.
 const VIKING_TONE = { saturation: 1.3, contrast: 1.12 };
 const DETAIL_TONE = {};
@@ -67,16 +59,6 @@ export const SOURCES = {
     resolution: '232 m/px',
     credit: 'Viking MDIM 2.1: NASA/JPL/USGS · MOLA/HRSC: NASA/GSFC, ESA/DLR · colour design: Field Office',
   },
-  colorRelief: {
-    id: 'mola-hrsc-color',
-    url: trek('Mars_MOLA_blend200ppx_HRSC_ClrShade_clon0dd_200mpp_lzw', 'jpg'),
-    tileSize: 256,
-    maxLevel: 8,
-    mission: 'MGS MOLA + Mars Express HRSC',
-    instrument: 'Laser altimeter / stereo camera',
-    resolution: '200 m/px',
-    credit: 'NASA/JPL/GSFC · ESA/DLR/FU Berlin · Mars Trek',
-  },
   viking: {
     id: 'viking-mdim',
     url: trek('Mars_Viking_MDIM21_ClrMosaic_global_232m', 'jpg'),
@@ -87,21 +69,6 @@ export const SOURCES = {
     resolution: '232 m/px',
     credit: 'NASA/JPL/USGS · Mars Trek',
     tone: VIKING_TONE,
-  },
-  ctxGlobal: {
-    id: 'ctx-global',
-    url: 'https://astro.arcgis.com/arcgis/rest/services/OnMars/CTX/MapServer/tile/{z}/{y}/{x}',
-    tileSize: 512,
-    // REST metadata lists 18 LODs, but the cache stops at 12 (≈5 m/px, the source
-    // resolution); deeper requests 404 without CORS. Verified at Vera Rubin Ridge.
-    maxLevel: 12,
-    minViewLevel: 7,
-    colorize: true,
-    tone: DETAIL_TONE,
-    mission: 'Mars Reconnaissance Orbiter',
-    instrument: 'CTX global mosaic (Murray Lab, Caltech)',
-    resolution: '5 m/px',
-    credit: 'NASA/JPL/MSSS · Caltech Murray Lab · Esri',
   },
   galeCtx: {
     id: 'gale-ctx',
@@ -133,51 +100,13 @@ export const SOURCES = {
     resolution: '25 cm/px source',
     credit: 'NASA/JPL/University of Arizona · Mars Trek',
   },
-  jezeroHirise: {
-    id: 'jezero-hirise',
-    // Esri's sparse global HiRISE cache (red band, through 2018). Missing tiles
-    // fail without CORS, so it is only requested where coverage was checked:
-    // Jezero crater is fully covered at level 11, and tiles exist to level 17.
-    url: 'https://astro.arcgis.com/arcgis/rest/services/OnMars/HiRISE/MapServer/tile/{z}/{y}/{x}',
-    tileSize: 512,
-    maxLevel: 17,
-    bbox: { west: 77.05, south: 18.15, east: 77.85, north: 18.75 },
-    minViewLevel: 10,
-    colorize: true,
-    tone: DETAIL_TONE,
-    mission: 'Mars Reconnaissance Orbiter',
-    instrument: 'HiRISE, Esri global mosaic',
-    resolution: '25 cm/px source',
-    credit: 'NASA/JPL/University of Arizona/USGS · Esri',
-  },
 } satisfies Record<string, TileSource>;
 
 /** Colour source used to tint the greyscale detail layers. */
 export const COLOR_BASE = { url: SOURCES.viking.url, tileSize: SOURCES.viking.tileSize, maxLevel: SOURCES.viking.maxLevel };
 
-export const IMAGERY: ImageryStyle[] = [
-  {
-    id: 'best',
-    name: 'Natural colour',
-    short: 'Natural',
-    description: 'True-colour surface with shaded relief, sharpening to CTX and HiRISE as you zoom in',
-    stack: [SOURCES.painted, SOURCES.ctxGlobal, SOURCES.galeCtx, SOURCES.jezeroHirise, SOURCES.curiosityHirise],
-  },
-  {
-    id: 'relief',
-    name: 'Colour relief',
-    short: 'Relief',
-    description: 'MOLA elevation colours over HRSC shading',
-    stack: [SOURCES.colorRelief],
-  },
-  {
-    id: 'viking',
-    name: 'Viking mosaic',
-    short: 'Viking',
-    description: 'The unprocessed 1970s Viking colour mosaic',
-    stack: [SOURCES.viking],
-  },
-];
+/** Natural-colour imagery needed by the console at Gale crater, finest last. */
+export const IMAGERY: TileSource[] = [SOURCES.painted, SOURCES.galeCtx, SOURCES.curiosityHirise];
 
 export const TERRAIN = {
   url: 'https://astro.arcgis.com/arcgis/rest/services/OnMars/MDEM200M/ImageServer',
@@ -192,58 +121,3 @@ export const TERRAIN = {
     credit: 'HiRISE DTM mosaic · NASA/JPL/University of Arizona/USGS · Esri',
   },
 };
-
-export interface Place {
-  id: string;
-  name: string;
-  /** Degrees, planetocentric latitude, east-positive longitude. */
-  lat: number;
-  lon: number;
-  /** Camera range from the target when flying there, metres. */
-  range: number;
-  pitchDeg: number;
-  note: string;
-  /** Parent feature for the breadcrumb. */
-  region?: string;
-  /** Pin only shown when the camera is closer than this (m); avoids clutter at Gale. */
-  showBelowM?: number;
-  assignment?: boolean;
-}
-
-// Coordinates: Gale (IAU / Wikipedia 5.4°S 137.8°E), Vera Rubin Ridge (HiRISE
-// ESP_052176_1750 image centre), Aeolis Mons summit, Perseverance landing site,
-// Olympus Mons summit, central Valles Marineris.
-export const PLACES: Place[] = [
-  { id: 'vrr', name: 'Vera Rubin Ridge', lat: -4.714, lon: 137.357, range: 9000, pitchDeg: -38, note: 'Assignment area · Gale Crater', region: 'Gale Crater', assignment: true },
-  { id: 'gale', name: 'Gale Crater', lat: -5.4, lon: 137.8, range: 260000, pitchDeg: -55, note: '154 km impact crater', showBelowM: 3_000_000 },
-  { id: 'sharp', name: 'Mount Sharp', lat: -5.08, lon: 137.85, range: 70000, pitchDeg: -30, note: 'Aeolis Mons, ~5.5 km high', region: 'Gale Crater', showBelowM: 700_000 },
-  { id: 'jezero', name: 'Jezero Crater', lat: 18.4447, lon: 77.4508, range: 90000, pitchDeg: -50, note: 'Perseverance landing site' },
-  { id: 'olympus', name: 'Olympus Mons', lat: 18.65, lon: -133.8, range: 1100000, pitchDeg: -50, note: 'Largest volcano in the solar system' },
-  { id: 'valles', name: 'Valles Marineris', lat: -13.9, lon: -59.2, range: 1600000, pitchDeg: -60, note: '4,000 km canyon system' },
-];
-
-/** Fill a {z}/{y}/{x} template. */
-export function tileUrl(src: TileSource, z: number, y: number, x: number): string {
-  return src.url.replace('{z}', String(z)).replace('{y}', String(y)).replace('{x}', String(x));
-}
-
-/** Geographic 2×1 tiling: degrees per pixel at a level. */
-export function degreesPerPixel(level: number, tileSize = 256): number {
-  return 180 / tileSize / 2 ** level;
-}
-
-/** Tile containing a lon/lat at a level (geographic 2×1, origin -180/90). */
-export function tileFor(lon: number, lat: number, level: number): { x: number; y: number } {
-  const n = 2 ** level;
-  const span = 180 / n;
-  const x = Math.min(2 * n - 1, Math.max(0, Math.floor((lon + 180) / span)));
-  const y = Math.min(n - 1, Math.max(0, Math.floor((90 - lat) / span)));
-  return { x, y };
-}
-
-export const inBBox = (b: BBox, lon: number, lat: number) => lon >= b.west && lon <= b.east && lat >= b.south && lat <= b.north;
-
-/** Sources that cover a point, best (finest) last. */
-export function coverageAt(style: ImageryStyle, lon: number, lat: number): TileSource[] {
-  return style.stack.filter((s) => !s.bbox || inBBox(s.bbox, lon, lat));
-}

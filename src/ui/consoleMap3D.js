@@ -50,12 +50,9 @@ export async function mountConsoleMap3D(container, { onReady, onError } = {}) {
     console.warn('3D Mars map stopped; showing the 2D map instead.', error);
     onError?.(error);
   });
-  // Console-sized view: the globe defaults are tuned for full-screen exploring. Here a coarser detail
-  // target means far fewer NASA tiles to stream, and the sky is never in frame, so skip drawing it.
+  // A console-sized view needs fewer NASA tiles to stream.
   scene.globe.maximumScreenSpaceError = 6;
   scene.globe.preloadSiblings = false;
-  scene.skyBox.show = false;
-  if (scene.skyAtmosphere) scene.skyAtmosphere.show = false;
   // Render at CSS pixels (not 2-3x retina pixels), no multisampling, 30 fps: a console-sized map
   // looks the same, and the GPU does a fraction of the work while the view turns.
   viewer.useBrowserRecommendedResolution = true;
@@ -63,17 +60,6 @@ export async function mountConsoleMap3D(container, { onReady, onError } = {}) {
   scene.msaaSamples = 1;
   scene.postProcessStages.fxaa.enabled = true;
   viewer.targetFrameRate = 30;
-  // The globe's "Natural colour" style stacks five NASA layers. At Gale only three show: the painted
-  // base (fills in while loading), the Gale CTX mosaic and the Curiosity HiRISE mosaic. Hidden layers
-  // are never downloaded.
-  const keep = /painted|Gale_CTX|curiosity_hirise/;
-  const layers = Array.from({ length: viewer.imageryLayers.length }, (_, i) => viewer.imageryLayers.get(i));
-  if (layers.some((l) => keep.test(String(l.imageryProvider?.url)))) {
-    for (const l of layers) l.show = keep.test(String(l.imageryProvider?.url));
-  }
-  globe.handler?.removeInputAction(C.ScreenSpaceEventType.LEFT_CLICK); // no fly-to-click inside the console
-  // the globe's own place pins (Vera Rubin Ridge etc.) would cover the site
-  for (const e of [...viewer.entities.values]) if (String(e.id).startsWith('place:')) viewer.entities.remove(e);
 
   let entities = [];
   let lastPlan = null;
@@ -203,7 +189,6 @@ export async function mountConsoleMap3D(container, { onReady, onError } = {}) {
     setSpeed(radPerSec) { speed = radPerSec; },
     get spinning() { return spinning; },
     get ready() { return ready; },
-    setActive(on) { globe.setActive(on); },
     destroy() { clearTimeout(reseat); clearTimeout(readyFallback); lastPlan = null; globe.destroy(); },
   };
 }
