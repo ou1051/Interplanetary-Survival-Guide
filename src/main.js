@@ -1,14 +1,17 @@
 import * as THREE from 'three';
+import { ICON } from './map/icons.ts';
+import './ui/weatherControl.css';
 import { Terrain, featureMasks, sampleContext } from './world/terrain.js';
 import { Route, RouteVisuals } from './world/route.js';
 import { ROVER } from './config/mission.js';
 import { createRocks, createHabitat } from './world/scenery.js';
-import { createSky, createEnvironment, DustMotes, SUN_DIR, HORIZON } from './world/atmosphere.js';
+import { createSky, createEnvironment, DustMotes, SUN_DIR, HORIZON, ZENITH } from './world/atmosphere.js';
 import { Rover, EYE } from './rover/rover.js';
 import { createPostFX } from './world/postfx.js';
 import { drawNav, drawTraverse, drawScience, drawLife } from './rover/screens.js';
 import { LAYERS, layerById } from './data/layers.js';
 import { Mission, WALK } from './sim/mission.js';
+import { CLEAR_WEATHER, WIND_DIRECTION, windSpeedAt } from './sim/weather.js';
 import { placeArtifacts, loadCollection, recordFind, saveCollection } from './sim/artifacts.js';
 import { Astronaut, EYE_HEIGHT } from './world/astronaut.js';
 import { ArtifactField } from './world/artifactField.js';
@@ -20,12 +23,17 @@ import { Hud } from './ui/hud.js';
 import { PlanningBoard } from './ui/planningBoard.js';
 import { mountHabitat } from './ui/habitat.js';
 import { heightGrid, missionHeight, outcrop, worldPosition, sampleMinutes, imagery, observationSource } from './data/galeSite.js';
-import { clamp, damp, smoothstep, wrapAngle, DEG } from './core/math.js';
+import { clamp, damp, smoothstep, wrapAngle, DEG, formatDist } from './core/math.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
 const planningBoard = new PlanningBoard();
 document.getElementById('boardBtn').addEventListener('click', () => planningBoard.toggle(true));
+const weatherButtons = document.querySelectorAll('[data-open-weather]');
+for (const button of weatherButtons) {
+  button.querySelector('.weather-symbol').innerHTML = ICON.wind;
+  button.addEventListener('click', () => planningBoard.toggle(true, 'map'));
+}
 
 mountHabitat(document.getElementById('habitat'), initSurface);
 
@@ -52,7 +60,9 @@ async function initSurface(plan, scenario, status) {
 
   const input = new Input(viewport);
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(HORIZON.clone(), 0.00042);
+  scene.fog = new THREE.FogExp2(HORIZON.clone(), CLEAR_WEATHER.fogDensity);
+  const dustHorizon = new THREE.Color('#c49368');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const env = createEnvironment(renderer);
   scene.environment = env;
   scene.environmentIntensity = 0.38;
@@ -60,6 +70,9 @@ async function initSurface(plan, scenario, status) {
   const hemi = new THREE.HemisphereLight(0xe0b48c, 0x4a2618, 0.42);
   scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff0dc, 3.3);
+  const warmSun = sun.color.clone();
+  const coldSun = new THREE.Color('#d5e5f6');
+  const coldZenith = new THREE.Color('#777985');
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   const sc = sun.shadow.camera;
@@ -125,7 +138,10 @@ async function initSurface(plan, scenario, status) {
   const zoom = { chase: { d: 7, min: 3.5, max: 16 }, overhead: { d: 24, min: 12, max: 60 } };
   let viewMode = 'pov';
 
-  const mission = new Mission(route, terrain, hab.userData.antennaTop);
+  const mission = new Mission(route, terrain, hab.userData.antennaTop, {
+    variableWeather: scenario === 'variable',
+    frontSeconds: scenario === 'variable' ? plan.frontSeconds : 0,
+  });
   const artifacts = placeArtifacts({ route, terrain, site: route.site, seed: Math.round(route.length) });
   mission.setArtifacts(artifacts);
   const field = new ArtifactField(scene, artifacts);
@@ -139,7 +155,7 @@ async function initSurface(plan, scenario, status) {
   // keep keyboard shortcuts from re-triggering whatever button was clicked last
   document.addEventListener('click', (e) => {
     const button = e.target.closest?.('button');
-    if (button && button.id !== 'boardBtn' && !planningBoard.el.contains(button)) button.blur();
+    if (button && button.id !== 'boardBtn' && !button.hasAttribute('data-open-weather') && !planningBoard.el.contains(button)) button.blur();
   });
 
   // ---------------------------------------------------------------- layers
@@ -208,7 +224,12 @@ async function initSurface(plan, scenario, status) {
       if (isNew) newThisEva.push(p.artifact);
       collection.announce(p.artifact, isNew);
     }
-    if (type === 'state' && p.state === 'complete') setTimeout(() => hud.showDebrief(() => location.reload(), debriefSummary()), 1400);
+    if (type === 'state' && p.state === 'complete') {
+      setTimeout(() => hud.showDebrief(() => {
+        history.replaceState({ screen: 'briefing' }, '');
+        location.reload();
+      }, debriefSummary()), 1400);
+    }
     // finished a station with more ahead: the wrist navigator opens on the leg check
     if (type === 'legcheck') planningBoard.toggle(true);
   });
@@ -237,7 +258,6 @@ async function initSurface(plan, scenario, status) {
   const endBtn = document.getElementById('endBtn');
   const lookChip = document.getElementById('lookChip');
   let collectHeld = false;
-  let collecting = { target: null, t: 0 };
 
   function crewAction() {
     if (mission.state === 'drive') {
@@ -330,12 +350,16 @@ async function initSurface(plan, scenario, status) {
     dialog.addEventListener('close', () => viewport.focus({ preventScroll: true }));
   }
   mission.start();
+  if (plan.departureWaitSeconds > 0) mission.waitForWeather();
   input.resetLook();
   input.keys.clear();
   input.pressed.clear();
   const fieldAlert = document.getElementById('fieldAlert');
+  const fieldWeatherEffect = document.getElementById('fieldWeatherEffect');
+  const windBearing = Math.atan2(WIND_DIRECTION.x, -WIND_DIRECTION.z);
+  const windCues = ['Tailwind ↑', 'Wind ↗', 'Crosswind →', 'Wind ↘', 'Headwind ↓', 'Wind ↙', 'Crosswind ←', 'Wind ↖'];
   const dustAt = route.length * 0.29;
-  let dustActive = false;
+  let lastWeather;
 
   // debug / automated testing hook: advance the simulation with a fixed step.
   // Driving follows the planned route ahead (autopilot); walking stands still.
@@ -353,9 +377,10 @@ async function initSurface(plan, scenario, status) {
 
   function frame() {
     timer.update();
-    const dt = Math.min(timer.getDelta(), 0.05);
+    const elapsed = timer.getDelta();
+    const dt = Math.min(elapsed, 0.05);
     time += dt;
-    const paused = planningBoard.open || collection.open;
+    let paused = planningBoard.open || collection.open || sourcesDialog.open;
 
     // ---- discrete inputs
     if (!paused && mission.state !== 'brief') {
@@ -394,6 +419,7 @@ async function initSurface(plan, scenario, status) {
     }
 
     // ---- simulation
+    paused = planningBoard.open || collection.open || sourcesDialog.open;
     const onFoot = mission.state === 'walk';
     if (!paused) {
       if (onFoot) {
@@ -411,31 +437,43 @@ async function initSurface(plan, scenario, status) {
       mission.dustWarning = true;
       mission.rover.speed = mission.speed = 0;
       mission.cruise = false;
-      scene.fog.density = 0.008;
-      dustActive = true;
-      hud.log('Simulated dust front ahead. Open wrist navigation [P].', 'danger');
-      planningBoard.toggle(true);
+      hud.log('Dust front · rover stopped. Open the wrist navigator [P] to return.', 'danger');
     }
-    if (dustActive && mission.aborted) {
-      scene.fog.density = 0.00042;
-      dustActive = false;
-    }
+    const weather = mission.weather;
+    const windSpeed = windSpeedAt(weather, mission.met);
+    const cold = Number.isFinite(weather.exposureMinutes);
+    scene.fog.density += (weather.fogDensity - scene.fog.density) * damp(3, elapsed);
+    // Use the contrast lost across 45 m of terrain to soften the sunlight and fill the sky with dust.
+    const dust = 1 - Math.exp(-((45 * (scene.fog.density - CLEAR_WEATHER.fogDensity)) ** 2));
+    scene.fog.color.copy(HORIZON).lerp(dustHorizon, dust);
+    sky.material.uniforms.uHorizon.value.copy(scene.fog.color);
+    sky.material.uniforms.uDust.value = dust;
+    sun.intensity = 3.3 * (1 - 0.8 * dust);
+    hemi.intensity = 0.42 + 0.6 * dust; // dust scatters light into the shadows
     if (planningBoard.open) planningBoard.updateField();
-    const showAlert = mission.dustWarning && !mission.aborted && mission.state !== 'complete';
-    fieldAlert.classList.toggle('hidden', !showAlert);
-
-    // ---- collecting: hold E (or the button) next to an artifact
-    const reach = artifactInReach();
-    const holding = !paused && (input.down('e') || collectHeld || (onFoot && input.virtual.action));
-    if (reach && holding) {
-      if (collecting.target !== reach) collecting = { target: reach, t: 0 };
-      collecting.t += dt;
-      if (collecting.t >= 0.9) {
-        mission.collect(reach);
-        collecting = { target: null, t: 0 };
+    if (weather !== lastWeather || mission.state === 'complete') {
+      if (weather !== lastWeather) {
+        sun.color.copy(cold ? coldSun : warmSun);
+        sky.material.uniforms.uZenith.value.copy(cold ? coldZenith : ZENITH);
+        const tone = weather.limitsVisibility ? 'dust' : cold ? 'cold' : 'clear';
+        for (const button of weatherButtons) button.dataset.tone = tone;
+        document.getElementById('fieldWeather').textContent = weather.label;
       }
-    } else collecting = { target: null, t: 0 };
-    walker.setReach(collecting.target ? Math.min(1, collecting.t * 3) : 0);
+      let message = '';
+      if (mission.state !== 'complete' && weather.label !== 'Clear') {
+        message = mission.dustWarning ? `Dust front · Visibility ≈ ${formatDist(weather.visibilityM)} · Rover stopped. Open Wrist navigator [P] to return.`
+          : cold ? `Cold spell · Outside work limited to ${weather.exposureMinutes} min. Review tasks on your wrist navigator.`
+          : `${weather.label} · Visibility ≈ ${formatDist(weather.visibilityM)} · Rover limit ${Math.round(weather.speedLimit * 3.6)} km/h`;
+      }
+      if (fieldAlert.textContent !== message) fieldAlert.textContent = message;
+      lastWeather = weather;
+    }
+
+    // ---- station instruments and physical finds share truthful hold progress.
+    const reach = artifactInReach();
+    hud.updateHold(elapsed, { held: input.down('e') || collectHeld || input.virtual.action, reach, paused });
+    const collecting = hud.hold;
+    walker.setReach(collecting.target === reach && collecting.t ? Math.min(1, collecting.t * 3) : 0);
 
     // ---- rover pose (free driving)
     const R = mission.rover;
@@ -480,6 +518,22 @@ async function initSurface(plan, scenario, status) {
     // Who is shown: the cockpit legs in first person, the whole figure outside.
     const outside = viewMode !== 'pov';
     const inRover = !onFoot; // driving, or the EVA has ended with the crew aboard
+    const frost = cold && !outside && mission.state !== 'complete' ? (onFoot ? 'visor' : 'windshield') : '';
+    if (viewport.dataset.frost !== frost) viewport.dataset.frost = frost;
+    let effect = '';
+    if (cold) {
+      const secondsLeft = Math.max(0, Math.ceil((weather.exposureMinutes - mission.outsideMinutes) * 60));
+      effect = `EVA left ${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`;
+    } else if (windSpeed > 0) {
+      // Wind direction is relative to the vehicle's nose, or the astronaut's heading on foot.
+      const relative = wrapAngle(windBearing + (onFoot ? mission.walker.yaw : R.heading));
+      const arrow = windCues[(8 + Math.round(relative / (Math.PI / 4))) % 8];
+      effect = `${arrow} · ${Math.round(windSpeed)} m/s`;
+    }
+    if (fieldWeatherEffect.textContent !== effect) {
+      fieldWeatherEffect.textContent = effect;
+      fieldWeatherEffect.hidden = !effect;
+    }
     rover.driverLegs.visible = inRover && !outside;
     rover.driver.visible = inRover && outside;
     walker.root.visible = onFoot && outside;
@@ -526,7 +580,7 @@ async function initSurface(plan, scenario, status) {
     sky.position.copy(camWorld);
     sun.target.position.set(focus.x, focus.y, focus.z);
     sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, 150);
-    motes.update(dt, camWorld);
+    motes.update(reducedMotion.matches || paused ? 0 : dt, camWorld, dust, windSpeed);
 
     const simSpeed = Math.abs(roverSpeed);
 
@@ -563,9 +617,9 @@ async function initSurface(plan, scenario, status) {
     setButton(crewBtn, driving || onFoot, driving ? 'Get out [F]' : mission.canBoard ? 'Board rover [F]' : 'Walk to the rover to board');
     crewBtn.disabled = driving ? !mission.canExit : !mission.canBoard;
     setButton(viewBtn, true, `View · ${VIEW_NAMES[viewMode]} [T]`);
-    setButton(collectBtn, Boolean(reach), reach ? `Hold to collect ${reach.name} [E]` : '');
+    setButton(collectBtn, Boolean(reach), reach ? collecting.target === reach && collecting.reason ? `Unavailable · ${collecting.reason}` : `Hold to collect ${reach.name} [E]` : '');
     setButton(endBtn, mission.atHome && (driving || onFoot));
-    hud.context = { reach, collecting: collecting.target ? collecting.t / 0.9 : 0, view: viewMode };
+    hud.context = { reach, collecting: collecting.target === reach || collecting.target?.artifact === reach ? collecting.t / 0.9 : 0, view: viewMode };
 
     if (mission.state !== 'brief') hud.update(dt, view);
     audio.update(driving ? simSpeed : 0, roughness);

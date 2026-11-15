@@ -51,6 +51,7 @@ export function buildDeltaApproaches(original) {
     const built = buildLoopRoute(terrain, legs);
     const lastIndex = Math.floor(distance / built.step);
     const unknowns = built.zones.filter(zone => zone.unsurveyed && zone.s0 < distance);
+    built.retracesOutbound = false;
     const estimate = estimateLeg(built, terrain, distance);
     return { ...deltaPlan, ...variant, distance, s1: distance, unknowns, estimate, legs, name: `Delta Front · ${variant.label} to S1`,
       maxTilt: Math.max(...built.tilt.subarray(0, lastIndex + 1)),
@@ -76,6 +77,8 @@ export function buildLoopRoute(terrain, legs) {
   const route = new Route(terrain, { path: joinCurves(legs), stations });
   route.retracesOutbound = false;
   route.legs = legs;
+  const unknown = route.zones.find(zone => zone.unsurveyed && zone.s0 < legs[0].getLength());
+  if (unknown) route.weatherExposure = { from: unknown.s0, to: unknown.s1 };
   return route;
 }
 

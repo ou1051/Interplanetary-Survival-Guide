@@ -1,3 +1,5 @@
+@import './consoleTheme.css';
+
 #habitat {
   position:absolute; inset:0; z-index:10; overflow:auto;
   color:#e7eef0; font: 14px/1.45 Inter, var(--sans);
@@ -89,15 +91,15 @@
   justify-content: space-between;
   gap: 12px;
   padding: 14px clamp(14px, 2vw, 30px);
-  background: linear-gradient(#18120ff7 55%, #18120f00);
+  background: linear-gradient(#071022eb, transparent);
   min-height: 12%;
-  color: #f0e9df;
-  font-size: clamp(10px, 1.05vw, 15px);
+  color: var(--ops-text);
+  font: 600 clamp(10px, 1.05vw, 15px)/1.3 var(--ops-font);
   letter-spacing: .08em;
   text-transform: uppercase;
 }
-.hab-overlay b { color: #f6ae70; }
-.hab-overlay span:last-child { color: #a6e2e6; white-space: nowrap; }
+.hab-overlay b { color: var(--ops-dim); }
+.hab-overlay span:last-child { color: var(--ops-text); white-space: nowrap; }
 .hab-stage .hab-wall {
   border: 1px solid #654b3c;
   box-shadow: 0 12px 26px #100c0acc, inset 0 0 0 3px #49392e;
@@ -149,11 +151,12 @@
 .hab-stage .hab-mapcredit { margin-top: 3px; color: #a4bdc0; }
 #habitat .hab-review {
   z-index: 1;
-  background: #181713;
-  border: 1px solid #b8997c;
+  background: var(--nasa-blue);
+  border: 1px solid var(--nasa-blue-hi);
   border-radius: 3px;
   padding: 9px 15px;
-  color: #f8f3ec;
+  color: var(--ops-text);
+  font: 700 13px/1.3 var(--ops-font);
   letter-spacing: .13em;
   text-transform: uppercase;
   box-shadow: 0 3px 17px #100a06cc;
@@ -169,10 +172,21 @@
     top: var(--screen-top);
     width: var(--screen-width);
     height: var(--screen-height);
+    max-width: none;
     padding: 2px;
     border-radius: 2px;
   }
-  .hab-stage.hab-has-room .hab-mapframe { height: 100%; aspect-ratio: auto; }
+  #habitat:not(.hab-zoomed) .hab-stage.hab-has-room .hab-map {
+    container-type: size;
+    display: grid;
+    place-items: center;
+  }
+  #habitat:not(.hab-zoomed) .hab-stage.hab-has-room .hab-mapframe {
+    box-sizing: content-box;
+    width: min(calc(100% - 2px), calc((100cqh - 2px) * 1.6));
+    height: auto;
+    aspect-ratio: 640 / 400;
+  }
   .hab-stage.hab-has-room .hab-review { position: absolute; bottom: clamp(17px, 6vh, 65px); }
 }
 @media (max-width: 699px), (max-aspect-ratio: 6/5) {
@@ -361,18 +375,6 @@
 /* ---------------- Console · NASA mission-operations style ----------------
    Deep navy display, NASA blue title bar with a red accent, Helvetica type,
    data shown as labelled readouts, blue for selection, red for the main action. */
-#habitat {
-  --ops-bg: #071022;
-  --ops-panel: #0c1a33;
-  --ops-line: #1f3560;
-  --ops-text: #eef3fb;
-  --ops-dim: #8fa6cc;
-  --nasa-blue: #0b3d91;
-  --nasa-blue-hi: #2f6fd6;
-  --nasa-red: #fc3d21;
-  --ops-go: #34c46a;
-  --ops-font: "Helvetica Neue", Helvetica, Arial, sans-serif;
-}
 /* monitor housing (zoomed view only; in the room the console is pinned to the 3D monitor) */
 #habitat .hab-stage .hab-wall { background: #0b0f17; border-color: #05070b; box-shadow: none; }
 #habitat.hab-zoomed .hab-stage .hab-wall {
@@ -414,11 +416,11 @@
 #habitat .hab-header > span, #habitat .hab-eva { color: #d6e2f7; font: 600 11px var(--ops-font); letter-spacing: .12em; }
 #habitat .hab-eva i { background: var(--ops-go); box-shadow: 0 0 5px var(--ops-go); border-radius: 50%; }
 #habitat .hab-nav { gap: 6px; }
-#habitat .hab-nav a, #habitat .hab-nav button {
-  font: 600 11px var(--ops-font); letter-spacing: .06em; color: #fff; text-decoration: none;
+#habitat .hab-nav button {
+  font: 600 11px var(--ops-font); letter-spacing: .06em; color: #fff;
   background: transparent; border: 1px solid #7fa2e0; border-radius: 3px; padding: 4px 10px;
 }
-#habitat .hab-nav a:hover, #habitat .hab-nav button:hover { background: #ffffff1f; filter: none; }
+#habitat .hab-nav button:hover { background: #ffffff1f; filter: none; }
 /* map */
 #habitat .hab-stage .hab-mapframe { border: 1px solid var(--ops-line); box-shadow: none; background: #0a1426; border-radius: 2px; }
 #habitat .hab-mapframe::after {
@@ -462,6 +464,21 @@
   background: var(--ops-panel); border: 1px solid var(--ops-line); border-radius: 3px; color: #fff;
   font: 500 13px var(--ops-font); letter-spacing: 0; text-transform: none; padding: 7px 8px;
 }
+#habitat .hab-scenario .weather-control { position: relative; }
+#habitat .hab-scenario .weather-control select {
+  flex: 1; min-width: 0; width: 100%; min-height: 34px; appearance: none; cursor: pointer;
+  background: transparent; border: 0; border-radius: 0; padding: 8px 34px 8px 0;
+  color: #edf3ff; font-weight: 600; line-height: 18px;
+}
+#habitat .weather-control::after {
+  content: ''; position: absolute; right: 15px; top: calc(50% - 4px); width: 6px; height: 6px;
+  border-right: 1.5px solid var(--weather-accent, #91cce9); border-bottom: 1.5px solid var(--weather-accent, #91cce9);
+  transform: rotate(45deg); pointer-events: none;
+}
+#habitat .weather-control:hover { border-color: var(--weather-accent, #91cce9); }
+#habitat .weather-control:has(select:focus-visible) { outline: 2px solid var(--weather-accent, #91cce9); outline-offset: 2px; }
+#habitat .weather-control select:focus-visible { outline: 0; }
+#habitat .weather-control select option { background: var(--ops-panel); color: #edf3ff; }
 #habitat .hab-brief .hab-objective, #habitat .hab-brief h3 { font-family: var(--ops-font); color: #fff; letter-spacing: 0; }
 #habitat .hab-brief .hab-objective { font-size: 21px; margin-top: 16px; }
 #habitat .hab-brief p:not(.hab-eyebrow) { color: #c7d4ea; font-family: var(--ops-font); }
@@ -526,6 +543,11 @@
 .hab-unknowns p { margin: 0 0 4px; }
 .hab-unknowns ul { margin: 0 0 6px; padding-left: 16px; }
 .hab-unknowns small { color: #d9c3a6; }
+.hab-weather h4 { margin: 0 0 5px; color: #ffc178; font-size: 12px; }
+.hab-weather .hab-routes { margin-top: 8px; }
+.hab-weather .hab-routes button { min-block-size: 44px; }
+.hab-weather .hab-routes button:focus-visible { outline: 2px solid #fff0d9; outline-offset: 2px; }
+.hab-weather .hab-routes button b { color: #ffc178; }
 
 /* ---------------- Integrated Site Topology Console Tabs & Viewport Lock ---------------- */
 #habitat .hab-stage .hab-wall {
@@ -566,6 +588,20 @@
   color: #071022;
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
 }
+#habitat.hab-zoomed .hab-header {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 8px 12px;
+}
+#habitat.hab-zoomed .hab-console-tabs { margin: 0; }
+#habitat.hab-zoomed .hab-nav { margin-inline-start: auto; }
+#habitat.hab-zoomed .hab-header button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 28px;
+}
+#habitat.hab-zoomed .hab-header :focus-visible { outline-color: #fff; }
 #habitat:not(.hab-zoomed) .hab-stage .hab-header {
   padding: 5px 10px 5px 14px;
   margin-bottom: 6px;
@@ -601,7 +637,6 @@
 }
 #habitat:not(.hab-zoomed).hab-topology-mode .st-preview-card,
 #habitat:not(.hab-zoomed).hab-topology-mode .st-site-strip,
-#habitat:not(.hab-zoomed).hab-topology-mode .st-globe-footer,
 #habitat:not(.hab-zoomed).hab-topology-mode .st-topo-sidebar,
 #habitat:not(.hab-zoomed).hab-topology-mode .st-topo-legend {
   display: none;
@@ -685,9 +720,42 @@
 }
 
 @media (max-width: 800px) {
+  #habitat.hab-zoomed .hab-nav { flex-basis: 100%; justify-content: flex-start; }
+  #habitat.hab-zoomed .hab-header button { min-block-size: 36px; }
   #habitat.hab-topology-mode.hab-zoomed .hab-stage .hab-screen {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    height: auto;
     gap: 0;
   }
+  #habitat.hab-topology-mode.hab-zoomed .hab-topology-panel { height: auto; max-height: none; overflow: visible; }
 }
+@media (max-width: 540px) {
+  #habitat.hab-zoomed .hab-header { padding-inline: 14px 10px; gap: 8px; }
+  #habitat.hab-zoomed .hab-nav {
+    display: grid; grid-template-columns: repeat(2, minmax(0,1fr));
+  }
+  #habitat.hab-zoomed .hab-nav button {
+    padding-inline: 4px; letter-spacing: .02em; text-align: center;
+  }
+}
+
+#habitat .hab-cabin-weather { margin-block: 14px; min-inline-size: 0; }
+#habitat .hab-cabin-weather > summary {
+  position: relative; inline-size: 100%; min-block-size: 76px; padding: 12px 30px 12px 10px;
+  align-items: start; cursor: pointer; list-style: none;
+  border-color: var(--ops-line); border-inline-start-color: var(--weather-accent); border-radius: 3px;
+  color: var(--ops-text); background: var(--ops-panel); font-family: var(--ops-font);
+}
+#habitat .hab-cabin-weather > summary::-webkit-details-marker { display: none; }
+#habitat .hab-cabin-weather[open] > summary::after { transform: rotate(225deg); }
+#habitat .hab-cabin-weather > summary:focus-visible,
+#habitat .hab-rehearsal-settings > summary:focus-visible { outline: 2px solid #9af4ff; outline-offset: 3px; }
+#habitat .hab-cabin-weather .weather-reading { min-inline-size: 0; gap: 5px; overflow-wrap: anywhere; }
+#habitat .hab-cabin-weather .weather-reading strong { font-size: 13px; line-height: 1.4; }
+#habitat .hab-cabin-weather .weather-reading > span { color: #c7d4df; font-size: 12px; line-height: 1.5; font-weight: 400; }
+#habitat .hab-forecast-details { padding: 8px 12px; border: 1px solid var(--ops-line); border-block-start: 0; background: var(--ops-panel); }
+#habitat .hab-forecast-details p, #habitat .hab-rehearsal-settings p { margin-block: 8px; font-size: 12px; line-height: 1.6; }
+#habitat .hab-rehearsal-settings { margin-block: 14px; }
+#habitat .hab-rehearsal-settings > summary { min-block-size: 36px; padding-block: 8px; color: #a8bcc4; cursor: pointer; font-size: 12px; }
+#habitat .hab-rehearsal-settings .hab-scenario { margin-block-start: 8px; }

@@ -129,10 +129,10 @@ export class CollectionView {
     dialog.className = 'collection';
     dialog.setAttribute('aria-labelledby', 'collectionTitle');
     dialog.innerHTML = `
-      <header>
-        <div><span class="col-eyebrow">Crew collection</span><h2 id="collectionTitle">Space artifacts</h2></div>
+      <header class="source-header">
+        <h2 id="collectionTitle">Artifact collection</h2>
         <p class="col-count" data-count></p>
-        <button type="button" class="col-close" data-close aria-label="Close collection">× Close</button>
+        <button type="button" class="col-close" data-close aria-label="Close collection">×</button>
       </header>
       <div class="col-filter" role="group" aria-label="Filter by rarity" data-filter></div>
       <ul class="col-grid" data-grid></ul>

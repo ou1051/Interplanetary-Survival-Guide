@@ -1,8 +1,10 @@
+import { renderStationChoices } from './stationChoices.js';
 import { LIFE_SUPPORT } from '../config/mission.js';
 import { fieldGuidance } from '../sim/fieldGuidance.js';
-import { legOptions, temperatureAt } from '../sim/legCheck.js';
+import { forecastReturn, legOptions, temperatureAt } from '../sim/legCheck.js';
 import { legVariants, buildLoopRoute } from '../data/deltaTraverse.js';
 import { SUIT, SUIT_PRESETS, defaultSuit, predict } from '../sim/suit.js';
+import { mapWeatherLabel } from './mapRenderer.js';
 import { TraverseRelief } from './traverseRelief.js';
 import { SiteTopologyWidget } from './siteTopology.js';
 import './planningBoard.css';
@@ -37,6 +39,7 @@ export class PlanningBoard {
 
     const topoHost = $('[data-topology-host]', this.el);
     this.topology = new SiteTopologyWidget(topoHost, {
+      actionLabel: 'Set target',
       onDeploy: (selection) => {
         this.toggle(false);
         if (this.onDeploy) this.onDeploy(selection);
@@ -105,7 +108,9 @@ export class PlanningBoard {
                   <div><span>Next stop</span><b data-next-stop>S1 · -- m</b></div>
                   <div><span>Follow route</span><b data-bearing>N · 0°</b></div>
                   <div><span>Hazard ahead</span><b data-hazard>Clear</b></div>
-                  <div><span>Est. O₂ on return</span><b data-home-o2>6h 30m</b></div>
+                  <div><span>O₂ if returning now</span><b data-home-o2>6h 30m</b></div>
+                  <div><span>Inside HAB if returning now</span><b data-home-time></b></div>
+                  <div><span>Battery if returning now</span><b data-home-power></b></div>
                 </div>
                 <button type="button" class="wd-return" data-return hidden>Turn around and return ↶</button>
               </section>
@@ -120,8 +125,15 @@ export class PlanningBoard {
               </section>
               <section data-route-view hidden>
                 <p class="wd-h">Selected traverse <span data-route-name>Delta Front</span></p>
+                <p class="wd-maplegend" data-route-weather></p>
                 <canvas data-traverse width="400" height="240" aria-label="Selected route over mission terrain"></canvas>
                 <p class="wd-maplegend">◇ Science stop · ▲ Hazard gate · ■ Habitat · ● Rover</p>
+                <section data-weather-drive hidden aria-label="Weather decisions">
+                  <p class="wd-maplegend" data-drive-cost></p>
+                  <button type="button" class="wd-return" data-wait-weather>Wait in rover</button>
+                  <p class="wd-maplegend" data-wait-cost></p>
+                </section>
+                <section class="station-decisions" data-field-science aria-label="Station decisions" hidden></section>
               </section>
               <section data-topology-view hidden>
                 <div data-topology-host></div>
@@ -150,7 +162,6 @@ export class PlanningBoard {
           <span class="wd-grille"></span>
         </div>
       </div>
-      <div class="wd-keys"><span><kbd>←</kbd> <kbd>→</kbd> Switch site / screen</span><span><kbd>Enter</kbd> Select / Zoom</span><span><kbd>P</kbd> Close</span></div>
     </div>`;
   }
 
@@ -194,6 +205,7 @@ export class PlanningBoard {
       if (!button) return;
       if (button.hasAttribute('data-close')) this.toggle(false);
       else if (button.hasAttribute('data-return') && this.mission?.returnToHabitat()) this.toggle(false);
+      else if (button.hasAttribute('data-wait-weather') && this.mission?.waitForWeather()) this.updateField(true);
       else if (button.dataset.tab) this.showTab(button.dataset.tab);
       else if (button.dataset.leg) { this.legChoice = button.dataset.leg; this.renderLeg(); }
       else if (button.dataset.path) { this.pathChoice = button.dataset.path; this.renderLeg(); }
@@ -278,9 +290,8 @@ export class PlanningBoard {
     const tabBtn = $('[data-tab="' + tab + '"]', this.el);
     if (tabBtn) tabBtn.focus({ preventScroll: true });
 
-    this.updateField();
+    this.updateField(true);
     if (tab === 'leg') this.renderLeg(true);
-    if (tab === 'map') this.drawRoute();
     if (tab === 'topology') this.topology._scheduleDraw();
   }
 
@@ -300,7 +311,13 @@ export class PlanningBoard {
     this.legCtx = ctx;
     if (fresh) this.pathChoice = 'planned';
     const path = ctx.paths?.find((p) => p.id === this.pathChoice) ?? null;
-    const check = legOptions(this.mission, path);
+    let previewRoute = this.mission.route;
+    if (path && path.id !== 'planned') {
+      const legs = [...previewRoute.legs];
+      legs[ctx.index] = path.curve;
+      previewRoute = buildLoopRoute(this.terrain, legs);
+    }
+    const check = legOptions(this.mission, previewRoute);
     this.legCheck = check;
     if (fresh || !check.options.some((option) => option.id === this.legChoice)) this.legChoice = check.recommended.id;
     const chosen = check.options.find((option) => option.id === this.legChoice);
@@ -420,13 +437,17 @@ export class PlanningBoard {
 
   drawRoute() {
     if (this.relief && this.mission) {
-      this.relief.draw($('[data-traverse]', this.el), undefined, this.mission.s);
+      this.relief.draw($('[data-traverse]', this.el), undefined, this.mission.s, this.mission.weather, this.mission.activeFront, this.mission.detectedObstacles, this.mission.pos);
     }
   }
 
-  updateField() {
+  updateField(force = false) {
     if (!this.mission) return;
     const mission = this.mission;
+    // Simulation is paused in the navigator until the crew takes an action.
+    if (!force && this.lastFieldTime === mission.met && this.lastFieldState === mission.state) return;
+    this.lastFieldTime = mission.met;
+    this.lastFieldState = mission.state;
     const guidance = fieldGuidance(mission);
     const budget = LIFE_SUPPORT.evaHours * 60;
     const percent = Math.max(0, mission.o2Remaining) / budget;
@@ -435,13 +456,16 @@ export class PlanningBoard {
       oxygen: `${Math.round(percent * 100)}% · ${hm(mission.o2Remaining)}`,
       'plan-name': name,
       'route-name': name,
+      'route-weather': mapWeatherLabel(mission.weather, mission.activeFront, mission.detectedObstacles),
       advice: guidance.advice,
       reason: guidance.reason,
       'next-stop': `${guidance.next} · ${guidance.distance} m`,
       bearing: `${guidance.direction} · ${guidance.degrees}°`,
       hazard: guidance.hazard,
       'home-o2': hm(guidance.returnOxygen),
-      temp: `${Math.round(temperatureAt(mission.lmst))} °C`.replace('-', '−'),
+      'home-time': guidance.returnForecast.backAt,
+      'home-power': `${Math.floor(guidance.returnForecast.batteryPct)}%`,
+      temp: `${Math.round(temperatureAt(mission.lmst, mission.weather.temperatureOffsetC))} °C`.replace('-', '−'),
       lmst: `${String(Math.floor(mission.lmst / 60) % 24).padStart(2, '0')}:${String(Math.floor(mission.lmst % 60)).padStart(2, '0')}`,
     };
     for (const [key, value] of Object.entries(values)) {
@@ -453,10 +477,23 @@ export class PlanningBoard {
     needle.style.setProperty('--needle', `${-66 + percent * 132}deg`);
     $('[data-meter]', this.el).style.width = `${percent * 100}%`;
     $('[data-lamp]', this.el).classList.toggle('caution', guidance.advice !== 'Continue');
-    const position = Math.round(mission.s);
-    if (this.tab === 'map' && position !== this.mapPosition) {
+    if (this.tab === 'map') {
       this.drawRoute();
-      this.mapPosition = position;
+      const science = $('[data-field-science]', this.el);
+      science.hidden = !mission.currentStation || !(mission.onFoot || mission.canExit);
+      if (!science.hidden) renderStationChoices(science, mission, () => this.updateField(true));
+      const decision = $('[data-weather-drive]', this.el);
+      decision.hidden = !mission.canExit || !(mission.waitSeconds > 0);
+      if (!decision.hidden) {
+        const wait = forecastReturn(mission, { waitSeconds: mission.waitSeconds, homeOnly: true });
+        const drive = forecastReturn(mission, { homeOnly: true });
+        const budget = f => `HAB ${f.backAt} · O₂ ${Math.floor(f.oxygenLeft)} min · battery ${Math.floor(f.batteryPct)}% · ${Math.abs(Math.round(f.daylightMinutes))} min ${f.daylightMinutes >= 0 ? 'before' : 'after'} sunset`;
+        $('[data-drive-cost]', this.el).textContent = `Continue now · ${budget(drive)}`;
+        const button = $('[data-wait-weather]', this.el);
+        button.disabled = !wait.reserveOK || wait.batteryPct < 10 || wait.daylightMinutes < -30;
+        button.textContent = `Wait in rover · ${Math.ceil(mission.waitSeconds / 60)} min`;
+        $('[data-wait-cost]', this.el).textContent = `${budget(wait)}${button.disabled ? ' · outside return limits' : ''}`;
+      }
     }
   }
 }

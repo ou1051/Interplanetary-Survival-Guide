@@ -37,7 +37,7 @@
           <div class="vital" id="v-dose"><span class="k">DOSE</span><b class="v">--</b></div>
           <div class="vital" id="v-comms"><span class="k">COMMS</span><b class="v">--</b></div>
           <div class="vital" id="v-walk"><span class="k">WALKBACK</span><b class="v">--</b><i class="bar"><i></i></i></div>
-          <div class="vital" id="v-temp"><span class="k">EXT TEMP</span><b class="v">-23 °C</b></div>
+          <div class="vital" id="v-temp"><span class="k">EXT TEMP</span><b class="v">– °C</b></div>
         </aside>
 
         <aside class="hud-right" id="navPanel">
@@ -63,7 +63,7 @@
           <canvas id="progressCanvas" width="760" height="40"></canvas>
           <div class="keys" id="keys">
             <span><kbd>W</kbd> drive</span><span><kbd>S</kbd> brake</span><span><kbd>A</kbd><kbd>D</kbd> steer</span>
-            <span><kbd>C</kbd> cruise</span><span><kbd>⇧</kbd> time ×3 (short boost)</span><span><kbd>E</kbd> task</span>
+            <span><kbd>C</kbd> cruise</span><span><kbd>⇧</kbd> boost</span><span><kbd>E</kbd> task</span>
             <span><kbd>↵</kbd> confirm</span><span><kbd>M</kbd> map</span><span><kbd>L</kbd> lights</span>
             <span><kbd>H</kbd> HUD</span><span><kbd>V</kbd> recentre view</span>
           </div>
@@ -72,20 +72,29 @@
         <div id="log" class="log"></div>
 
         <div id="layers" class="layers">
-          <div class="panel-title">DATA LAYERS <small>[1–4]</small></div>
+          <div class="panel-title">SURFACE SCANNERS</div>
           <div class="layer-buttons" id="layerButtons"></div>
           <div class="legend" id="legend"></div>
         </div>
 
-        <div class="eva-actions" id="evaActions">
-          <button type="button" id="collectBtn" class="eva-collect" hidden></button>
-          <button type="button" id="endBtn" class="eva-end" hidden>End EVA at airlock [Enter]</button>
-          <button type="button" id="crewBtn" class="eva-crew">Get out [F]</button>
-          <button type="button" id="viewBtn" class="ghost eva-view">View · First person [T]</button>
-          <button type="button" id="collectionHudBtn" class="ghost eva-view">Collection [I]</button>
+        <div class="field-tools">
+          <div class="field-controls">
+            <button type="button" class="weather-control field-weather" data-open-weather aria-controls="planningBoard" aria-haspopup="dialog" aria-labelledby="fieldWeatherLabel fieldWeather" aria-describedby="fieldWeatherEffect" title="Read current conditions on the wrist map">
+              <span class="weather-symbol" aria-hidden="true"></span>
+              <span class="weather-reading"><small id="fieldWeatherLabel">Weather now</small><strong id="fieldWeather">Clear</strong><span id="fieldWeatherEffect" hidden></span></span>
+              <span class="weather-chevron" aria-hidden="true">›</span>
+            </button>
+            <button type="button" id="boardBtn" class="ghost">Wrist navigator [P]</button>
+          </div>
+          <div class="eva-actions" id="evaActions">
+            <button type="button" id="collectBtn" class="eva-collect" hidden></button>
+            <button type="button" id="endBtn" class="eva-end" hidden>End EVA at airlock [Enter]</button>
+            <button type="button" id="crewBtn" class="eva-crew">Get out [F]</button>
+            <button type="button" id="viewBtn" class="ghost eva-view">View · First person [T]</button>
+            <button type="button" id="collectionHudBtn" class="ghost eva-view">Collection [I]</button>
+          </div>
         </div>
-        <button type="button" id="boardBtn" class="ghost field-wrist">Wrist navigator [P]</button>
-        <p id="fieldAlert" class="field-alert hidden" role="status">Dust front ahead. Open your wrist navigator to return.</p>
+        <p id="fieldAlert" class="field-alert" role="status"></p>
 
         <div id="touch" class="touch">
           <button data-v="left" aria-label="steer left">◀</button>
@@ -104,6 +113,10 @@
             <div>
               <div class="overlay-title">SURVIVAL ROUTE · <span id="mapSite"></span></div>
               <div class="overlay-sub" id="mapSub"></div>
+              <button type="button" class="weather-control map-weather" data-open-weather aria-controls="planningBoard" aria-haspopup="dialog" title="Read current conditions on the wrist map">
+                <span class="weather-symbol" aria-hidden="true"></span>
+                <span id="mapWeather"></span><span class="weather-chevron" aria-hidden="true">›</span>
+              </button>
             </div>
             <button id="mapClose" class="ghost">CLOSE [M]</button>
           </div>
@@ -124,16 +137,42 @@
         </div>
       </section>
 
-      <section id="habitat" aria-label="Habitat mission control"></section>
+      <section id="habitat" aria-label="Habitat mission control">
+        <div id="localLaunch" class="screen hidden">
+          <div class="screen-inner">
+            <h1>Mars Surface Operations</h1>
+            <p><a href="./dist-single/index.html">Open the offline game</a></p>
+            <p>To build or update the offline game, run <code>npm run build:single</code> in the project folder.</p>
+          </div>
+        </div>
+      </section>
 
       <dialog id="sourcesDialog" class="sources-dialog" aria-labelledby="sourcesTitle">
-        <form method="dialog"><button class="source-close" aria-label="Close mission information">×</button></form>
-        <h2 id="sourcesTitle">Mission &amp; sources</h2>
-        <p>Plan a route from the habitat, drive to science stations and monitor your oxygen for the return. The Delta traverse uses fictional terrain. Gale Crater uses archived HiRISE elevation and imagery with a Curiosity field reference. Hazards, weather and life support are simulated.</p>
-        <p>The <a href="./map.html">Mars globe</a> streams NASA and USGS imagery and elevation. Coverage and resolution depend on the source.</p>
-        <h3>Science sources</h3><ul><li><a href="https://science.nasa.gov/mars/facts/" target="_blank" rel="noopener">NASA · Mars facts ↗</a> — planetary context</li><li><a href="https://science.nasa.gov/mission/mars-2020-perseverance/" target="_blank" rel="noopener">NASA · Perseverance ↗</a> — ancient delta and exploration context</li><li><a href="https://trek.nasa.gov/mars/" target="_blank" rel="noopener">NASA · Mars Trek ↗</a> — orbital map sources</li></ul>
-        <h3>Open-source inspiration</h3><p>We studied <a href="https://github.com/sohaib1083/gale-marswalk-planner" target="_blank" rel="noopener">Gale Marswalk Planner</a> for terrain-aware route planning, <a href="https://github.com/PhewwcCoder/nasa-space-app-challenge" target="_blank" rel="noopener">Sol-3</a> for first-person exploration and source-linked learning, and <a href="https://github.com/NASA-AMMOS/3DTilesRendererJS" target="_blank" rel="noopener">NASA AMMOS 3D Tiles Renderer</a> for multiscale 3D terrain architecture.</p>
-        <p class="source-note">Built with Three.js and CesiumJS. Independent Space Apps project; no NASA endorsement. Concept demonstrator, not operational astronaut navigation.</p>
+        <header class="source-header">
+          <h2 id="sourcesTitle">Mission &amp; sources</h2>
+          <form method="dialog"><button class="source-close" aria-label="Close mission information" autofocus>×</button></form>
+        </header>
+        <div class="source-body">
+          <section class="source-panel" aria-labelledby="sourceMissionTitle">
+            <h3 id="sourceMissionTitle">Mission overview</h3>
+            <p>Plan a route from the habitat, drive to science stations and monitor your oxygen for the return. The Delta traverse uses fictional terrain. Gale Crater uses archived HiRISE elevation and imagery with a Curiosity field reference. Hazards, weather and life support are simulated.</p>
+            <p>The 3D route briefing uses NASA and USGS imagery and elevation. Coverage and resolution depend on the source.</p>
+          </section>
+          <section class="source-panel" aria-labelledby="sourceScienceTitle">
+            <h3 id="sourceScienceTitle">Science sources</h3>
+            <ul>
+              <li><a href="https://science.nasa.gov/mars/facts/" target="_blank" rel="noopener">NASA · Mars facts ↗</a> — planetary context</li>
+              <li><a href="https://science.nasa.gov/mission/mars-2020-perseverance/" target="_blank" rel="noopener">NASA · Perseverance ↗</a> — ancient delta and exploration context</li>
+              <li><a href="https://trek.nasa.gov/mars/" target="_blank" rel="noopener">NASA · Mars Trek ↗</a> — orbital map sources</li>
+              <li><a href="https://science.nasa.gov/resource/mars-report-dust-storms-on-mars/" target="_blank" rel="noopener">NASA · Dust storms on Mars ↗</a> — observed loss of visibility. Event timing, visibility ranges and rover limits in this mission are simulated.</li>
+            </ul>
+          </section>
+          <section class="source-panel" aria-labelledby="sourceInspirationTitle">
+            <h3 id="sourceInspirationTitle">Open-source inspiration</h3>
+            <p>We studied <a href="https://github.com/sohaib1083/gale-marswalk-planner" target="_blank" rel="noopener">Gale Marswalk Planner</a> for terrain-aware route planning, <a href="https://github.com/PhewwcCoder/nasa-space-app-challenge" target="_blank" rel="noopener">Sol-3</a> for first-person exploration and source-linked learning, and <a href="https://github.com/NASA-AMMOS/3DTilesRendererJS" target="_blank" rel="noopener">NASA AMMOS 3D Tiles Renderer</a> for multiscale 3D terrain architecture.</p>
+          </section>
+          <p class="source-note">Built with Three.js and CesiumJS. Independent Space Apps project; no NASA endorsement. Concept demonstrator, not operational astronaut navigation.</p>
+        </div>
       </dialog>
 
       <section id="debrief" class="screen hidden">
@@ -143,13 +182,14 @@
           <p class="debrief-note" id="debriefNote" hidden></p>
           <div class="brief-grid" id="debriefGrid"></div>
           <div class="debrief-actions">
-            <button id="restartBtn" class="primary">RETURN TO MISSION MAP</button>
+            <button id="restartBtn" class="primary">RETURN TO MISSION BRIEFING</button>
             <button id="debriefExtra" class="ghost" hidden></button>
           </div>
         </div>
       </section>
     </div>
-    <script type="module" src="./src/main.js"></script>
+    <script type="module" src="./src/main.js"
+      onerror="if (location.protocol === 'file:') document.getElementById('localLaunch').classList.remove('hidden')"></script>
   </body>
 </html>
 

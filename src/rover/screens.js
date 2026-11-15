@@ -49,19 +49,20 @@ export function drawNav(scr, map, mission, view) {
   const { ctx: g, canvas } = scr;
   const W = canvas.width;
   const H = canvas.height;
-  map.drawNav(g, W, H, { x: view.x, z: view.z, heading: (view.headingDeg * Math.PI) / 180, s: mission.s }, 130);
+  map.drawNav(g, W, H, { x: view.x, z: view.z, heading: (view.headingDeg * Math.PI) / 180, s: mission.s, weather: mission.weather, front: mission.activeFront, obstacles: mission.detectedObstacles }, 130);
   g.fillStyle = 'rgba(3,8,10,0.78)';
   g.fillRect(0, 0, W, 34);
   g.fillStyle = CYAN;
   g.font = `600 18px ${FONT}`;
   g.textAlign = 'left';
   g.fillText(`NAV  HDG ${String(Math.round(view.headingDeg) % 360).padStart(3, '0')}°`, 12, 23);
-  const next = mission.nextStop;
+  const next = mission.nextKnownStop;
   if (next) {
     g.textAlign = 'right';
-    const label = next.ref.final ? 'HAB' : next.ref.id;
+    const label = next.kind === 'gate' ? 'GATE' : next.ref.final ? 'HAB' : next.ref.id;
+    const at = next.kind === 'gate' ? next.ref.at : next.ref;
     const r = mission.rover;
-    g.fillText(`${label} ${formatDist(Math.hypot(next.ref.x - r.x, next.ref.z - r.z))}`, W - 12, 23);
+    g.fillText(`${label} ${formatDist(Math.hypot(at.x - r.x, at.z - r.z))}`, W - 12, 23);
   }
   g.fillStyle = 'rgba(3,8,10,0.78)';
   g.fillRect(0, H - 28, W, 28);
@@ -70,7 +71,7 @@ export function drawNav(scr, map, mission, view) {
   g.textAlign = 'left';
   g.fillText(`LAYER ${map.layer ? map.layer.name : ''}`, 12, H - 9);
   g.textAlign = 'right';
-  g.fillText('RINGS 50 m', W - 12, H - 9);
+  g.fillText(!mission.weather.limitsVisibility ? 'RINGS 50 m' : `VIS ≈ ${formatDist(mission.weather.visibilityM)}`, W - 12, H - 9);
   scr.tex.needsUpdate = true;
 }
 
@@ -87,7 +88,7 @@ export function drawTraverse(scr, route, mission, view) {
   g.fillStyle = DIM;
   g.font = `15px ${FONT}`;
   g.fillText('km/h', 16, 114);
-  const lim = (mission.state === 'drive' ? mission.limit : route.speedLimitAt(mission.s + 3)) * 3.6;
+  const lim = Math.min(mission.limit, mission.weather.speedLimit) * 3.6;
   g.fillStyle = mission.governed ? ZONE_COLORS.caution : DIM;
   g.fillText(`LIMIT ${Math.round(lim)}`, 16, 136);
   // attitude
@@ -161,7 +162,8 @@ export function drawScience(scr, layer, readout, mission) {
   g.fillStyle = ZONE_COLORS.caution;
   g.font = `14px ${FONT}`;
   g.fillText(`SRC ${layer.source}`, 14, 96);
-  const st = mission.nextStation;
+  const latest = mission.scienceResults.at(-1);
+  const st = mission.currentStation ?? mission.nextStation;
   if (st) {
     g.fillStyle = DIM;
     g.font = `14px ${FONT}`;
@@ -169,7 +171,11 @@ export function drawScience(scr, layer, readout, mission) {
     g.fillStyle = CYAN;
     g.font = `16px ${FONT}`;
     wrap(g, st.objective, 14, 154, W - 28, 21, 3);
-    if (st.why && st.why[0]) {
+    if (latest) {
+      g.fillStyle = latest.quality === 'dust-degraded' || latest.status !== 'complete' ? ZONE_COLORS.caution : CYAN;
+      g.font = `14px ${FONT}`;
+      wrap(g, `${latest.station} · ${latest.result}`, 14, 230, W - 28, 19, 2);
+    } else if (st.why && st.why[0]) {
       g.fillStyle = DIM;
       g.font = `14px ${FONT}`;
       wrap(g, `▸ ${st.why[0]}`, 14, 230, W - 28, 19, 2);

@@ -37,20 +37,11 @@ function siteAssets(single) {
 
 export default defineConfig(({ mode }) => ({
   base: './',
+  appType: 'mpa',
   build: {
     outDir: mode === 'single' ? 'dist-single' : 'dist',
     copyPublicDir: mode !== 'single', // the one-file build carries what it needs inline
     chunkSizeWarningLimit: 6000,
-    rollupOptions:
-      mode === 'single'
-        ? undefined
-        : {
-            input: {
-              main: resolve(import.meta.dirname, 'index.html'),
-              map: resolve(import.meta.dirname, 'map.html'), // mission map + 3D Mars globe (src/map)
-              modelPreview: resolve(import.meta.dirname, 'model-preview.html'), // v2 rover + marker post review
-            },
-          },
   },
   plugins: [
     siteAssets(mode === 'single'),

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" preserveAspectRatio="none" fill="none">
+  <defs>
+    <linearGradient id="ice" x2="0" y2="1">
+      <stop stop-color="#e4f7ff" stop-opacity=".75"/>
+      <stop offset="1" stop-color="#b9e4ff" stop-opacity="0"/>
+    </linearGradient>
+    <g id="corner">
+      <path d="M0 0H260L236 14 203 7 175 30 150 16 137 44 108 21 87 55 60 31 36 70 13 47 0 140Z" fill="url(#ice)"/>
+      <g stroke="#d7f2ff" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M25 0 70 49 113 110M47 24 77 19M57 35 52 62M70 49 106 47M83 67 74 99M96 86 126 83" stroke-opacity=".65" stroke-width="1.6"/>
+        <path d="M118 0 139 28 174 65M134 21 156 17M146 36 144 57M159 50 182 49M0 107 34 118 78 153M24 115 35 93M38 121 34 144M57 136 78 129" stroke-opacity=".5"/>
+        <path d="M0 213 27 228 62 273M20 224 38 210M32 234 26 257M43 249 66 242M227 0 244 21 277 43M240 16 257 10M254 28 253 45" stroke-opacity=".35"/>
+      </g>
+      <path d="m8 28 17 32-10-4Zm63-28 19 29-16-8Zm91 0 18 16-9 8ZM0 164l22 27-18-9Z" fill="#e7f7ff" fill-opacity=".35"/>
+    </g>
+  </defs>
+  <use href="#corner"/>
+  <use href="#corner" transform="translate(1600 0) scale(-1 1)"/>
+  <use href="#corner" transform="translate(0 900) scale(1 -.7)" opacity=".65"/>
+  <use href="#corner" transform="translate(1600 900) scale(-1 -.7)" opacity=".65"/>
+</svg>

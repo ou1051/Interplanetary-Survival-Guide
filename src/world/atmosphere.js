@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mulberry32 } from '../core/math.js';
+import { WIND_DIRECTION } from '../sim/weather.js';
 
 // Sun position (late afternoon, low in the WSW → long shadows).
 const SUN_EL = 24 * (Math.PI / 180);
@@ -25,6 +26,7 @@ const skyFrag = /* glsl */ `
   uniform vec3 uSun;
   uniform vec3 uHorizon;
   uniform vec3 uZenith;
+  uniform float uDust;
   varying vec3 vDir;
   void main() {
     vec3 d = normalize(vDir);
@@ -38,9 +40,12 @@ const skyFrag = /* glsl */ `
     col = mix(col, vec3(0.62, 0.66, 0.70), pow(max(c, 0.0), 22.0) * 0.6);
     col += vec3(0.55, 0.42, 0.30) * pow(max(c, 0.0), 5.0) * 0.25;
     float disc = smoothstep(0.99982, 0.99992, c);
-    col += vec3(1.0, 0.96, 0.9) * disc * 14.0;
+    col += vec3(1.0, 0.96, 0.9) * disc * 14.0 * (1.0 - uDust);
     gl_FragColor = vec4(col, 1.0);
     #include <tonemapping_fragment>
+    // Terrain fog bypasses tone mapping. Match that colour at the skyline so distant ridges disappear.
+    float skyDust = clamp(uDust * mix(4.0, 1.2, t), 0.0, 1.0);
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, uHorizon, skyDust);
     #include <colorspace_fragment>
   }
 `;
@@ -54,6 +59,7 @@ export function createSky() {
       uSun: { value: SUN_DIR.clone() },
       uHorizon: { value: HORIZON.clone() },
       uZenith: { value: ZENITH.clone() },
+      uDust: { value: 0 },
     },
     side: THREE.BackSide,
     depthWrite: false,
@@ -127,19 +133,24 @@ export class DustMotes {
       }),
     );
     this.points.frustumCulled = false;
-    this.wind = new THREE.Vector3(1.4, 0.05, 0.6);
+    this.wind = new THREE.Vector3(WIND_DIRECTION.x, 0, WIND_DIRECTION.z);
     this.offset = new THREE.Vector3();
   }
 
-  update(dt, center) {
-    this.offset.addScaledVector(this.wind, dt);
+  update(dt, center, dust, windSpeed) {
+    this.offset.addScaledVector(this.wind, dt * (windSpeed || 1.5));
+    this.points.material.size = 0.05 + 0.23 * dust;
     const arr = this.points.geometry.attributes.position.array;
     const B = this.box;
     const wrap = (v) => ((((v + B / 2) % B) + B) % B) - B / 2;
     for (let i = 0; i < arr.length; i += 3) {
-      arr[i] = center.x + wrap(this.base[i] + this.offset.x - center.x);
-      arr[i + 1] = center.y + wrap(this.base[i + 1] + this.offset.y + Math.sin(this.offset.x * 0.3 + i) * 0.2 - center.y) * 0.4;
-      arr[i + 2] = center.z + wrap(this.base[i + 2] + this.offset.z - center.z);
+      const x = wrap(this.base[i] + this.offset.x - center.x);
+      const y = wrap(this.base[i + 1] + this.offset.y + Math.sin(this.offset.x * 0.3 + i) * 0.2 - center.y) * 0.4;
+      const z = wrap(this.base[i + 2] + this.offset.z - center.z);
+      arr[i] = center.x + x;
+      // Keep airborne grains outside the immediate cockpit and visor.
+      arr[i + 1] = x * x + y * y + z * z < 6.25 ? -9999 : center.y + y;
+      arr[i + 2] = center.z + z;
     }
     this.points.geometry.attributes.position.needsUpdate = true;
   }
