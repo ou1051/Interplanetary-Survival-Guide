@@ -413,6 +413,55 @@ export function mountHabitatExterior(canvas) {
   let last = performance.now();
   let offsetX = 0;
 
+  // ------------------------------------------------------------ cel look (三渲二)
+  // Hard-stepped toon lighting plus an inverted-hull ink outline on every solid.
+  const toonRamp = keep(new THREE.DataTexture(new Uint8Array([70, 70, 70, 255, 150, 150, 150, 255, 225, 225, 225, 255, 255, 255, 255, 255]), 4, 1, THREE.RGBAFormat));
+  toonRamp.minFilter = toonRamp.magFilter = THREE.NearestFilter;
+  toonRamp.needsUpdate = true;
+  const toonOf = new Map();
+  const toToon = (m) => {
+    if (!m.isMeshStandardMaterial) return m;
+    if (!toonOf.has(m)) {
+      toonOf.set(m, keep(new THREE.MeshToonMaterial({
+        color: m.color, map: m.map, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity,
+        gradientMap: toonRamp, transparent: m.transparent, opacity: m.opacity, side: m.side,
+      })));
+    }
+    return toonOf.get(m);
+  };
+  const ink = keep(new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    fog: true,
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uWidth: { value: 0.0028 }, uColor: { value: new THREE.Color('#1a0f0b') } }]),
+    vertexShader: `#include <fog_pars_vertex>
+      uniform float uWidth;
+      void main() {
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        vec3 n = normalize(normalMatrix * normal);
+        mvPosition.xyz += n * uWidth * -mvPosition.z; // constant on-screen width
+        gl_Position = projectionMatrix * mvPosition;
+        #include <fog_vertex>
+      }`,
+    fragmentShader: `#include <fog_pars_fragment>
+      uniform vec3 uColor;
+      void main() {
+        gl_FragColor = vec4(uColor, 1.0);
+        #include <fog_fragment>
+      }`,
+  }));
+  const noOutline = new Set([M.ground, M.track, M.window, M.lamp]);
+  const solids = [];
+  scene.traverse((o) => { if (o.isMesh && !o.isInstancedMesh) solids.push(o); });
+  for (const o of solids) {
+    const original = o.material;
+    o.material = Array.isArray(original) ? original.map(toToon) : toToon(original);
+    if (Array.isArray(original) || !original.isMeshStandardMaterial || noOutline.has(original) || original.transparent || !o.geometry.attributes.normal) continue;
+    const hull = new THREE.Mesh(o.geometry, ink);
+    hull.castShadow = hull.receiveShadow = false;
+    hull.raycast = () => {};
+    o.add(hull);
+  }
+
   function orbitPosition(a) {
     return new THREE.Vector3(Math.sin(a) * 24 - 1.5, 5.6 + Math.sin(a * 2) * 0.5, Math.cos(a) * 24);
   }

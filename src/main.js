@@ -5,8 +5,9 @@ import { Terrain, featureMasks, sampleContext } from './world/terrain.js';
 import { Route, RouteVisuals } from './world/route.js';
 import { ROVER } from './config/mission.js';
 import { createRocks, createHabitat } from './world/scenery.js';
-import { createSky, createEnvironment, DustMotes, WheelDust, SUN_DIR, HORIZON, ZENITH } from './world/atmosphere.js';
+import { createSky, createEnvironment, DustMotes, SUN_DIR, HORIZON, ZENITH } from './world/atmosphere.js';
 import { Rover, EYE } from './rover/rover.js';
+import { createPostFX } from './world/postfx.js';
 import { drawNav, drawTraverse, drawScience, drawLife } from './rover/screens.js';
 import { LAYERS, layerById } from './data/layers.js';
 import { Mission, WALK } from './sim/mission.js';
@@ -55,7 +56,7 @@ async function initSurface(plan, scenario, status) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap; // soft edges via sun.shadow.radius
   viewport.appendChild(renderer.domElement);
 
   const input = new Input(viewport);
@@ -65,19 +66,20 @@ async function initSurface(plan, scenario, status) {
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const env = createEnvironment(renderer);
   scene.environment = env;
-  scene.environmentIntensity = 0.55;
+  scene.environmentIntensity = 0.38;
 
-  const hemi = new THREE.HemisphereLight(0xe0b48c, 0x5a3020, 0.75);
+  const hemi = new THREE.HemisphereLight(0xe0b48c, 0x4a2618, 0.42);
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xfff0dc, 2.6);
+  const sun = new THREE.DirectionalLight(0xfff0dc, 3.3);
   const warmSun = sun.color.clone();
   const coldSun = new THREE.Color('#d5e5f6');
   const coldZenith = new THREE.Color('#777985');
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   const sc = sun.shadow.camera;
-  sc.left = -32; sc.right = 32; sc.top = 32; sc.bottom = -32; sc.near = 1; sc.far = 400;
-  sun.shadow.bias = -0.0003;
+  sc.left = -40; sc.right = 40; sc.top = 40; sc.bottom = -40; sc.near = 1; sc.far = 400;
+  sun.shadow.bias = -0.0002;
+  sun.shadow.radius = 3;
   sun.shadow.normalBias = 0.035;
   scene.add(sun, sun.target);
 
@@ -120,8 +122,6 @@ async function initSurface(plan, scenario, status) {
 
   const motes = new DustMotes();
   scene.add(motes.points);
-  const wheelDust = new WheelDust();
-  scene.add(wheelDust.points);
 
 
   // ---------------------------------------------------------------- crew, finds
@@ -325,11 +325,16 @@ async function initSurface(plan, scenario, status) {
     return best;
   }
 
+  // ---------------------------------------------------------------- post-processing (AO + bloom)
+  const postfx = createPostFX(renderer, scene, camera);
+  if (import.meta.env.DEV) window.__postfx = postfx; // console tuning: __postfx.ao.setDisplayMode('AO')
+
   // ---------------------------------------------------------------- resize
   const resize = () => {
     const w = window.innerWidth;
     const h = window.innerHeight;
     renderer.setSize(w, h);
+    postfx.setSize(w, h);
     for (const cam of [camera, freeCam]) {
       cam.aspect = w / h;
       cam.fov = w / h < 1 ? 88 : 72;
@@ -342,7 +347,6 @@ async function initSurface(plan, scenario, status) {
   // ---------------------------------------------------------------- state
   const view = { x: 0, z: 0, pitch: 0, roll: 0, headingDeg: 0, elev: 0, camera };
   const look = { yaw: 0, pitch: 0 };
-  const contacts = [];
   const camWorld = new THREE.Vector3();
   const camDir = new THREE.Vector3();
   const target = new THREE.Vector3();
@@ -425,6 +429,14 @@ async function initSurface(plan, scenario, status) {
         else if (mission.atHome) mission.endEva();
         else if (mission.legPending) planningBoard.toggle(true);
       }
+      // dev only: K ends the EVA wherever you are and shows the debrief (npm run dev; stripped from builds)
+      if (import.meta.env.DEV && input.hit('k') && ['drive', 'walk', 'gate'].includes(mission.state)) {
+        mission.legPending = null;
+        mission.rover.speed = mission.speed = 0;
+        mission.state = 'complete';
+        mission.emit('log', { text: 'DEV: EVA ended early (K).', tone: 'info' });
+        mission.emit('state', { state: 'complete' });
+      }
     }
 
     // ---- simulation
@@ -457,8 +469,8 @@ async function initSurface(plan, scenario, status) {
     scene.fog.color.copy(HORIZON).lerp(dustHorizon, dust);
     sky.material.uniforms.uHorizon.value.copy(scene.fog.color);
     sky.material.uniforms.uDust.value = dust;
-    sun.intensity = 2.6 * (1 - 0.8 * dust);
-    hemi.intensity = 0.75 + 0.5 * dust;
+    sun.intensity = 3.3 * (1 - 0.8 * dust);
+    hemi.intensity = 0.42 + 0.6 * dust; // dust scatters light into the shadows
     if (planningBoard.open) planningBoard.updateField();
     if (weather !== lastWeather || mission.state === 'complete') {
       if (weather !== lastWeather) {
@@ -592,16 +604,6 @@ async function initSurface(plan, scenario, status) {
     motes.update(reducedMotion.matches || paused ? 0 : dt, camWorld, dust, windSpeed);
 
     const simSpeed = Math.abs(roverSpeed);
-    if (simSpeed > 0.25) {
-      rover.wheelContacts(contacts);
-      const n = simSpeed * dt * 9;
-      const fx = -Math.sin(R.heading) * Math.sign(R.speed), fz = -Math.cos(R.heading) * Math.sign(R.speed);
-      for (const c of contacts) {
-        const k = n + (Math.random() < n % 1 ? 1 : 0);
-        for (let i = 0; i < Math.floor(k); i++) wheelDust.emit(c.x, c.y, c.z, fx * simSpeed * 0.35, fz * simSpeed * 0.35, simSpeed);
-      }
-    }
-    wheelDust.update(dt, (wx, wz) => terrain.heightAt(wx, wz));
 
     visuals.update(time, mission.s, station ? station.id : null);
     field.update(dt, time, reach, camWorld);
@@ -644,7 +646,7 @@ async function initSurface(plan, scenario, status) {
     audio.update(driving ? simSpeed : 0, roughness);
     input.endFrame();
 
-    renderer.render(scene, activeCam);
+    postfx.render(dt, activeCam);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
