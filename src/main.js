@@ -326,15 +326,20 @@ async function initSurface(plan, scenario, status) {
   }
 
   // ---------------------------------------------------------------- post-processing (AO + bloom)
-  const postfx = createPostFX(renderer, scene, camera);
-  if (import.meta.env.DEV) window.__postfx = postfx; // console tuning: __postfx.ao.setDisplayMode('AO')
+  let postfx = null;
+  try {
+    postfx = createPostFX(renderer, scene, camera);
+    if (import.meta.env.DEV) window.__postfx = postfx; // console tuning: __postfx.ao.setDisplayMode('AO')
+  } catch (err) {
+    console.warn('[ISG] Post-processing disabled; falling back to direct renderer:', err);
+  }
 
   // ---------------------------------------------------------------- resize
   const resize = () => {
     const w = window.innerWidth;
     const h = window.innerHeight;
     renderer.setSize(w, h);
-    postfx.setSize(w, h);
+    postfx?.setSize(w, h);
     for (const cam of [camera, freeCam]) {
       cam.aspect = w / h;
       cam.fov = w / h < 1 ? 88 : 72;
@@ -646,7 +651,17 @@ async function initSurface(plan, scenario, status) {
     audio.update(driving ? simSpeed : 0, roughness);
     input.endFrame();
 
-    postfx.render(dt, activeCam);
+    if (postfx) {
+      try {
+        postfx.render(dt, activeCam);
+      } catch (err) {
+        console.warn('[ISG] Post-processing render failed; falling back to direct renderer:', err);
+        postfx = null;
+        renderer.render(scene, activeCam);
+      }
+    } else {
+      renderer.render(scene, activeCam);
+    }
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
