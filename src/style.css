@@ -430,6 +430,7 @@ kbd {
   position: relative;
   display: grid;
   grid-template-columns: 22px 1fr auto;
+  width: 100%; background: transparent; color: inherit; font-family: inherit; text-align: left;
   align-items: center;
   gap: 8px;
   padding: 9px 10px;
@@ -448,6 +449,7 @@ kbd {
 .task.done { border-color: rgba(92, 255, 154, 0.4); cursor: default; }
 .task.done .chk { border-color: var(--ok); background: var(--ok); }
 .task.active { border-color: var(--hud); }
+.task:focus-visible { outline: 2px solid var(--hud); outline-offset: 2px; }
 .task.locked { opacity: 0.45; cursor: default; }
 .task.skipped { opacity: 0.35; cursor: default; text-decoration: line-through; } /* dropped by a quick-stop leg choice */
 .station-conditions, .station-outcomes { font-size: 12px; line-height: 1.5; }

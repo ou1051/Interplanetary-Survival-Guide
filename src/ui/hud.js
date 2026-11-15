@@ -115,6 +115,44 @@ export class Hud {
     $('hud').classList.toggle('off', this.hidden);
   }
 
+  // A held input completes one item; the crew must release before starting another.
+  updateHold(dt, { held = false, reach = null, paused = false } = {}) {
+    const M = this.mission;
+    const H = this.hold ??= { target: null, t: 0, latched: false, reason: '' };
+    if (paused) { this.heldTask = null; H.target = null; H.t = 0; H.reason = ''; return; }
+    if (!held && !this.heldTask) { H.target = null; H.t = 0; H.reason = ''; H.latched = false; return; }
+    if (H.latched) return;
+    const station = M.currentStation;
+    const target = this.heldTask ?? reach ?? station?.tasks.find(t => !t.done && !t.skipped && !t.artifact);
+    if (!target || target.done || target.collected || target.skipped) {
+      H.target = null;
+      H.t = 0;
+      return;
+    }
+    const artifact = target.artifact ?? (target === reach ? reach : null);
+    const index = station?.tasks.indexOf(target);
+    if (H.target !== target) {
+      H.target = target;
+      H.t = 0;
+      const option = artifact ? null : M.stationOptions.find(o => o.id === `task:${index}`);
+      H.reason = artifact ? M.collectionBlockReason(artifact)
+        : option ? option.reason : 'Stop the rover at this station before starting work';
+      if (H.reason) { H.latched = true; M.emit('log', { text: H.reason, tone: 'warn' }); }
+      return; // The preceding frame interval may include time before the press.
+    }
+    H.t += dt;
+    if (H.t < 0.9) return;
+    H.latched = true;
+    const completed = artifact ? M.collect(artifact) : M.chooseStationAction(`task:${index}`);
+    H.t = 0;
+    if (!completed) {
+      H.reason = artifact ? M.collectionBlockReason(artifact)
+        : M.stationOptions.find(o => o.id === `task:${index}`)?.reason || 'Task unavailable; review station conditions';
+      M.emit('log', { text: H.reason, tone: 'warn' });
+    }
+    this.stationDecisionKey = '';
+  }
+
   // ------------------------------------------------------------ log
   log(text, tone = 'info') {
     const el = $('log');
@@ -419,7 +457,8 @@ export class Hud {
     const C = this.context;
     const el = $('prompt');
     let html = '';
-    if (M.state === 'drive') {
+    if (this.hold?.t > 0 && this.hold.target?.label) html = `STATION WORK · ${this.hold.target.label} · ${Math.round(this.hold.t / 0.9 * 100)}%`;
+    else if (M.state === 'drive') {
       const st = M.currentStation;
       const open = st && !st.skipped ? st.tasks.filter((t) => !t.done && !t.skipped).length : 0;
       const charge = `${Math.round(M.boostCharge * 100)}%`;
@@ -427,7 +466,7 @@ export class Hud {
         : M.boostBlocked ? `<span class="boost-off">⇧ BOOST OFF · ${M.boostBlocked}${M.boostBlocked === 'RECHARGING' ? ` ${charge}` : ''}</span>` : '';
       if (M.atHome) html = `<span class="pulse">AT THE HABITAT · <kbd>↵</kbd> END EVA · <kbd>F</kbd> GET OUT</span>`;
       else if (M.legPending) html = `<span class="pulse">${M.legPending.id} DONE · CHOOSE THE NEXT LEG ON YOUR WRIST NAVIGATOR <kbd>P</kbd></span>`;
-      else if (st && open && M.speed < 0.3) html = `<span class="pulse">${st.id} · CHOOSE SCIENCE WORK BELOW · <kbd>F</kbd> GET OUT TO COLLECT FINDS</span>`;
+      else if (st && open && M.speed < 0.3) html = `<span class="pulse">${st.id} · HOLD <kbd>E</kbd> FOR SCIENCE WORK · <kbd>F</kbd> GET OUT TO COLLECT FINDS</span>`;
       else if (st && open) html = `${st.id} · STOP HERE FOR SCIENCE AND ARTIFACTS`;
       else if (M.cruise) html = `CRUISE ON · <kbd>S</kbd> to cancel${boost ? ` · ${boost}` : ''}`;
       else if (M.speed < 0.15 && !this.input.throttle) html = `<span class="pulse">HOLD <kbd>W</kbd> TO DRIVE · THE ROUTE IS A GUIDE, GO ANYWHERE</span>`;
@@ -453,8 +492,8 @@ export class Hud {
     this.keysMode = mode;
     const k = (keys, text) => `<span>${keys.map((x) => `<kbd>${x}</kbd>`).join('')} ${text}</span>`;
     $('keys').innerHTML = mode === 'walk'
-      ? [k(['W', 'A', 'S', 'D'], 'walk'), k(['⇧'], 'run'), k(['E'], 'collect (hold)'), k(['F'], 'board rover'), k(['T'], 'view'), k(['I'], 'collection'), k(['M'], 'map'), k(['V'], 'recentre')].join('')
-      : [k(['W'], 'drive'), k(['S'], 'brake · hold to reverse'), k(['A', 'D'], 'steer'), k(['C'], 'cruise'), k(['⇧'], 'time ×3'), k(['F'], 'get out'), k(['T'], 'view'), k(['I'], 'collection'),
+      ? [k(['W', 'A', 'S', 'D'], 'walk'), k(['⇧'], 'run'), k(['E'], 'collect · station work (hold)'), k(['F'], 'board rover'), k(['T'], 'view'), k(['I'], 'collection'), k(['M'], 'map'), k(['V'], 'recentre')].join('')
+      : [k(['W'], 'drive'), k(['S'], 'brake · hold to reverse'), k(['A', 'D'], 'steer'), k(['C'], 'cruise'), k(['E'], 'station work (hold)'), k(['⇧'], 'time ×3'), k(['F'], 'get out'), k(['T'], 'view'), k(['I'], 'collection'),
         k(['Z', 'X'], 'look'), k(['B'], 'look back'), k(['M'], 'map'), k(['L'], 'lights'), k(['H'], 'HUD')].join('');
   }
 
@@ -483,18 +522,22 @@ export class Hud {
         const t = st.tasks[i];
         el.classList.toggle('done', t.done);
         el.classList.toggle('skipped', !!t.skipped && !t.done);
-        el.classList.toggle('active', !t.done && t.artifact === this.context.reach);
+        const held = this.hold?.target && (this.hold.target === t || this.hold.target === t.artifact);
+        el.classList.toggle('active', !t.done && (held || t.artifact && t.artifact === this.context.reach));
+        el.querySelector('.fill').style.width = `${t.done ? 100 : held ? Math.min(100, this.hold.t / 0.9 * 100) : 0}%`;
+        el.setAttribute('aria-disabled', String(!!t.done || !!t.skipped));
         const res = el.querySelector('.res');
-        if (t.done || t.skipped) res.textContent = `→ ${t.done || t.deferred ? t.result : 'Not performed · omitted from selected station plan'}`;
+        res.textContent = t.done || t.skipped ? `→ ${t.done || t.deferred ? t.result : 'Not performed · omitted from selected station plan'}`
+          : held ? this.hold.reason : '';
       });
       const left = st.tasks.filter((t) => !t.done && !t.skipped).length;
       const findsLeft = st.tasks.some(t => t.artifact && !t.done && !t.skipped);
       const hint = card.querySelector('.hint');
       const text = st.skipped ? `${st.id} is skipped on this EVA.`
         : !left ? `${st.id} complete.${M.legPending === st ? ' Choose the next leg on your wrist navigator [P].' : ' Board the rover and head for the next station.'}`
-        : !findsLeft ? 'Choose instrument work below, or board the rover and continue.'
-          : M.onFoot ? 'Follow the light beams. Stand next to a find and hold E to collect it.'
-          : 'Stop the rover and press F to get out. Artifacts can only be collected on foot.';
+        : !findsLeft ? 'Hold E for the next instrument task, or hold a station task button.'
+          : M.onFoot ? 'Hold E beside a find to collect it; hold any instrument task button to run it.'
+          : 'Hold E or an instrument task button for science. Press F to get out and collect artifacts.';
       if (hint.textContent !== text) hint.textContent = text;
       const decisionKey = `${st.id}:${M.state}:${Math.floor(M.met)}:${st.tasks.map(t => `${!!t.done}${!!t.skipped}`).join('')}:${M.weather.label}`;
       if (decisionKey !== this.stationDecisionKey) {
@@ -548,6 +591,8 @@ export class Hud {
   _stationCard(card, st) {
     const onFoot = this.mission.onFoot;
     this.stationDecisionKey = '';
+    this.heldTask = null;
+    if (this.hold) this.hold.t = 0;
     card.className = `card ${onFoot ? 'compact' : ''}`;
     const T = this.route.terrain;
     const slope = T.slopeAt ? T.slopeAt(st.x, st.z, 3) : 0;
@@ -566,9 +611,22 @@ export class Hud {
         <img src="${st.observation.image}" alt="Horizontal rock beds photographed by Curiosity">
         Curiosity Mastcam · Sol 1790 ↗</a>` : ''}`}
       <h3>STATION WORK</h3>
-      <div class="tasks">${st.tasks.map((t) => `<div class="task"><i class="fill"></i><i class="chk" style="border-color:${RARITY[t.artifact?.rarity ?? 'common'].color}"></i><span class="lbl">${t.artifact?.name ?? t.label}</span><span class="min">${t.artifact ? RARITY[t.artifact.rarity].label : `${t.minutes} min`}</span><span class="res"></span></div>`).join('')}</div>
+      <div class="tasks">${st.tasks.map((t) => `<button type="button" class="task" data-task-index="${st.tasks.indexOf(t)}"><i class="fill"></i><i class="chk" style="border-color:${RARITY[t.artifact?.rarity ?? 'common'].color}"></i><span class="lbl">${t.artifact?.name ?? t.label}</span><span class="min">${t.artifact ? RARITY[t.artifact.rarity].label : `${t.minutes} min`}</span><span class="res" role="status"></span></button>`).join('')}</div>
       <p class="hint"></p>
       <div class="station-choices"></div>`;
+    for (const button of card.querySelectorAll('[data-task-index]')) {
+      const task = st.tasks[Number(button.dataset.taskIndex)];
+      const start = event => {
+        if (task.done || task.skipped) return;
+        event.preventDefault();
+        this.heldTask = task;
+      };
+      const stop = () => { if (this.heldTask === task) this.heldTask = null; };
+      button.addEventListener('pointerdown', start);
+      for (const type of ['pointerup', 'pointerleave', 'pointercancel', 'blur']) button.addEventListener(type, stop);
+      button.addEventListener('keydown', event => { if (['e', 'Enter', ' '].includes(event.key)) start(event); });
+      button.addEventListener('keyup', stop);
+    }
   }
 
   // ------------------------------------------------------------ map overlay

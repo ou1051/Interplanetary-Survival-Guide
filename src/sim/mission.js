@@ -425,10 +425,17 @@ export class Mission {
     }
   }
 
+  collectionBlockReason(artifact) {
+    if (!artifact) return 'No find selected';
+    if (artifact.collected) return 'Already collected';
+    if (this.aborted) return 'Science ended · returning to habitat';
+    if (!this.onFoot) return 'Leave the rover to collect this find';
+    if (Math.hypot(this.walker.x - artifact.x, this.walker.z - artifact.z) > WALK.reach) return 'Move closer to the find';
+    return this._workBudget(artifact).reason;
+  }
+
   collect(artifact) {
-    if (!artifact || artifact.collected || !this.onFoot || this.aborted ||
-        Math.hypot(this.walker.x - artifact.x, this.walker.z - artifact.z) > WALK.reach) return false;
-    const { reason } = this._workBudget(artifact);
+    const reason = this.collectionBlockReason(artifact);
     if (reason) {
       this.emit('log', { text: reason, tone: 'warn' });
       return false;

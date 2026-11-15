@@ -247,7 +247,6 @@ async function initSurface(plan, scenario, status) {
   const endBtn = document.getElementById('endBtn');
   const lookChip = document.getElementById('lookChip');
   let collectHeld = false;
-  let collecting = { target: null, t: 0 };
 
   function crewAction() {
     if (mission.state === 'drive') {
@@ -360,7 +359,8 @@ async function initSurface(plan, scenario, status) {
 
   function frame() {
     timer.update();
-    const dt = Math.min(timer.getDelta(), 0.05);
+    const elapsed = timer.getDelta();
+    const dt = Math.min(elapsed, 0.05);
     time += dt;
     let paused = planningBoard.open || collection.open || sourcesDialog.open;
 
@@ -433,18 +433,11 @@ async function initSurface(plan, scenario, status) {
       lastWeather = weather;
     }
 
-    // ---- collecting: hold E (or the button) next to an artifact
+    // ---- station instruments and physical finds share truthful hold progress.
     const reach = artifactInReach();
-    const holding = !paused && (input.down('e') || collectHeld || (onFoot && input.virtual.action));
-    if (reach && holding) {
-      if (collecting.target !== reach) collecting = { target: reach, t: 0 };
-      collecting.t += dt;
-      if (collecting.t >= 0.9) {
-        mission.collect(reach);
-        collecting = { target: null, t: 0 };
-      }
-    } else collecting = { target: null, t: 0 };
-    walker.setReach(collecting.target ? Math.min(1, collecting.t * 3) : 0);
+    hud.updateHold(elapsed, { held: input.down('e') || collectHeld || input.virtual.action, reach, paused });
+    const collecting = hud.hold;
+    walker.setReach(collecting.target === reach && collecting.t ? Math.min(1, collecting.t * 3) : 0);
 
     // ---- rover pose (free driving)
     const R = mission.rover;
@@ -582,9 +575,9 @@ async function initSurface(plan, scenario, status) {
     setButton(crewBtn, driving || onFoot, driving ? 'Get out [F]' : mission.canBoard ? 'Board rover [F]' : 'Walk to the rover to board');
     crewBtn.disabled = driving ? !mission.canExit : !mission.canBoard;
     setButton(viewBtn, true, `View · ${VIEW_NAMES[viewMode]} [T]`);
-    setButton(collectBtn, Boolean(reach), reach ? `Hold to collect ${reach.name} [E]` : '');
+    setButton(collectBtn, Boolean(reach), reach ? collecting.target === reach && collecting.reason ? `Unavailable · ${collecting.reason}` : `Hold to collect ${reach.name} [E]` : '');
     setButton(endBtn, mission.atHome && (driving || onFoot));
-    hud.context = { reach, collecting: collecting.target ? collecting.t / 0.9 : 0, view: viewMode };
+    hud.context = { reach, collecting: collecting.target === reach || collecting.target?.artifact === reach ? collecting.t / 0.9 : 0, view: viewMode };
 
     if (mission.state !== 'brief') hud.update(dt, view);
     audio.update(driving ? simSpeed : 0, roughness);

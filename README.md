@@ -46,7 +46,7 @@ Run `npm run api` to plan a route or recalculate the remaining leg after a hazar
 
 ## Controls
 
-The planned route is a guide, not a rail: drive and walk anywhere. At a science station, complete the planned instrument observations or get out and collect its assigned finds on foot. Both count toward station progress. Rarer finds hide away from the route. Unsurveyed ground can hide an obstacle that stops the rover until you deal with it (Enter). When a station is done and more lie ahead, pick the next leg on the wrist navigator (`P`). Return to the habitat and press Enter to end the EVA.
+The planned route is a guide, not a rail: drive and walk anywhere. At a science station, complete the planned instrument observations or get out and collect its assigned finds on foot. To choose a particular instrument, hold its row in the station card. The row shows the result or explains what blocks the work. Release before starting another task. Rarer finds hide away from the route. Unsurveyed ground can hide an obstacle that stops the rover until you deal with it (Enter). When a station is done and more lie ahead, pick the next leg on the wrist navigator (`P`). Return to the habitat and press Enter to end the EVA.
 
 | Key | Driving | On foot |
 | --- | --- | --- |
@@ -55,7 +55,7 @@ The planned route is a guide, not a rail: drive and walk anywhere. At a science 
 | `A` `D` / `←` `→` | steer | step sideways |
 | `Shift` (hold) | time ×3 · short boost that refills; off on hazard ground and near a station | run |
 | `F` | get out (rover stopped) | board the rover (within 3 m) |
-| `E` (hold) | | collect the find in reach |
+| `E` (hold) | run the next instrument task while parked at a station | collect the find in reach, or run the next station task |
 | `T` | view: first person → third person → overhead | same |
 | `I` | artifact collection | same |
 | `C` | cruise control | |

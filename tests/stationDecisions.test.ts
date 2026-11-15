@@ -176,23 +176,47 @@ it('applies the same cold and reserve limits to nearby finds, charging a success
   const { x, z } = m.rover;
   const find = { name: 'Dust core', stationId: 'S4', minutes: 6, note: 'Bagged', x: x - 2.1, z };
   m.setArtifacts([find]);
+  expect(m.collectionBlockReason(find)).toContain('Leave the rover');
   m.exitRover();
+  Object.assign(m.walker, { x: find.x + 10, z: find.z });
+  expect(m.collectionBlockReason(find)).toContain('Move closer');
   Object.assign(m.walker, { x: find.x, z: find.z });
   m.update(0, {}, 0);
   m._weather = cold;
   m.update(5 * 60, {}, 0);
+  const messages = [];
+  m.on((type, data) => { if (type === 'log') messages.push(data.text); });
+  const coldReason = m.collectionBlockReason(find);
+  expect(coldReason).toContain('5 min left in cold window');
   expect(m.collect(find)).toBe(false);
+  expect(messages.at(-1)).toBe(coldReason);
   expect(m.samples).toBe(0);
   expect(m.met).toBe(300);
   m._weatherAt = 600; // a new spell restores the exposure window
   m.batteryWh = 100;
+  expect(m.collectionBlockReason(find)).toContain('battery margin');
   expect(m.collect(find)).toBe(false);
   m.batteryWh = 1600;
+  expect(m.collectionBlockReason(find)).toBe('');
   expect(m.collect(find)).toBe(true);
+  expect(m.collectionBlockReason(find)).toBe('Already collected');
   expect(m.collect(find)).toBe(false);
   expect(m.met).toBe(660);
   expect(m.samples).toBe(1);
   expect(m.scienceResults.filter(result => result.status === 'complete')).toHaveLength(1);
+});
+
+it('explains a refused collection on the return trip and keeps instrument work closed', () => {
+  const m = atStation();
+  m.exitRover();
+  const find = { x: m.walker.x, z: m.walker.z, minutes: 4, name: 'Rock' };
+  expect(m.collectionBlockReason(find)).toBe('');
+  expect(m.chooseStationAction('home')).toBe(true);
+  expect(m.collectionBlockReason(find)).toContain('returning to habitat');
+  expect(m.collect(find)).toBe(false);
+  expect(m.stationOptions).toEqual([]);
+  expect(m.chooseStationAction('task:0')).toBe(false);
+  expect(m.met).toBe(0);
 });
 
 it('keeps the same reserve threshold for a station wait and a navigator wait', () => {

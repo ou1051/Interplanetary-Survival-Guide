@@ -113,6 +113,24 @@ try {
   await page.waitForFunction(() => window.__isg.mission.canBoard);
   await page.keyboard.press('f');
   await page.waitForFunction(() => window.__isg.mission.state === 'drive');
+  // Reproduce the cold S1 card, then run the previously blocked scan through the keyboard.
+  await page.evaluate(() => {
+    const { mission } = window.__isg;
+    mission._weather = { ...mission.weather, label: 'Cold spell', exposureMinutes: 10 };
+    mission._weatherAt = mission.met + 360;
+  });
+  const scan = page.locator('#card .tasks .task').filter({ hasText: 'VNIR spectrometer scan' });
+  await page.locator('#viewport').focus();
+  await page.keyboard.down('e');
+  try { await scan.getByText(/cold window/).waitFor(); }
+  finally { await page.keyboard.up('e'); }
+  assert.equal(await page.evaluate(() => window.__isg.mission.currentStation.tasks[0].done), false);
+  await page.locator('#card [data-action="wait"]').click();
+  await page.locator('#viewport').focus();
+  await page.keyboard.down('e');
+  try { await scan.getByText(/olivine-rich/).waitFor(); }
+  finally { await page.keyboard.up('e'); }
+  assert.equal(await page.evaluate(() => window.__isg.mission.currentStation.tasks.filter(task => !task.artifact && task.done).length), 1);
   await page.close();
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
   mobile.on('pageerror', e => errors.push(e.message));
@@ -180,5 +198,5 @@ try {
   await mobile.getByRole('button', { name: /Turn around and return/ }).click();
   assert.equal(await mobile.evaluate(() => window.__isg.mission.aborted), true);
   assert.deepEqual(errors, [], 'No runtime errors');
-  console.log('Browser checks passed: habitat forecast, live weather controls, free driving, on-foot collection, reboarding and Gale dust return.');
+  console.log('Browser checks passed for forecasts, field weather, rover driving, station task holds, artifact collection, reboarding and Gale dust return.');
 } finally { await browser.close(); }
