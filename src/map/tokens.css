@@ -1,44 +1,33 @@
-/* ---------------------------------------------------------------------------
-   Design tokens for the mission screens (globe + site plan).
-
-   Modelled on Apple's Human Interface Guidelines, dark appearance:
-   - type: the system font first (SF Pro on Apple devices), Inter elsewhere,
-     the same fallback Puppertino (codedgar/Puppertino, MIT) uses for its
-     HIG-based web components; sizes follow the iOS text styles, one step
-     denser for a desktop tool, with SF's size-specific tracking;
-   - colour: iOS/macOS dark-mode system colours and label/fill/separator ramps;
-   - space: a 4 pt grid (8 pt rhythm), 44 pt minimum hit targets for rows;
-   - materials: translucent fills with saturate(180%) + blur, a hairline
-     border and a soft shadow, like the system's regular/thick materials.
-   --------------------------------------------------------------------------- */
+/* Mission operations theme shared with the Route Briefing console. */
+@import '../ui/consoleTheme.css';
 
 .ms,
 .mm {
   /* type */
-  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', Inter, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font: var(--ops-font);
   --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, 'JetBrains Mono', Consolas, monospace;
-  --t-title1: 700 22px/28px var(--font); --t-title1-ls: -0.022em;
-  --t-title3: 600 17px/22px var(--font); --t-title3-ls: -0.024em;
-  --t-body: 400 15px/20px var(--font); --t-body-ls: -0.016em;
-  --t-callout: 400 14px/19px var(--font); --t-callout-ls: -0.011em;
-  --t-subhead: 400 13px/18px var(--font); --t-subhead-ls: -0.006em;
+  --t-title1: 700 22px/28px var(--font); --t-title1-ls: 0;
+  --t-title3: 600 17px/22px var(--font); --t-title3-ls: 0;
+  --t-body: 400 15px/20px var(--font); --t-body-ls: 0;
+  --t-callout: 400 14px/19px var(--font); --t-callout-ls: 0;
+  --t-subhead: 400 13px/18px var(--font); --t-subhead-ls: 0;
   --t-footnote: 400 12px/16px var(--font); --t-footnote-ls: 0;
   --t-caption: 400 11px/13px var(--font); --t-caption-ls: 0.005em;
 
   /* colour: labels */
-  --label: #ffffff;
-  --label-2: rgba(235, 235, 245, 0.6);
-  --label-3: rgba(235, 235, 245, 0.3);
-  --label-4: rgba(235, 235, 245, 0.18);
+  --label: var(--ops-text);
+  --label-2: var(--ops-dim);
+  --label-3: #7f95b7;
+  --label-4: #5d7193;
   /* fills (controls, rows) */
-  --fill-1: rgba(120, 120, 128, 0.36);
-  --fill-2: rgba(120, 120, 128, 0.32);
-  --fill-3: rgba(118, 118, 128, 0.24);
-  --fill-4: rgba(118, 118, 128, 0.18);
-  --separator: rgba(255, 255, 255, 0.1);
-  --hairline: rgba(255, 255, 255, 0.08);
-  /* system colours (dark) */
-  --blue: #0a84ff;
+  --fill-1: #203b65;
+  --fill-2: #1a3155;
+  --fill-3: #132a4e;
+  --fill-4: #10213d;
+  --separator: var(--ops-line);
+  --hairline: var(--ops-line);
+  /* Preserve the map data and status colours. */
+  --blue: var(--nasa-blue-hi);
   --green: #30d158;
   --orange: #ff9f0a;
   --red: #ff453a;
@@ -46,16 +35,16 @@
   --teal: #64d2ff;
   --indigo: #5e5ce6;
   --mars: #e8794a; /* brand: the assignment marker */
-  --bg: #000000;
-  --bg-elevated: #1c1c1e;
+  --bg: var(--ops-bg);
+  --bg-elevated: var(--ops-panel);
 
-  /* materials */
-  --mat-regular: rgba(30, 30, 32, 0.72);
-  --mat-thick: rgba(28, 28, 30, 0.86);
-  --mat-thin: rgba(44, 44, 46, 0.56);
-  --mat-blur: saturate(180%) blur(28px);
-  --mat-border: 0.5px solid rgba(255, 255, 255, 0.12);
-  --mat-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.2);
+  /* Instrument panels */
+  --mat-regular: var(--ops-panel);
+  --mat-thick: var(--ops-panel);
+  --mat-thin: #132a4e;
+  --mat-blur: none;
+  --mat-border: 1px solid var(--ops-line);
+  --mat-shadow: none;
 
   /* space (4 pt grid) */
   --s1: 4px;
@@ -67,11 +56,11 @@
   --s8: 32px;
 
   /* radii */
-  --r-sm: 8px;
-  --r-md: 10px;
-  --r-lg: 14px;
-  --r-xl: 20px;
-  --r-pill: 999px;
+  --r-sm: 3px;
+  --r-md: 3px;
+  --r-lg: 3px;
+  --r-xl: 3px;
+  --r-pill: 3px;
 
   /* motion */
   --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
@@ -86,15 +75,8 @@
   text-rendering: optimizeLegibility;
 }
 
-/* Material surface. Blur is costly over a live WebGL canvas, so it is used on
-   few, small surfaces, and dropped when the user asks for reduced transparency. */
+/* Shared panel surface. */
 .material {
   background: var(--mat-regular);
-  -webkit-backdrop-filter: var(--mat-blur);
-  backdrop-filter: var(--mat-blur);
   border: var(--mat-border);
-  box-shadow: var(--mat-shadow);
-}
-@media (prefers-reduced-transparency: reduce) {
-  .material { background: var(--bg-elevated); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }

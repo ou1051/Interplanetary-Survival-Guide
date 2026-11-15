@@ -100,7 +100,7 @@ export class MissionMap {
       <div class="mm-modal" hidden></div>
       <div class="mm-toast" role="status" aria-live="polite"></div>
       <div class="mm-sr" aria-live="polite"></div>`;
-    this.root.style.setProperty('--mm-top', `${this.opts.topInset}px`);
+    if (options.topInset !== undefined) this.root.style.setProperty('--mm-top', `${options.topInset}px`);
     if (!this.opts.showClock) this.root.classList.add('no-clock');
     container.appendChild(this.root);
     const q = (s: string) => this.root.querySelector(s) as HTMLElement;
@@ -907,7 +907,7 @@ export class MissionMap {
     const side = rect(this.el.side);
     const rail = rect(this.el.layers);
     const clock = rect(this.el.clock);
-    const top = this.opts.topInset;
+    const top = parseFloat(getComputedStyle(this.root).getPropertyValue('--mm-top')) || this.opts.topInset;
     if (!side.w) return { l: 24, r: 24, t: top + 24, b: 24 };
     const sheet = side.t > top + h * 0.3; // narrow layout: the sidebar is a bottom sheet
     if (sheet) return { l: 16, r: rail.w ? w - rail.l + 12 : 16, t: top + 40, b: h - side.t + 16 };

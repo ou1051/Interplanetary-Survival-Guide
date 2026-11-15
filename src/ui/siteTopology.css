@@ -516,3 +516,144 @@
     width: 175px;
   }
 }
+
+/* Console presentation stays local: the wrist navigator keeps its own display. */
+#habitat .st-root {
+  container-type: inline-size;
+  color: var(--ops-text);
+  font-family: var(--ops-font);
+  font-variant-numeric: tabular-nums;
+}
+#habitat .st-globe-viewport,
+#habitat .st-topo-canvas-wrap {
+  border-color: var(--ops-line);
+  border-radius: 2px;
+  background: var(--ops-bg);
+}
+#habitat .st-preview-card {
+  width: clamp(200px, 28%, 280px);
+  padding: 12px;
+  border-color: var(--ops-line);
+  border-top: 3px solid var(--nasa-blue-hi);
+  border-radius: 3px;
+  background: var(--ops-panel);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+#habitat .st-preview-thumb-wrap { border-color: var(--ops-line); border-radius: 2px; }
+#habitat .st-preview-badge {
+  background: var(--nasa-blue);
+  border-color: var(--nasa-blue-hi);
+  border-radius: 2px;
+  color: #fff;
+  font-family: var(--ops-font);
+}
+#habitat .st-preview-name { font-size: 15px; line-height: 1.3; color: var(--ops-text); }
+#habitat .st-preview-coords { color: var(--ops-dim); font: 500 11px var(--ops-font); }
+#habitat .st-preview-desc { color: #c7d4ea !important; font-size: 12px; line-height: 1.45; margin: 6px 0 10px !important; }
+#habitat :where(.st-root) button {
+  border-color: var(--ops-line) !important;
+  border-radius: 3px;
+  background: var(--ops-panel) !important;
+  color: var(--ops-text) !important;
+  font-family: var(--ops-font) !important;
+  box-shadow: none;
+  cursor: pointer;
+}
+#habitat :where(.st-root) button:hover { border-color: var(--nasa-blue-hi) !important; }
+#habitat :where(.st-root) button:focus-visible { outline: 2px solid var(--nasa-blue-hi); outline-offset: 2px; }
+#habitat .st-preview-actions button { min-height: 32px; font-size: 11px !important; }
+#habitat .st-preview-actions .st-zoom-btn,
+#habitat .st-deploy-btn {
+  background: var(--nasa-red) !important;
+  border-color: var(--nasa-red) !important;
+  color: #fff !important;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+#habitat .st-site-strip { gap: 6px; bottom: 10px; }
+#habitat .st-site-pill { min-height: 34px; font-size: 11px !important; }
+#habitat .st-site-pill span { color: var(--ops-dim); font-family: var(--ops-font); }
+#habitat .st-root .st-site-pill[aria-selected="true"],
+#habitat .st-root .st-toggle-btn[aria-pressed="true"] {
+  border-color: var(--nasa-blue-hi) !important;
+  background: var(--nasa-blue) !important;
+  color: #fff !important;
+}
+#habitat .st-site-pill[aria-selected="true"] span { color: #fff; }
+#habitat .st-globe-footer,
+#habitat .st-topo-legend { color: var(--ops-dim); font-size: 11px; line-height: 1.4; }
+#habitat .st-site-header { border-color: var(--ops-line); padding-bottom: 10px; gap: 10px; }
+#habitat .st-back-btn { min-height: 34px; }
+#habitat .st-site-kicker,
+#habitat .st-side-label {
+  color: var(--ops-dim);
+  font: 600 10px/1.4 var(--ops-font);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+#habitat .st-site-title { margin-top: 3px !important; font: 700 18px/1.3 var(--ops-font) !important; color: #fff; }
+#habitat .st-toggle-btn { min-height: 34px; letter-spacing: .04em; }
+#habitat .st-site-body { grid-template-columns: minmax(0, 2.2fr) minmax(275px, 1fr); gap: 20px; }
+#habitat .st-topo-sidebar { border-left: 1px solid var(--ops-line); padding-left: 20px; gap: 16px; }
+#habitat .st-topo-controls,
+#habitat .st-topo-hint,
+#habitat .st-topo-readout {
+  border-color: var(--ops-line);
+  border-radius: 3px;
+  background: #071022e6;
+  color: var(--ops-dim);
+  font-family: var(--ops-font);
+  backdrop-filter: none;
+}
+#habitat .st-topo-controls { max-width: calc(100% - 16px); box-sizing: border-box; }
+#habitat .st-topo-controls button { min-width: 28px; min-height: 30px; }
+#habitat .st-ctrl-sep { background: var(--ops-line); }
+#habitat .st-zoom-val { color: var(--ops-text); font-family: var(--ops-font); }
+#habitat .st-topo-readout { padding: 8px 10px; line-height: 1.4; }
+#habitat .st-stat-grid { gap: 1px; border: 1px solid var(--ops-line); background: var(--ops-line); }
+#habitat .st-stat-grid div { border: 0; border-radius: 0; background: var(--ops-panel); padding: 8px 10px; }
+#habitat .st-stat-grid span { color: var(--ops-dim); font-size: 10px; }
+#habitat .st-stat-grid b { display: block; color: var(--ops-text); font-size: 15px; margin-top: 3px; }
+#habitat .st-path-card { padding: 10px !important; }
+#habitat .st-root .st-path-card[aria-pressed="true"] {
+  border-color: var(--nasa-blue-hi) !important;
+  border-left-color: var(--path-c) !important;
+  background: #0e2a5e !important;
+}
+#habitat .st-path-card { border-left-color: var(--path-c) !important; }
+#habitat .st-path-head { gap: 10px; font-size: 13px; line-height: 1.35; }
+#habitat .st-path-head span { white-space: nowrap; }
+#habitat .st-path-card small { color: var(--ops-dim); font-size: 11px; line-height: 1.45; margin-top: 5px; }
+#habitat .st-deploy-btn { min-height: 44px; gap: 10px; }
+
+#habitat:not(.hab-zoomed) .st-site-body { grid-template-columns: minmax(0, 1fr); }
+
+@container (max-width: 720px) {
+  #habitat.hab-zoomed .st-site-body { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
+  #habitat.hab-zoomed .st-topo-map-wrap { height: auto; min-height: 340px; flex-shrink: 0; }
+  #habitat.hab-zoomed .st-topo-canvas-wrap { min-height: 250px; }
+  #habitat.hab-zoomed .st-topo-sidebar { height: auto; overflow: visible; border-left: 0; padding-left: 0; }
+  #habitat .st-site-title-block { min-width: 140px; }
+  #habitat.hab-zoomed .st-globe-stage { overflow-y: auto; }
+  #habitat.hab-zoomed .st-globe-viewport { display: flex; flex-direction: column; flex: none; height: auto; }
+  #habitat.hab-zoomed .st-globe-canvas { height: 280px; flex: none; }
+  #habitat.hab-zoomed .st-preview-card { position: static; width: auto; margin: 10px; padding: 10px; }
+  #habitat.hab-zoomed .st-site-strip { position: static; flex: none; margin: 0 10px 10px; padding-bottom: 4px; }
+  #habitat.hab-zoomed .st-site-pill { flex: 0 0 auto; min-width: 120px; }
+  #habitat.hab-zoomed .st-preview-actions button { min-height: 44px; }
+  #habitat .st-preview-thumb-wrap { height: 64px; }
+  #habitat .st-preview-name { font-size: 13px; }
+  #habitat .st-preview-desc { font-size: 11px; }
+}
+
+@media (max-width: 800px) {
+  #habitat.hab-zoomed .st-root,
+  #habitat.hab-zoomed .st-globe-stage,
+  #habitat.hab-zoomed .st-site-stage {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  #habitat.hab-zoomed .st-site-body { height: auto; overflow: visible; }
+}

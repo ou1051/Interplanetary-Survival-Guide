@@ -1,4 +1,4 @@
-/* Site plan (mission map & scouting). Scoped under .mm. Tokens: tokens.css (Apple HIG, dark). */
+/* Site plan (mission map & scouting). Scoped under .mm. Tokens: tokens.css (mission operations). */
 @import './tokens.css';
 
 .mm {
@@ -6,17 +6,17 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #0b0b0c;
+  background: var(--bg);
 }
 .mm *, .mm *::before, .mm *::after { box-sizing: border-box; }
 .mm button { font: inherit; letter-spacing: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
-.mm :focus-visible { outline: 3px solid color-mix(in srgb, var(--blue) 70%, transparent); outline-offset: 2px; }
+.mm :focus-visible { outline: 2px solid var(--nasa-blue-hi); outline-offset: 2px; }
 .mm-sr, .mm-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 .mm-stage { position: absolute; inset: 0; }
 .mm-canvas { display: block; width: 100%; height: 100%; cursor: default; touch-action: none; }
 .mm-canvas.placing { cursor: crosshair; }
-.mm-canvas:focus-visible { outline: none; }
+.mm-canvas:focus-visible { outline-offset: -3px; }
 .mm-tip {
   position: absolute; left: 0; top: 0; pointer-events: none; z-index: 3;
   display: flex; gap: var(--s2); align-items: baseline;
@@ -41,20 +41,20 @@
   .mm-job, .mm-panel, .mm-clock, .mm-layers, .mm-legend, .mm-sheet { background: var(--bg-elevated); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 
-.mm-kicker { font: var(--t-caption); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--label-2); }
+.mm-kicker { font: var(--t-caption); font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--label-2); }
 .mm-tag {
   margin-left: var(--s2); padding: 2px 7px; border-radius: var(--r-pill);
   font: var(--t-caption); font-weight: 600; letter-spacing: 0.02em;
   color: var(--orange); background: color-mix(in srgb, var(--orange) 16%, transparent);
 }
 
-/* ---------------- sidebar: assignment + scout/plan (Apple Maps style) ---------------- */
+/* ---------------- sidebar: assignment + scout/plan ---------------- */
 .mm-side {
   position: absolute; z-index: 2; top: calc(var(--mm-top, 0px) + var(--s4)); left: var(--s4); bottom: var(--s4); width: 360px;
   display: flex; flex-direction: column; gap: var(--s2); pointer-events: none;
 }
 .mm-side > * { pointer-events: auto; }
-.mm-job { flex: none; padding: var(--s4); border-radius: var(--r-xl); }
+.mm-job { border-top: 3px solid var(--nasa-blue-hi); flex: none; padding: var(--s4); border-radius: var(--r-xl); }
 .mm-job.collapsed { padding: var(--s3) var(--s4); }
 .mm-job-toggle { display: flex; align-items: center; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; text-align: left; }
 .mm-job-toggle .mm-kicker { white-space: nowrap; }
@@ -86,7 +86,7 @@
   display: flex; align-items: center; gap: var(--s3); padding: 6px 8px 6px var(--s4); border-radius: var(--r-pill);
 }
 .mm-turn { display: flex; align-items: baseline; gap: var(--s2); }
-.mm-turn span { font: var(--t-caption); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--label-2); }
+.mm-turn span { font: var(--t-caption); font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--label-2); }
 .mm-turn b { font: var(--t-title3); font-variant-numeric: tabular-nums; }
 .mm-wins { list-style: none; display: flex; gap: var(--s1); margin: 0; padding: 0; }
 .mm-wins li {
@@ -137,14 +137,14 @@
 
 /* ---------------- panel: segmented tabs, inset lists, route cards ---------------- */
 .mm-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border-radius: var(--r-xl); }
-.mm-tabs { display: grid; grid-template-columns: 1fr 1fr; padding: 2px; margin: var(--s3) var(--s3) 0; border-radius: 9px; background: var(--fill-3); }
+.mm-tabs { display: grid; grid-template-columns: 1fr 1fr; padding: 2px; margin: var(--s3) var(--s3) 0; border-radius: 3px; background: var(--ops-bg); border: 1px solid var(--ops-line); }
 .mm-tab {
   display: flex; align-items: center; justify-content: center; gap: var(--s2); height: 30px;
-  border: 0; border-radius: 7px; background: none; cursor: pointer; font: var(--t-subhead); font-weight: 500;
+  border: 0; border-radius: 2px; background: none; cursor: pointer; font: var(--t-subhead); font-weight: 500;
   transition: background 0.2s var(--ease);
 }
 .mm-tab .n { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; font: var(--t-caption); font-weight: 700; background: var(--fill-2); }
-.mm-tab.on { background: #636366; font-weight: 600; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 3px 1px rgba(0, 0, 0, 0.04); }
+.mm-tab.on { background: var(--nasa-blue); font-weight: 600; box-shadow: none; }
 .mm-tab.on .n { background: var(--blue); color: #fff; }
 .mm-pane { flex: 1; overflow: auto; padding: var(--s2) var(--s3) var(--s4); scrollbar-width: thin; overscroll-behavior: contain; }
 .mm-lede { margin: var(--s3) var(--s1) var(--s1); font: var(--t-subhead); color: var(--label-2); }
@@ -186,7 +186,7 @@
 }
 .mm-btn:active:not(:disabled) { transform: scale(0.98); }
 .mm-btn svg { width: 16px; height: 16px; }
-.mm-btn.primary { background: var(--blue); color: #fff; }
+.mm-btn.primary { background: var(--nasa-red); color: #fff; }
 .mm-btn.primary:hover:not(:disabled) { filter: brightness(1.1); }
 .mm-btn.primary:disabled { background: var(--fill-3); color: var(--label-3); cursor: default; }
 .mm-btn.ghost { background: var(--fill-4); color: var(--blue); }
@@ -197,7 +197,7 @@
 .mm-routes { display: flex; flex-direction: column; gap: var(--s2); }
 .mm-route {
   display: flex; flex-direction: column; gap: var(--s3); padding: var(--s3) var(--s4) var(--s4); text-align: left; cursor: pointer;
-  border-radius: var(--r-lg); border: 0; background: var(--fill-4); box-shadow: inset 0 0 0 1.5px transparent;
+  border-radius: var(--r-lg); border: 1px solid var(--ops-line); background: var(--ops-panel); box-shadow: inset 0 0 0 1.5px transparent;
   transition: background 0.15s var(--ease), box-shadow 0.15s var(--ease);
 }
 .mm-route:hover { background: var(--fill-3); }

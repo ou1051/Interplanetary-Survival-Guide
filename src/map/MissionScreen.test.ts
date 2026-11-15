@@ -20,6 +20,12 @@ afterEach(() => screen.destroy());
 const $ = (s: string) => host.querySelector(s) as HTMLElement;
 
 describe('map · mission screen', () => {
+  it('offers a return to Route Briefing from either view', () => {
+    expect($('.ms-return').getAttribute('href')).toBe('./index.html#briefing');
+    $('[data-cmd="open-site"]').click();
+    expect($('.ms-return').textContent).toContain('Route Briefing');
+  });
+
   it('opens on the globe with the assignment and real-data places', () => {
     expect($('.ms').dataset.view).toBe('globe');
     expect($('.ms-assign h1').textContent).toBe('Ridge and bedrock contact');

@@ -495,14 +495,15 @@ export function mountHabitat(root, launch) {
   stage.classList.toggle('hab-has-room', Boolean(room));
   // Outside first: the habitat at dusk. Entering flies to the lit window, cuts
   // inside through a warm flash, then pushes into the console screen.
-  const exterior = mountHabitatExterior(query('[data-exterior]'));
+  const directBriefing = location.hash === '#briefing';
+  const exterior = directBriefing ? null : mountHabitatExterior(query('[data-exterior]'));
   const cut = query('[data-cut]');
   let entering = false;
   const enterHabitat = async () => {
     if (entering) return;
     entering = true;
     enter.disabled = true;
-    const still = motionReduced();
+    const still = directBriefing || motionReduced();
     if (!still) {
       query('.hab-intro-card').animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(-28px)' }],
         { duration: 260, easing: 'ease-in', fill: 'forwards' });
@@ -708,4 +709,5 @@ export function mountHabitat(root, launch) {
   });
   reviewClose.hidden = true;
   update();
+  if (directBriefing) enterHabitat().then(() => setZoom(true));
 }

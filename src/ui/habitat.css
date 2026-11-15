@@ -1,3 +1,5 @@
+@import './consoleTheme.css';
+
 #habitat {
   position:absolute; inset:0; z-index:10; overflow:auto;
   color:#e7eef0; font: 14px/1.45 Inter, var(--sans);
@@ -89,15 +91,15 @@
   justify-content: space-between;
   gap: 12px;
   padding: 14px clamp(14px, 2vw, 30px);
-  background: linear-gradient(#18120ff7 55%, #18120f00);
+  background: linear-gradient(#071022eb, transparent);
   min-height: 12%;
-  color: #f0e9df;
-  font-size: clamp(10px, 1.05vw, 15px);
+  color: var(--ops-text);
+  font: 600 clamp(10px, 1.05vw, 15px)/1.3 var(--ops-font);
   letter-spacing: .08em;
   text-transform: uppercase;
 }
-.hab-overlay b { color: #f6ae70; }
-.hab-overlay span:last-child { color: #a6e2e6; white-space: nowrap; }
+.hab-overlay b { color: var(--ops-dim); }
+.hab-overlay span:last-child { color: var(--ops-text); white-space: nowrap; }
 .hab-stage .hab-wall {
   border: 1px solid #654b3c;
   box-shadow: 0 12px 26px #100c0acc, inset 0 0 0 3px #49392e;
@@ -149,11 +151,12 @@
 .hab-stage .hab-mapcredit { margin-top: 3px; color: #a4bdc0; }
 #habitat .hab-review {
   z-index: 1;
-  background: #181713;
-  border: 1px solid #b8997c;
+  background: var(--nasa-blue);
+  border: 1px solid var(--nasa-blue-hi);
   border-radius: 3px;
   padding: 9px 15px;
-  color: #f8f3ec;
+  color: var(--ops-text);
+  font: 700 13px/1.3 var(--ops-font);
   letter-spacing: .13em;
   text-transform: uppercase;
   box-shadow: 0 3px 17px #100a06cc;
@@ -361,18 +364,6 @@
 /* ---------------- Console · NASA mission-operations style ----------------
    Deep navy display, NASA blue title bar with a red accent, Helvetica type,
    data shown as labelled readouts, blue for selection, red for the main action. */
-#habitat {
-  --ops-bg: #071022;
-  --ops-panel: #0c1a33;
-  --ops-line: #1f3560;
-  --ops-text: #eef3fb;
-  --ops-dim: #8fa6cc;
-  --nasa-blue: #0b3d91;
-  --nasa-blue-hi: #2f6fd6;
-  --nasa-red: #fc3d21;
-  --ops-go: #34c46a;
-  --ops-font: "Helvetica Neue", Helvetica, Arial, sans-serif;
-}
 /* monitor housing (zoomed view only; in the room the console is pinned to the 3D monitor) */
 #habitat .hab-stage .hab-wall { background: #0b0f17; border-color: #05070b; box-shadow: none; }
 #habitat.hab-zoomed .hab-stage .hab-wall {
@@ -586,6 +577,20 @@
   color: #071022;
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
 }
+#habitat.hab-zoomed .hab-header {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 8px 12px;
+}
+#habitat.hab-zoomed .hab-console-tabs { margin: 0; }
+#habitat.hab-zoomed .hab-nav { margin-inline-start: auto; }
+#habitat.hab-zoomed .hab-header :is(button, a) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 28px;
+}
+#habitat.hab-zoomed .hab-header :focus-visible { outline-color: #fff; }
 #habitat:not(.hab-zoomed) .hab-stage .hab-header {
   padding: 5px 10px 5px 14px;
   margin-bottom: 6px;
@@ -705,10 +710,23 @@
 }
 
 @media (max-width: 800px) {
+  #habitat.hab-zoomed .hab-nav { flex-basis: 100%; justify-content: flex-start; }
+  #habitat.hab-zoomed .hab-header :is(button, a) { min-block-size: 36px; }
   #habitat.hab-topology-mode.hab-zoomed .hab-stage .hab-screen {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    height: auto;
     gap: 0;
+  }
+  #habitat.hab-topology-mode.hab-zoomed .hab-topology-panel { height: auto; max-height: none; overflow: visible; }
+}
+@media (max-width: 540px) {
+  #habitat.hab-zoomed .hab-header { padding-inline: 14px 10px; gap: 8px; }
+  #habitat.hab-zoomed .hab-nav {
+    display: grid; grid-template-columns: repeat(3, minmax(0,1fr));
+  }
+  #habitat.hab-zoomed .hab-nav :is(a, button) {
+    padding-inline: 4px; letter-spacing: .02em; text-align: center;
   }
 }
 
@@ -716,6 +734,8 @@
 #habitat .hab-cabin-weather > summary {
   position: relative; inline-size: 100%; min-block-size: 76px; padding: 12px 30px 12px 10px;
   align-items: start; cursor: pointer; list-style: none;
+  border-color: var(--ops-line); border-inline-start-color: var(--weather-accent); border-radius: 3px;
+  color: var(--ops-text); background: var(--ops-panel); font-family: var(--ops-font);
 }
 #habitat .hab-cabin-weather > summary::-webkit-details-marker { display: none; }
 #habitat .hab-cabin-weather[open] > summary::after { transform: rotate(225deg); }
@@ -724,7 +744,7 @@
 #habitat .hab-cabin-weather .weather-reading { min-inline-size: 0; gap: 5px; overflow-wrap: anywhere; }
 #habitat .hab-cabin-weather .weather-reading strong { font-size: 13px; line-height: 1.4; }
 #habitat .hab-cabin-weather .weather-reading > span { color: #c7d4df; font-size: 12px; line-height: 1.5; font-weight: 400; }
-#habitat .hab-forecast-details { padding: 8px 12px; border: 1px solid #52666b; border-block-start: 0; }
+#habitat .hab-forecast-details { padding: 8px 12px; border: 1px solid var(--ops-line); border-block-start: 0; background: var(--ops-panel); }
 #habitat .hab-forecast-details p, #habitat .hab-rehearsal-settings p { margin-block: 8px; font-size: 12px; line-height: 1.6; }
 #habitat .hab-rehearsal-settings { margin-block: 14px; }
 #habitat .hab-rehearsal-settings > summary { min-block-size: 36px; padding-block: 8px; color: #a8bcc4; cursor: pointer; font-size: 12px; }
