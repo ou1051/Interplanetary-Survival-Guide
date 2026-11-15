@@ -57,7 +57,7 @@ export function drawFieldHazards(g, route, project, front, obstacles) {
     g.setLineDash([]);
   }
   for (const obstacle of obstacles ?? []) {
-    const { x, z } = route.sample(obstacle.s);
+    const { x, z } = obstacle.ref.at ?? route.sample(obstacle.s);
     const [px, py] = project(x, z);
     g.fillStyle = obstacle.ref.acknowledged ? '#a6abae' : '#ff7f63';
     g.fillRect(px - 5, py - 5, 10, 10);

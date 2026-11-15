@@ -40,7 +40,7 @@ export class TraverseRelief {
     });
   }
 
-  draw(canvas, selected, roverS, weather, front, obstacles) {
+  draw(canvas, selected, roverS, weather, front, obstacles, crewPosition) {
     const width = canvas.clientWidth;
     if (!width) return;
     const height = width * 0.66;
@@ -125,8 +125,8 @@ export class TraverseRelief {
       if (index !== selected) marker(stop, false);
     });
     drawFieldHazards(ctx, this.route, (x, z) => toScreen(this.project(x, z, this.route.terrain.heightAt(x, z), 2)), front, obstacles);
-    if (Number.isFinite(roverS)) {
-      const { x, z } = this.route.sample(roverS);
+    if (crewPosition || Number.isFinite(roverS)) {
+      const { x, z } = crewPosition ?? this.route.sample(roverS);
       const elevation = this.route.terrain.heightAt(x, z);
       drawVisibilityRing(ctx, weather, x, z, (rx, rz) => toScreen(this.project(rx, rz, elevation, 2)));
       const position = this.project(x, z, elevation, 2);

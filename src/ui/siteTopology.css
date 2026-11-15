@@ -178,16 +178,6 @@
   box-shadow: 0 0 10px rgba(121, 242, 208, 0.28);
 }
 
-.st-globe-footer {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 6px;
-  font-size: 11px;
-  color: #9ec0c8;
-}
-
 /* Stage 2: Zoomed-in Site Topography UI */
 .st-site-stage {
   display: flex;
@@ -581,7 +571,6 @@
   color: #fff !important;
 }
 #habitat .st-site-pill[aria-selected="true"] span { color: #fff; }
-#habitat .st-globe-footer,
 #habitat .st-topo-legend { color: var(--ops-dim); font-size: 11px; line-height: 1.4; }
 #habitat .st-site-header { border-color: var(--ops-line); padding-bottom: 10px; gap: 10px; }
 #habitat .st-back-btn { min-height: 34px; }

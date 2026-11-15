@@ -5,8 +5,15 @@ import { Mission } from '../src/sim/mission.js';
 
 vi.mock('../src/ui/habitatRoom.js', () => ({ mountHabitatRoom: () => null }));
 vi.mock('../src/ui/habitatExterior.js', () => ({ mountHabitatExterior: () => null }));
-vi.mock('../src/ui/consoleMap3D.js', () => ({ mountConsoleMap3D: vi.fn() }));
-vi.mock('../src/ui/siteTopology.js', () => ({ MARS_SITES: [], SiteTopologyWidget: class {} }));
+vi.mock('../src/ui/consoleMap3D.js', () => ({ map3DSupport: () => ({ ok: false }), mountConsoleMap3D: vi.fn() }));
+vi.mock('../src/ui/siteTopology.js', () => ({ MARS_SITES: [], SiteTopologyWidget: class {
+  constructor(host, { onDeploy }) {
+    const deploy = document.createElement('button');
+    deploy.dataset.topologyDeploy = '';
+    deploy.onclick = () => onDeploy({ site: { name: 'Jezero' }, pathId: 'shortest' });
+    host.append(deploy);
+  }
+} }));
 vi.mock('../src/ui/deltaOverview.js', () => ({ makeDeltaOverview: () => ({ draw: vi.fn(), s1: [100, 100] }) }));
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); document.body.innerHTML = ''; });
@@ -43,6 +50,25 @@ describe('habitat weather departure decision', () => {
     expect(plan.frontSeconds).toBeGreaterThanOrEqual(360);
     expect(plan.departureWaitSeconds).toBe(choice === 'wait' ? plan.frontSeconds : 0);
     expect(!!plan.traverse.route.weatherExposure).toBe(choice !== 'detour');
+  });
+
+  it.each(['variable', 'clear'])('carries the %s shortcut forecast into a topology deployment', async mode => {
+    const { root, launch, click } = setup();
+    const conditions = root.querySelector<HTMLSelectElement>('[data-scenario]')!;
+    conditions.value = mode;
+    conditions.dispatchEvent(new Event('change'));
+    click('[data-topology-deploy]');
+    await vi.waitFor(() => expect(launch).toHaveBeenCalledOnce());
+    const [plan, scenario] = launch.mock.calls[0];
+    expect(scenario).toBe(mode);
+    if (mode === 'clear') expect(plan.frontSeconds).toBe(0);
+    else expect(plan.frontSeconds).toBeGreaterThanOrEqual(360);
+    const { route, terrain } = plan.traverse;
+    const mission = new Mission(route, terrain, {}, { frontSeconds: plan.frontSeconds, surprises: false });
+    const patch = route.areaHazards.find(area => area.unsurveyed);
+    const point = { x: patch.cx, z: patch.cz };
+    expect(mission.weatherAt(0, 0, route, point).label).toBe(mode === 'variable' ? 'Dust front over shortcut' : 'Clear');
+    expect(mission.weatherAt(0, plan.frontSeconds, route, point).label).toBe('Clear');
   });
 
   it('clears a wait choice when nominal conditions are selected', async () => {

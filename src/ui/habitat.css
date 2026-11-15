@@ -626,7 +626,6 @@
 }
 #habitat:not(.hab-zoomed).hab-topology-mode .st-preview-card,
 #habitat:not(.hab-zoomed).hab-topology-mode .st-site-strip,
-#habitat:not(.hab-zoomed).hab-topology-mode .st-globe-footer,
 #habitat:not(.hab-zoomed).hab-topology-mode .st-topo-sidebar,
 #habitat:not(.hab-zoomed).hab-topology-mode .st-topo-legend {
   display: none;
@@ -723,7 +722,7 @@
 @media (max-width: 540px) {
   #habitat.hab-zoomed .hab-header { padding-inline: 14px 10px; gap: 8px; }
   #habitat.hab-zoomed .hab-nav {
-    display: grid; grid-template-columns: repeat(3, minmax(0,1fr));
+    display: grid; grid-template-columns: repeat(2, minmax(0,1fr));
   }
   #habitat.hab-zoomed .hab-nav :is(a, button) {
     padding-inline: 4px; letter-spacing: .02em; text-align: center;

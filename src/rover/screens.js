@@ -60,7 +60,9 @@ export function drawNav(scr, map, mission, view) {
   if (next) {
     g.textAlign = 'right';
     const label = next.kind === 'gate' ? 'GATE' : next.ref.final ? 'HAB' : next.ref.id;
-    g.fillText(`${label} ${formatDist(Math.max(0, next.s - mission.s))}`, W - 12, 23);
+    const at = next.ref.at ?? next.ref;
+    const r = mission.rover;
+    g.fillText(`${label} ${formatDist(Math.hypot(at.x - r.x, at.z - r.z))}`, W - 12, 23);
   }
   g.fillStyle = 'rgba(3,8,10,0.78)';
   g.fillRect(0, H - 28, W, 28);
@@ -86,7 +88,7 @@ export function drawTraverse(scr, route, mission, view) {
   g.fillStyle = DIM;
   g.font = `15px ${FONT}`;
   g.fillText('km/h', 16, 114);
-  const lim = Math.min(route.speedLimitAt(mission.s + 3), mission.weather.speedLimit) * 3.6;
+  const lim = Math.min(mission.limit, mission.weather.speedLimit) * 3.6;
   g.fillStyle = mission.governed ? ZONE_COLORS.caution : DIM;
   g.fillText(`LIMIT ${Math.round(lim)}`, 16, 136);
   // attitude

@@ -2,6 +2,25 @@ import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 
+async function checkMobileActions(page, label) {
+  const issues = await page.evaluate(() => {
+    const buttons = [...document.querySelectorAll('.field-tools button')].filter(button => button.getClientRects().length);
+    const issues = [];
+    for (const button of buttons) {
+      const r = button.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      if (r.left < 0 || r.right > innerWidth || r.top < 0 || r.bottom > innerHeight) issues.push(`${button.textContent.trim()}: outside viewport`);
+      if (!button.contains(hit)) issues.push(`${button.textContent.trim()}: covered by ${hit?.id || hit?.className}`);
+    }
+    for (let i = 0; i < buttons.length; i++) for (let j = i + 1; j < buttons.length; j++) {
+      const a = buttons[i].getBoundingClientRect(), b = buttons[j].getBoundingClientRect();
+      if (Math.min(a.right, b.right) > Math.max(a.left, b.left) && Math.min(a.bottom, b.bottom) > Math.max(a.top, b.top)) issues.push(`${buttons[i].id} overlaps ${buttons[j].id}`);
+    }
+    return issues;
+  });
+  assert.deepEqual(issues, [], `Mobile ${label}: all weather and crew buttons are visible and reachable`);
+}
+
 await mkdir('test-results', { recursive: true });
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const errors = [];
@@ -67,6 +86,33 @@ try {
   await page.locator('[data-route-view]').waitFor();
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('.map-weather').evaluate(el => el === document.activeElement), true);
+  await page.locator('#mapClose').click();
+  // Free roaming EVA: drive to S1, get out, collect a find on foot, board again.
+  await page.evaluate(() => {
+    const { mission, simulate } = window.__isg;
+    for (let i = 0; i < 900 && mission.currentStation?.id !== 'S1'; i++) simulate(0.5, { boost: true });
+    for (let i = 0; i < 300 && Math.abs(mission.rover.speed) > 0.01; i++) mission.update(1 / 30, { brake: true }, 0);
+  });
+  assert.equal(await page.evaluate(() => window.__isg.mission.currentStation?.id), 'S1');
+  await page.keyboard.press('f');
+  await page.waitForFunction(() => window.__isg.mission.state === 'walk');
+  await page.evaluate(() => {
+    const { mission, artifacts } = window.__isg;
+    const find = artifacts.find(a => a.stationId === 'S1');
+    mission.walker.x = find.x + 1.2;
+    mission.walker.z = find.z;
+  });
+  await page.waitForFunction(() => !document.getElementById('collectBtn').hidden);
+  await page.screenshot({ path: 'test-results/02b-on-foot.png' });
+  await page.keyboard.down('e');
+  try { await page.waitForFunction(() => window.__isg.mission.collected.length > 0, null, { timeout: 20000 }); }
+  finally { await page.keyboard.up('e'); }
+  assert.equal(await page.evaluate(() => window.__isg.mission.collected.length), 1);
+  assert.equal(await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('isg.collection.v1')).items).length), 1);
+  await page.evaluate(() => { const { mission } = window.__isg; const r = mission.rover; mission.walker.x = r.x - Math.cos(r.heading) * 2.4; mission.walker.z = r.z + Math.sin(r.heading) * 2.4; });
+  await page.waitForFunction(() => window.__isg.mission.canBoard);
+  await page.keyboard.press('f');
+  await page.waitForFunction(() => window.__isg.mission.state === 'drive');
   await page.close();
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
   mobile.on('pageerror', e => errors.push(e.message));
@@ -84,6 +130,44 @@ try {
   await mobile.getByRole('button', { name: /Go outside/ }).click();
   await mobile.waitForFunction(() => window.__isg?.mission?.state === 'drive');
   assert.equal(await mobile.evaluate(() => window.__isg.route.planName), 'Shortest route');
+  await checkMobileActions(mobile, 'driving');
+  await mobile.locator('#crewBtn').click();
+  await mobile.waitForFunction(() => window.__isg.mission.onFoot);
+  await mobile.waitForFunction(() => window.__isg.mission.canBoard);
+  await mobile.locator('#crewBtn').click();
+  await mobile.waitForFunction(() => window.__isg.mission.state === 'drive');
+  await mobile.locator('#crewBtn').click();
+  await mobile.waitForFunction(() => window.__isg.mission.onFoot);
+  await mobile.evaluate(() => {
+    const { mission, artifacts } = window.__isg;
+    const find = artifacts.find(a => a.stationId === 'S1');
+    mission.walker.x = find.x + 1.2;
+    mission.walker.z = find.z;
+  });
+  await mobile.waitForFunction(() => !document.getElementById('collectBtn').hidden);
+  await checkMobileActions(mobile, 'artifact pickup');
+  await mobile.screenshot({ path: 'test-results/04-mobile-pickup.png' });
+  await mobile.locator('#collectBtn').dispatchEvent('pointerdown');
+  try { await mobile.waitForFunction(() => window.__isg.mission.collected.length === 1); }
+  finally { await mobile.locator('#collectBtn').dispatchEvent('pointerup'); }
+  await mobile.evaluate(() => {
+    const { mission } = window.__isg;
+    const r = mission.rover, distance = Math.hypot(r.x, r.z);
+    mission.walker.x = r.x + r.x / distance * 2.4;
+    mission.walker.z = r.z + r.z / distance * 2.4;
+  });
+  await mobile.waitForFunction(() => window.__isg.mission.canBoard);
+  await mobile.locator('#crewBtn').click();
+  await mobile.waitForFunction(() => window.__isg.mission.state === 'drive');
+  await mobile.evaluate(() => { window.__isg.mission.leftHome = true; });
+  await mobile.waitForFunction(() => !document.getElementById('endBtn').hidden);
+  await checkMobileActions(mobile, 'airlock return');
+  // Reproject the outbound leg after moving the test walker back to the parked rover.
+  await mobile.evaluate(() => {
+    const m = window.__isg.mission;
+    m.leftHome = false;
+    m.s = m.route.nearestS(m.rover.x, m.rover.z);
+  });
   await mobile.evaluate(() => {
     const { mission, route, simulate } = window.__isg;
     for (let i = 0; i < 300 && mission.s < route.length * 0.29; i++) {
@@ -96,5 +180,5 @@ try {
   await mobile.getByRole('button', { name: /Turn around and return/ }).click();
   assert.equal(await mobile.evaluate(() => window.__isg.mission.aborted), true);
   assert.deepEqual(errors, [], 'No runtime errors');
-  console.log('Browser checks passed: habitat entry on desktop and mobile, sources, Delta driving, weather controls and wrist navigator, Gale dust return.');
+  console.log('Browser checks passed: habitat forecast, live weather controls, free driving, on-foot collection, reboarding and Gale dust return.');
 } finally { await browser.close(); }

@@ -5,10 +5,14 @@ import { buildDeltaTraverse } from '../src/data/deltaTraverse.js';
 function atStation(id = 'S2') {
   const { route, terrain } = buildDeltaTraverse();
   const mission = new Mission(route, terrain, {}, { surprises: false, legCheck: false });
-  mission.stopIndex = mission.stops.findIndex(stop => stop.ref.id === id);
-  mission.s = mission.nextStop.s;
-  mission.state = 'station';
+  mission.start();
+  parkAt(mission, id);
   return mission;
+}
+function parkAt(mission, id) {
+  const station = mission.route.stations.find(station => station.id === id);
+  Object.assign(mission.rover, { x: station.x, z: station.z, speed: 0 });
+  mission.update(0, {}, 0);
 }
 const cold = { label: 'Cold spell', speedLimit: 4.5, fogDensity: 0.00042, temperatureOffsetC: -25, exposureMinutes: 10 };
 const dust = { label: 'Blowing dust', speedLimit: 1.5, fogDensity: 0.009, visibilityM: 190, temperatureOffsetC: 0, exposureMinutes: Infinity };
@@ -54,13 +58,15 @@ describe('station science choices', () => {
     expect(m.currentStation.tasks[2].done).toBe(false);
   });
 
-  it('blocks hold-E outside work after the cold window rather than bypassing decisions', () => {
+  it('blocks outdoor work once time walking uses the cold window', () => {
     const m = atStation('S4');
     m._weather = cold;
-    expect(m.chooseStationAction('task:0')).toBe(true);
-    m._station(3, { action: true });
+    m.exitRover();
+    m.update(6 * 60, {}, 0);
+    expect(m.outsideMinutes).toBe(6);
+    expect(m.chooseStationAction('task:1')).toBe(false);
     expect(m.currentStation.tasks[1].done).toBe(false);
-    expect(m.met).toBe(600);
+    expect(m.stationOptions.some(option => option.id === 'wait')).toBe(false);
   });
 
   it('enforces late ambient temperature for outdoor tasks', () => {
@@ -79,7 +85,7 @@ describe('station science choices', () => {
     expect(m.chooseStationAction('home')).toBe(true);
     expect(m.state).toBe('drive');
     expect(m.aborted).toBe(true);
-    expect(m.stops.slice(m.stopIndex).filter(stop => stop.kind === 'station').map(stop => stop.ref.id)).toEqual(['HAB']);
+    expect(m.nextStation.id).toBe('HAB');
   });
 
   it('resets exposure for a later cold event even when the same profile is reused', () => {
@@ -99,9 +105,7 @@ describe('station science choices', () => {
     m._weather = cold;
     m._weatherAt = 2400;
     expect(m.chooseStationAction('task:0')).toBe(true);
-    m.stopIndex = m.stops.findIndex(stop => stop.ref.id === 'S4');
-    m.s = m.nextStop.s;
-    m.state = 'station';
+    parkAt(m, 'S4');
     expect(m.outsideMinutes).toBe(5);
     expect(m.chooseStationAction('task:0')).toBe(false);
     expect(m.chooseStationAction('task:1')).toBe(true);
@@ -135,20 +139,20 @@ describe('station science choices', () => {
     m._weather = dust;
     m.chooseStationAction('task:0');
     m.chooseStationAction('home');
-    m.stopIndex = m.stops.findIndex(stop => stop.ref.final);
-    m.s = m.nextStop.s;
-    m.state = 'station';
+    parkAt(m, 'HAB');
     m.dustWarning = true;
-    expect(m.chooseStationAction('task:0')).toBe(true);
-    expect(m.state).toBe('stationDone');
-    expect(m.acknowledge()).toBe(true);
+    const before = m.met;
+    expect(m.endEva()).toBe(true);
+    expect(m.met - before).toBe(20 * 60);
+    expect(m.endEva()).toBe(false);
     expect(m.state).toBe('complete');
     expect(m.scienceResults.some(result => result.quality === 'dust-degraded')).toBe(true);
   });
 
   it.each(['quick', 'skip', 'home'])('records %s leg omissions without claiming science acquisition', (id) => {
     const m = atStation('S1');
-    m.state = 'legcheck';
+    m.legPending = m.currentStation;
+    m.legPending.done = true;
     expect(m.chooseLeg({ id, label: id, allowed: true })).toBe(true);
     const omitted = m.scienceResults.filter(result => result.status === 'skipped');
     expect(omitted.length).toBeGreaterThan(0);
@@ -165,4 +169,38 @@ describe('station science choices', () => {
     expect(m.scienceResults.filter(result => result.status === 'skipped')).toHaveLength(12);
     expect(m.scienceResults.every(result => result.result.startsWith('Not performed'))).toBe(true);
   });
+});
+
+it('applies the same cold and reserve limits to nearby finds, charging a successful pickup once', () => {
+  const m = atStation('S4');
+  const { x, z } = m.rover;
+  const find = { name: 'Dust core', stationId: 'S4', minutes: 6, note: 'Bagged', x: x - 2.1, z };
+  m.setArtifacts([find]);
+  m.exitRover();
+  Object.assign(m.walker, { x: find.x, z: find.z });
+  m.update(0, {}, 0);
+  m._weather = cold;
+  m.update(5 * 60, {}, 0);
+  expect(m.collect(find)).toBe(false);
+  expect(m.samples).toBe(0);
+  expect(m.met).toBe(300);
+  m._weatherAt = 600; // a new spell restores the exposure window
+  m.batteryWh = 100;
+  expect(m.collect(find)).toBe(false);
+  m.batteryWh = 1600;
+  expect(m.collect(find)).toBe(true);
+  expect(m.collect(find)).toBe(false);
+  expect(m.met).toBe(660);
+  expect(m.samples).toBe(1);
+  expect(m.scienceResults.filter(result => result.status === 'complete')).toHaveLength(1);
+});
+
+it('keeps the same reserve threshold for a station wait and a navigator wait', () => {
+  const m = atStation();
+  m._weather = dust;
+  m._weatherAt = 90;
+  m.batteryWh = 100;
+  expect(m.stationOptions.find(option => option.id === 'wait').allowed).toBe(false);
+  expect(m.waitForWeather()).toBe(false);
+  expect(m.met).toBe(0);
 });

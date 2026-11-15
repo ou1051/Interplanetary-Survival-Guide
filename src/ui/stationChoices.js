@@ -4,7 +4,7 @@ import { formatHM } from '../core/math.js';
 // Used by both the parked station card and wrist navigator. Buttons remain mounted while forecasts update.
 export function renderStationChoices(container, mission, onAction = () => {}) {
   const station = mission.currentStation;
-  if (!station || !['station', 'stationDone'].includes(mission.state)) {
+  if (!station || !(mission.onFoot || mission.canExit)) {
     container.replaceChildren();
     return;
   }
@@ -13,7 +13,7 @@ export function renderStationChoices(container, mission, onAction = () => {}) {
   }
   const weather = mission.weather;
   const outsideLeft = Math.max(0, (weather.exposureMinutes ?? Infinity) - mission.outsideMinutes);
-  container.querySelector('.station-conditions').textContent = `${weather.label}${Number.isFinite(outsideLeft) ? ` · ${outsideLeft} min outside left in this cold spell` : ''} · choose a task to run, or hold E for the first unfinished task.`;
+  container.querySelector('.station-conditions').textContent = `${weather.label}${Number.isFinite(outsideLeft) ? ` · ${outsideLeft} min outside left in this cold spell` : ''} · choose instrument work below. Collect physical finds on foot by holding E beside them.`;
   const actions = container.querySelector('.station-actions');
   const options = mission.stationOptions;
   const key = `${station.id}:${options.map(option => option.id).join(',')}`;

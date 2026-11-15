@@ -3,14 +3,14 @@ import { Mission } from '../src/sim/mission.js';
 import { legOptions } from '../src/sim/legCheck.js';
 import { buildDeltaTraverse } from '../src/data/deltaTraverse.js';
 
-const parked = { throttle: false, brake: true, steer: 0, boost: false, action: false };
+const parked = { throttle: false, brake: false, steer: 0, boost: false, action: false };
 const driving = { ...parked, throttle: true, brake: false };
 function mission(random = () => 0, variableWeather = true) {
   const route = {
-    length: 100000, stops: [], stations: [], zones: [], step: 1,
+    sample: () => ({ x: 50, z: 0, tx: 0, tz: -1 }), length: 100000, stops: [], stations: [], zones: [], step: 1,
     speedLimitAt: () => 4.5, zonesAt: () => [],
   };
-  return new Mission(route, {}, {}, { random, variableWeather });
+  return new Mission(route, { heightAt: () => 0 }, { x: 0, y: 10, z: 0 }, { random, variableWeather });
 }
 
 describe('variable mission weather', () => {
@@ -84,7 +84,7 @@ describe('variable mission weather', () => {
     m.on((type, p) => { if (type === 'log') messages.push(p.text); });
     m.start();
     drivingMission.start();
-    m.state = 'stationDone';
+    m.exitRover();
     m.update(15, parked, 0);
     expect(m.weather.label).toBe('Dust gust');
     const before = messages.length;
@@ -116,10 +116,17 @@ describe('variable mission weather', () => {
     const checks = legOptions(m).options.flatMap(option => option.checks).filter(check => check.id === 'dust');
     expect(checks.length).toBeGreaterThan(0);
     expect(checks.every(check => check.ok && check.value === 'Dust gust')).toBe(true);
-    for (let i = 0; i < 15000 && m.state !== 'complete'; i++) {
-      if (m.state === 'legcheck') m.chooseLeg(legOptions(m).options.at(-1));
-      else if (!m.acknowledge()) m.update(0.1, { ...driving, boost: true, action: true }, 0);
-    }
+    const before = { ...m.rover };
+    for (let i = 0; i < 30; i++) m.update(0.1, m.autopilot(), 0);
+    expect(Math.hypot(m.rover.x - before.x, m.rover.z - before.z)).toBeGreaterThan(1);
+    const site = m.stations[0];
+    Object.assign(m.rover, { x: site.x, z: site.z, speed: 0 });
+    m.update(0, {}, 0);
+    expect(m.stationOptions.some(option => option.allowed && option.id.startsWith('task:'))).toBe(true);
+    expect(m.chooseStationAction('home')).toBe(true);
+    Object.assign(m.rover, { x: 0, z: -15 });
+    m.update(0, {}, 0);
+    expect(m.endEva()).toBe(true);
     expect(m.state).toBe('complete');
   });
 });

@@ -1,5 +1,6 @@
 import './siteTopology.css';
 import { createMarsGlobeRenderer, GLOBE_PAD } from './marsGlobeGL.js';
+import { siteAssetUrl, loadTopographyGrid } from './siteAssets.js';
 
 // ---------------------------------------------------------------------------
 // Site Topology Module:
@@ -142,7 +143,7 @@ function layerImageFilename(heights, steepness, craters) {
 export class SiteTopologyWidget {
   /**
    * @param {HTMLElement} container
-   * @param {{ onDeploy?: (selection: { site: typeof MARS_SITES[0], pathId: string }) => void }} options
+   * @param {{ onDeploy?: (selection: { site: typeof MARS_SITES[0], pathId: string }) => void, actionLabel?: string }} options
    */
   constructor(container, options = {}) {
     this.container = container;
@@ -178,7 +179,7 @@ export class SiteTopologyWidget {
     this.pinScreenCoords = [];
     this._raf = 0;
 
-    this._renderShell();
+    this._renderShell(options.actionLabel ?? 'Deploy rover');
     this._bindEvents();
     this._loadAssets();
     this._scheduleDraw();
@@ -193,8 +194,7 @@ export class SiteTopologyWidget {
   }
 
   _loadAssets() {
-    fetch('./jezero/topography_grid.json')
-      .then((r) => (r.ok ? r.json() : null))
+    loadTopographyGrid()
       .then((data) => {
         if (data) {
           this.gridData = data;
@@ -220,11 +220,11 @@ export class SiteTopologyWidget {
         this.marsTex = null; // keep the painted fallback
       }
     };
-    marsImg.src = './mars/mars_color_2048.jpg';
+    marsImg.src = siteAssetUrl('./mars/mars_color_2048.jpg');
 
     // 3D relief-lit globe (WebGL). Until it is ready, or without WebGL, the 2D render is used.
     this.marsGL = null;
-    createMarsGlobeRenderer({ color: './mars/mars_color_2048.jpg', height: './mars/mars_mola_height_2048.png' })
+    createMarsGlobeRenderer({ color: siteAssetUrl('./mars/mars_color_2048.jpg'), height: siteAssetUrl('./mars/mars_mola_height_2048.png') })
       .then((r) => {
         this.marsGL = r;
         this._scheduleDraw();
@@ -244,12 +244,12 @@ export class SiteTopologyWidget {
     for (const src of files) {
       const img = new Image();
       img.onload = () => this._scheduleDraw();
-      img.src = src;
+      img.src = siteAssetUrl(src);
       this.images.set(src, img);
     }
   }
 
-  _renderShell() {
+  _renderShell(actionLabel) {
     this.container.innerHTML = `
       <div class="st-root" data-stage="globe">
         <!-- STAGE 1: MARS GLOBE WITH 5 SITES & TOP-LEFT PREVIEW CARD -->
@@ -260,7 +260,7 @@ export class SiteTopologyWidget {
             <!-- Top-Left Site Preview Card -->
             <aside class="st-preview-card" data-preview-card aria-live="polite">
               <div class="st-preview-thumb-wrap">
-                <img class="st-preview-img" data-preview-img src="./jezero/combined.png" alt="Topography preview of selected Mars site" />
+                <img class="st-preview-img" data-preview-img src="${siteAssetUrl('./jezero/combined.png')}" alt="Topography preview of selected Mars site" />
                 <span class="st-preview-badge" data-preview-code>SITE 01 / 05</span>
               </div>
               <div class="st-preview-meta">
@@ -268,9 +268,9 @@ export class SiteTopologyWidget {
                 <small class="st-preview-coords" data-preview-coords>${MARS_SITES[0].coords}</small>
                 <p class="st-preview-desc" data-preview-desc>${MARS_SITES[0].summary}</p>
                 <div class="st-preview-actions">
-                  <button type="button" class="st-nav-btn" data-site-prev title="Previous site (Left Arrow)">◀</button>
-                  <button type="button" class="st-zoom-btn" data-site-zoom>Zoom In [Enter] →</button>
-                  <button type="button" class="st-nav-btn" data-site-next title="Next site (Right Arrow)">▶</button>
+                  <button type="button" class="st-nav-btn" data-site-prev aria-label="Previous site" title="Previous site (←)">◀</button>
+                  <button type="button" class="st-zoom-btn" data-site-zoom title="Inspect site (Enter)">Inspect site</button>
+                  <button type="button" class="st-nav-btn" data-site-next aria-label="Next site" title="Next site (→)">▶</button>
                 </div>
               </div>
             </aside>
@@ -283,10 +283,6 @@ export class SiteTopologyWidget {
                 </button>`
               ).join('')}
             </div>
-          </div>
-          <div class="st-globe-footer">
-            <span><kbd>←</kbd> <kbd>→</kbd> Switch site (1–5)</span>
-            <span><kbd>Enter</kbd> or <b>Click site</b> to zoom in &amp; inspect topography</span>
           </div>
         </div>
 
@@ -362,7 +358,7 @@ export class SiteTopologyWidget {
               </div>
 
               <button type="button" class="st-deploy-btn" data-deploy-rover>
-                Deploy Rover to 3D Surface <span>→</span>
+                ${actionLabel}
               </button>
             </aside>
           </div>

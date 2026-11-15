@@ -39,6 +39,7 @@ export class PlanningBoard {
 
     const topoHost = $('[data-topology-host]', this.el);
     this.topology = new SiteTopologyWidget(topoHost, {
+      actionLabel: 'Set target',
       onDeploy: (selection) => {
         this.toggle(false);
         if (this.onDeploy) this.onDeploy(selection);
@@ -71,7 +72,7 @@ export class PlanningBoard {
     }
     if (show) {
       this.el.showModal();
-      const targetTab = initialTab || (this.mission?.state === 'legcheck' ? 'leg' : (this.mission ? 'guide' : 'topology'));
+      const targetTab = initialTab || (this.mission?.legPending ? 'leg' : (this.mission ? 'guide' : 'topology'));
       this.showTab(targetTab);
     } else {
       this.el.close();
@@ -161,7 +162,6 @@ export class PlanningBoard {
           <span class="wd-grille"></span>
         </div>
       </div>
-      <div class="wd-keys"><span><kbd>←</kbd> <kbd>→</kbd> Switch site / screen</span><span><kbd>Enter</kbd> Select / Zoom</span><span><kbd>P</kbd> Close</span></div>
     </div>`;
   }
 
@@ -262,9 +262,9 @@ export class PlanningBoard {
     });
   }
 
-  // The "Next leg" screen only exists while the rover is parked at a station waiting for a decision.
+  // The "Next leg" screen only exists after a station's work is done, until the next leg is chosen.
   get tabs() {
-    return this.mission?.state === 'legcheck'
+    return this.mission?.legPending
       ? ['leg', 'guide', 'map', 'topology', 'suit']
       : ['guide', 'map', 'topology', 'suit'];
   }
@@ -298,7 +298,7 @@ export class PlanningBoard {
   // The leg ahead: which station we stand at, where the leg goes, and its three paths (Delta loop only).
   _legContext() {
     const route = this.mission.route;
-    const here = this.mission.currentStation;
+    const here = this.mission.legPending ?? this.mission.currentStation;
     const stops = route.stations.filter((station) => !station.final);
     const index = stops.indexOf(here) + 1;
     const next = route.stations[stops.indexOf(here) + 1];
@@ -437,7 +437,7 @@ export class PlanningBoard {
 
   drawRoute() {
     if (this.relief && this.mission) {
-      this.relief.draw($('[data-traverse]', this.el), undefined, this.mission.s, this.mission.weather, this.mission.activeFront, this.mission.detectedObstacles);
+      this.relief.draw($('[data-traverse]', this.el), undefined, this.mission.s, this.mission.weather, this.mission.activeFront, this.mission.detectedObstacles, this.mission.pos);
     }
   }
 
@@ -480,13 +480,13 @@ export class PlanningBoard {
     if (this.tab === 'map') {
       this.drawRoute();
       const science = $('[data-field-science]', this.el);
-      science.hidden = !['station', 'stationDone'].includes(mission.state);
+      science.hidden = !mission.currentStation || !(mission.onFoot || mission.canExit);
       if (!science.hidden) renderStationChoices(science, mission, () => this.updateField(true));
       const decision = $('[data-weather-drive]', this.el);
-      decision.hidden = !['drive', 'gate'].includes(mission.state) || !(mission.waitSeconds > 0);
+      decision.hidden = !mission.canExit || !(mission.waitSeconds > 0);
       if (!decision.hidden) {
-        const wait = forecastReturn(mission, { waitSeconds: mission.waitSeconds });
-        const drive = forecastReturn(mission);
+        const wait = forecastReturn(mission, { waitSeconds: mission.waitSeconds, homeOnly: true });
+        const drive = forecastReturn(mission, { homeOnly: true });
         const budget = f => `HAB ${f.backAt} · O₂ ${Math.floor(f.oxygenLeft)} min · battery ${Math.floor(f.batteryPct)}% · ${Math.abs(Math.round(f.daylightMinutes))} min ${f.daylightMinutes >= 0 ? 'before' : 'after'} sunset`;
         $('[data-drive-cost]', this.el).textContent = `Continue now · ${budget(drive)}`;
         const button = $('[data-wait-weather]', this.el);

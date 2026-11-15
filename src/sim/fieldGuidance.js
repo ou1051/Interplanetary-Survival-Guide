@@ -1,4 +1,4 @@
-import { LIFE_SUPPORT, ROVER } from '../config/mission.js';
+import { LIFE_SUPPORT, ROVER, HAB } from '../config/mission.js';
 import { consumptionEstimate } from '../physics/traverse.js';
 import { CLEAR_WEATHER } from './weather.js';
 
@@ -16,59 +16,101 @@ export function temperatureAt(lmstMinutes) {
   return -50 + 38 * Math.cos((2 * Math.PI * (hours - 13.5)) / 24);
 }
 
-export function forecastWeather(mission, s, elapsedSeconds, route = mission.route) {
-  if (mission.weatherAt) return mission.weatherAt(s, (mission.met ?? 0) + elapsedSeconds + 1e-7, route);
+export function forecastWeather(mission, s, elapsedSeconds, route = mission.route, position = route.sample?.(s)) {
+  if (mission.weatherAt) return mission.weatherAt(s, (mission.met ?? 0) + elapsedSeconds + 1e-7, route, position);
   return elapsedSeconds + 1e-7 < (mission.weatherRemainingSeconds ?? 0) ? mission.weather : CLEAR_WEATHER;
 }
 
-// shortcut: constant governed speed omits acceleration and gate pauses; add dynamics when sub-minute ETA accuracy is needed.
+// shortcut: governed speeds omit acceleration, unmapped obstacles and gate pauses; add dynamics when sub-minute ETA accuracy is needed.
 // Known weather only; future random events are not predicted.
 export function forecastReturn(mission, { workMinutes = 0, waitSeconds = 0, fromS = mission.s,
-  route = mission.route, workAtS = fromS, toS = route.length, includeIngress = true,
+  route = mission.route, workAtS = fromS, toS = route.length, includeIngress = true, homeOnly = false,
   workStops = [{ s: workAtS, minutes: workMinutes }] } = {}) {
   let elapsed = waitSeconds;
   let oxygenUsed = consumptionEstimate(waitSeconds).oxygenMinutes;
   let batteryWhUsed = consumptionEstimate(waitSeconds).batteryWh;
   let driveSeconds = 0;
+  let walkingSeconds = 0;
   let workStartMinutes = waitSeconds / 60;
-  const endS = Math.max(fromS, toS);
-  const stops = [...workStops, { s: endS, minutes: 0 }];
   const deadlines = [mission.weatherRemainingSeconds ?? 0, (mission.frontUntilMet ?? 0) - (mission.met ?? 0)];
   const front = route.weatherExposure;
-  for (const [leg, stop] of stops.entries()) {
-    const destination = Math.max(fromS, Math.min(endS, stop.s));
-    for (let s = fromS; s < destination;) {
-      const weather = forecastWeather(mission, s + 1e-7, elapsed, route);
-      const cap = Math.min(ROVER.maxSpeed, route.speedLimitAt(s + 3), weather.speedLimit);
-      // A mandatory front ends at its known deadline; do not divide by a zero driving cap.
+  const walking = mission.onFoot || mission.state === 'walk';
+  const rover = walking ? mission.rover : mission.pos;
+  if (walking && rover && route.nearestS) fromS = route.nearestS(rover.x, rover.z);
+
+  // The same accounting covers the selected route, its off-route approach, and a free-roam return.
+  function travel(start, end, path = route, onFoot = false) {
+    const direction = end >= start ? 1 : -1;
+    for (let s = start; direction * (end - s) > 1e-7;) {
+      const position = path.sample?.(s);
+      const weather = forecastWeather(mission, s + direction * 1e-7, elapsed, route, position);
+      const cap = Math.min(onFoot ? LIFE_SUPPORT.walkSpeedKmh / 3.6 : ROVER.maxSpeed,
+        path.speedLimitAt(s + direction * 3), weather.speedLimit);
       if (cap <= 0) {
         const remaining = Math.max(0, (mission.frontUntilMet ?? 0) - (mission.met ?? 0) - elapsed)
           || Math.max(0, (mission.weatherRemainingSeconds ?? 0) - elapsed);
         if (!remaining) { elapsed = Infinity; oxygenUsed = Infinity; batteryWhUsed = Infinity; break; }
-        const rest = consumptionEstimate(remaining);
+        const rest = consumptionEstimate(remaining, { work: onFoot });
         elapsed += remaining; oxygenUsed += rest.oxygenMinutes; batteryWhUsed += rest.batteryWh;
         continue;
       }
-      let distance = Math.min(route.step || 1, destination - s);
+      let distance = Math.min(path.step || 1, Math.abs(end - s));
       for (const deadline of deadlines) {
         const remaining = deadline - elapsed;
         if (remaining > 1e-7) distance = Math.min(distance, remaining * cap);
       }
-      if (front) for (const boundary of [front.from, front.to]) {
-        if (boundary > s + 1e-7) distance = Math.min(distance, boundary - s);
+      if (path === route && front) for (const boundary of [front.from, front.to]) {
+        if (direction * (boundary - s) > 1e-7) distance = Math.min(distance, Math.abs(boundary - s));
       }
       const seconds = distance / cap;
-      const pitch = (route.pitch?.[Math.min(route.pitch.length - 1, Math.round(s / route.step))] ?? 0) * Math.PI / 180;
-      const used = consumptionEstimate(seconds, { moving: distance, pitch });
+      const pitch = path.pitchAt ? path.pitchAt(s)
+        : (path.pitch?.[Math.min(path.pitch.length - 1, Math.round(s / path.step))] ?? 0) * Math.PI / 180 * direction;
+      const used = consumptionEstimate(seconds, { work: onFoot, moving: onFoot ? 0 : distance, pitch });
       elapsed += seconds; driveSeconds += seconds;
+      if (onFoot) walkingSeconds += seconds;
       oxygenUsed += used.oxygenMinutes; batteryWhUsed += used.batteryWh;
-      s += distance;
+      s += direction * distance;
     }
-    fromS = destination;
-    if (leg === 0) workStartMinutes = elapsed / 60;
-    const used = consumptionEstimate(stop.minutes * 60, { work: true });
-    elapsed += stop.minutes * 60;
-    oxygenUsed += used.oxygenMinutes; batteryWhUsed += used.batteryWh;
+  }
+
+  // Off-route ground has no planned line: keep upstream's 30% detour allowance and conservative speed.
+  function crossGround(from, to, onFoot = false) {
+    const length = Math.hypot(to.x - from.x, to.z - from.z) * 1.3;
+    const heading = Math.atan2(-(to.x - from.x), -(to.z - from.z));
+    const sample = s => ({ x: from.x + (to.x - from.x) * s / length, z: from.z + (to.z - from.z) * s / length });
+    const ground = s => mission.terrain?.heightAt ? mission._ground(sample(s).x, sample(s).z, heading) : null;
+    travel(0, length, {
+      step: 1, sample,
+      speedLimitAt: s => Math.min(ROVER.dangerSlopeSpeed, ...(ground(s)?.zones.map(zone => zone.limit) ?? [])),
+      pitchAt: s => (ground(s)?.pitch ?? 0) * Math.PI / 180,
+    }, onFoot);
+  }
+
+  if (homeOnly && mission.pos) {
+    workStartMinutes = elapsed / 60;
+    const work = consumptionEstimate(workMinutes * 60, { work: true });
+    elapsed += workMinutes * 60;
+    oxygenUsed += work.oxygenMinutes; batteryWhUsed += work.batteryWh;
+    if (walking || route.retracesOutbound === false) crossGround(mission.pos, HAB, walking);
+    else {
+      crossGround(rover, route.sample(fromS));
+      travel(fromS, fromS < route.length / 2 ? 0 : route.length);
+    }
+  } else {
+    if (walking && mission.pos && rover) crossGround(mission.pos, rover, true);
+    const start = route.sample?.(fromS);
+    if (rover && Number.isFinite(start?.x) && Number.isFinite(start?.z)) crossGround(rover, start);
+    const endS = Math.max(fromS, toS);
+    const stops = [...workStops, { s: endS, minutes: 0 }];
+    for (const [leg, stop] of stops.entries()) {
+      const destination = Math.max(fromS, Math.min(endS, stop.s));
+      travel(fromS, destination);
+      fromS = destination;
+      if (leg === 0) workStartMinutes = elapsed / 60;
+      const used = consumptionEstimate(stop.minutes * 60, { work: true });
+      elapsed += stop.minutes * 60;
+      oxygenUsed += used.oxygenMinutes; batteryWhUsed += used.batteryWh;
+    }
   }
   const finalStation = route.stations.find(station => station.final);
   const ingressTime = includeIngress ? (finalStation
@@ -83,58 +125,64 @@ export function forecastReturn(mission, { workMinutes = 0, waitSeconds = 0, from
     oxygenLeft, batteryPct: Math.max(0, mission.batteryWh - batteryWhUsed) / ROVER.batteryWh * 100,
     backAt: Number.isFinite(backAtMinutes) ? clock(backAtMinutes) : '—', backAtMinutes,
     daylightMinutes: SUNSET - backAtMinutes, reserveOK: oxygenLeft >= LIFE_SUPPORT.reserveMinutes,
-    driveMinutes: driveSeconds / 60, totalMinutes: elapsed / 60, workStartMinutes, oxygenUsed, batteryWhUsed,
+    driveMinutes: driveSeconds / 60, walkingMinutes: walkingSeconds / 60, totalMinutes: elapsed / 60, workStartMinutes, oxygenUsed, batteryWhUsed,
   };
 }
 
 export function fieldGuidance(mission) {
   const { route, s, nextKnownStop: nextStop, state } = mission;
-  const turn = route.length / 2;
+  const pos = mission.pos ?? route.sample(s);
   const retraces = route.retracesOutbound !== false;
-  const outbound = retraces && s < turn && !mission.aborted;
-  const homeDistance = outbound ? s : route.length - s;
-  const returnForecast = forecastReturn(mission, { fromS: outbound ? route.length - s : s });
+  const outbound = retraces && s < route.length / 2 && !mission.aborted;
+  const open = route.stations.filter(stop => !stop.final && !stop.done && !stop.skipped);
+  const returnForecast = forecastReturn(mission, { homeOnly: true,
+    fromS: !mission.pos && outbound ? route.length - s : s });
+  const workStops = open.map(stop => ({ s: stop.s,
+    minutes: (stop.tasks.some(task => task.artifact) ? stop.tasks.filter(task => task.artifact) : stop.tasks)
+      .reduce((sum, task) => sum + (task.done || task.skipped ? 0 : task.minutes), 0) }));
+  const plannedForecast = mission.aborted || state === 'complete' ? returnForecast : forecastReturn(mission, { workStops });
   const returnOxygen = returnForecast.oxygenLeft;
-  const workStops = route.stations.filter(stop => !stop.final && !stop.done && !stop.skipped && stop.s >= s)
-    .map(stop => ({ s: stop.s, minutes: stop.tasks.reduce((sum, task) => sum + (task.done || task.skipped ? 0 : task.minutes), 0) }));
-  const plannedForecast = forecastReturn(mission, { workStops });
-  const plannedReturnOxygen = plannedForecast.oxygenLeft;
-  const zone = route.zones.find(hazard => !hazard.acknowledged && hazard.s1 >= s && hazard.s0 - s <= 55);
+  const zone = mission.activeZones?.find(hazard => hazard.severity === 'danger')
+    ?? (!mission.pos ? route.zones.find(hazard => !hazard.acknowledged && hazard.s1 >= s && hazard.s0 - s <= 55) : null);
   const front = mission.activeFront;
   const dust = mission.dustWarning;
   const surprise = nextStop?.ref.surprise && (nextStop.ref.detected || state === 'gate') ? nextStop.ref : null;
-  const canReturn = ['drive', 'gate'].includes(state) && outbound && s > 1;
-  const reachedBase = state === 'complete' || (!outbound && nextStop?.ref.final && state !== 'drive' && state !== 'gate');
-  const belowReserve = plannedReturnOxygen < LIFE_SUPPORT.reserveMinutes;
+  const canReturn = ['drive', 'walk'].includes(state) && !mission.aborted
+    && (mission.pos ? mission.leftHome && !mission.atHome : outbound && s > 1);
+  const reachedBase = state === 'complete' || (mission.atHome && !open.length);
+  const belowReserve = plannedForecast.oxygenLeft < LIFE_SUPPORT.reserveMinutes;
   const late = plannedForecast.backAtMinutes > TWILIGHT_LIMIT;
   const lowBattery = plannedForecast.batteryPct < 10;
   let advice = 'Continue', reason = 'Planned return preserves your oxygen reserve.';
   if (reachedBase) { advice = 'At habitat'; reason = 'The traverse is complete or ready for ingress.'; }
   else if (returnOxygen < 0) { advice = 'Emergency'; reason = 'Estimated oxygen is insufficient for the return and ingress.'; }
   else if (dust || belowReserve || late || lowBattery) {
-    advice = outbound ? 'Return to habitat' : retraces ? 'Proceed to habitat' : belowReserve ? 'Oxygen caution' : 'Return caution';
-    reason = dust ? 'Simulated dust front ahead. Turn back along your outbound track.'
+    advice = mission.pos || outbound ? 'Return to habitat' : retraces ? 'Proceed to habitat' : belowReserve ? 'Oxygen caution' : 'Return caution';
+    reason = dust ? 'Simulated dust front ahead. Return to the airlock.'
       : belowReserve ? 'Finishing all remaining science would use your oxygen reserve.'
         : late ? 'Finishing all remaining science would put you back at HAB after twilight.' : 'Finishing all remaining science would use the rover battery margin.';
-    if (!outbound && dust) reason = 'Follow the route back to the airlock.';
   } else if (surprise) { advice = 'Caution'; reason = `${surprise.type.toLowerCase()}. Complete the on-site recovery before continuing.`; }
-  else if (zone) { advice = 'Caution'; reason = `${zone.type.toLowerCase()} ahead. Follow the marked speed limit.`; }
+  else if (zone) { advice = 'Caution'; reason = `${zone.type.toLowerCase()} here. Follow the marked speed limit.`; }
+  else if (!open.length || mission.aborted) { advice = 'Proceed to habitat'; reason = 'Head back to the airlock and end the EVA.'; }
   else if (mission.weather.label !== 'Clear') {
     advice = Number.isFinite(mission.weather.exposureMinutes) ? 'Cold caution' : 'Reduced visibility';
     reason = Number.isFinite(mission.weather.exposureMinutes)
       ? `${mission.weather.label}. Keep outdoor work within the ${mission.weather.exposureMinutes}-minute exposure window.`
       : `${mission.weather.label}. Follow the marked route at the reduced speed limit.`;
   }
-  else if (!outbound && (retraces || nextStop?.ref.final)) { advice = 'Proceed to habitat'; reason = 'Follow the return leg to the airlock.'; }
-  const returning = advice === 'Return to habitat';
-  const guideS = returning ? route.length - s : s;
-  const heading = route.sample(Math.min(guideS + 2, route.length));
-  const degrees = (Math.round(Math.atan2(heading.tx, -heading.tz) * 180 / Math.PI) + 360) % 360;
-  const direction = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(degrees / 45) % 8];
+  const returning = advice === 'Return to habitat' || advice === 'Proceed to habitat' || mission.aborted;
+  const target = returning ? { ...HAB, name: 'Habitat' } : open[0] ?? { ...HAB, name: 'Habitat' };
+  const hasCoordinates = Number.isFinite(pos?.x) && Number.isFinite(target.x);
+  const heading = route.sample(Math.min(s + 2, route.length));
+  const degrees = (Math.round(Math.atan2(hasCoordinates ? target.x - pos.x : heading.tx,
+    hasCoordinates ? -(target.z - pos.z) : -heading.tz) * 180 / Math.PI) + 360) % 360;
   return {
-    advice, reason, canReturn, degrees, direction, returnOxygen, returnForecast, plannedForecast,
-    next: returning ? 'Habitat' : nextStop?.kind === 'gate' ? 'Hazard gate' : nextStop?.ref.name ?? 'Habitat',
-    distance: Math.max(0, Math.round(returning ? homeDistance : (nextStop?.s ?? route.length) - s)),
-    hazard: surprise?.type.toLowerCase() ?? (dust || (front && front.to >= s) ? 'Dust front · simulated' : zone?.type.toLowerCase() ?? 'None reported ahead'),
+    advice, reason, canReturn, degrees,
+    direction: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(degrees / 45) % 8],
+    returnOxygen, returnForecast, plannedForecast,
+    next: returning ? 'Habitat' : nextStop?.kind === 'gate' ? 'Hazard gate' : target.name,
+    distance: Math.max(0, Math.round(hasCoordinates ? Math.hypot(target.x - pos.x, target.z - pos.z)
+      : returning && outbound ? s : (nextStop?.s ?? route.length) - s)),
+    hazard: surprise?.type.toLowerCase() ?? (dust || (front && front.to >= s) ? 'Dust front · simulated' : zone?.type.toLowerCase() ?? 'None reported here'),
   };
 }

@@ -5,13 +5,17 @@ import { Mission } from '../src/sim/mission.js';
 import { buildDeltaTraverse } from '../src/data/deltaTraverse.js';
 import { renderStationChoices } from '../src/ui/stationChoices.js';
 import { Hud } from '../src/ui/hud.js';
+import { placeArtifacts } from '../src/sim/artifacts.js';
 
 function setup(id = 'S2') {
   const { route, terrain } = buildDeltaTraverse();
   const mission = new Mission(route, terrain, {}, { surprises: false });
-  mission.stopIndex = mission.stops.findIndex(stop => stop.ref.id === id);
-  mission.s = mission.nextStop.s;
-  mission.state = 'station';
+  mission.start();
+  const station = mission.stations.find(station => station.id === id)!;
+  Object.assign(mission.rover, { x: station.x, z: station.z, speed: 0 });
+  mission.pos = { x: station.x, y: station.h, z: station.z };
+  mission.s = station.s;
+  mission.leftHome = true;
   const container = document.createElement('div');
   document.body.appendChild(container);
   return { mission, container };
@@ -19,6 +23,25 @@ function setup(id = 'S2') {
 afterEach(() => document.body.replaceChildren());
 
 describe('shared station decisions UI', () => {
+  it('shows instruments beside physical finds without adding remote collect buttons', () => {
+    const { mission, container } = setup();
+    const artifacts = placeArtifacts({ route: mission.route, terrain: mission.terrain, seed: 42 });
+    mission.setArtifacts(artifacts);
+    renderStationChoices(container, mission);
+    expect(container.querySelector('[data-action="task:0"]')).not.toBeNull();
+    mission.currentStation!.tasks.forEach((task, index) => {
+      if (task.artifact) expect(container.querySelector(`[data-action="task:${index}"]`)).toBeNull();
+    });
+    mission.exitRover();
+    renderStationChoices(container, mission);
+    expect(container.textContent).toContain('Collect physical finds on foot');
+    mission.rover.speed = 2;
+    mission.boardRover();
+    mission.rover.speed = 2;
+    renderStationChoices(container, mission);
+    expect(container.children).toHaveLength(0);
+  });
+
   it('runs the sample-first decision through a native button while the rover is parked', () => {
     const { mission, container } = setup();
     renderStationChoices(container, mission);
@@ -69,7 +92,7 @@ describe('shared station decisions UI', () => {
     mission._weather = { label: 'Blowing dust', speedLimit: 1.5, visibilityM: 190, temperatureOffsetC: 0, exposureMinutes: Infinity };
     mission.chooseStationAction('task:0');
     mission.chooseStationAction('home');
-    document.body.innerHTML = '<div id="hud"></div><div id="card"></div><div id="debriefGrid"></div><div id="debriefSub"></div><div id="debrief" class="hidden"></div><button id="restartBtn"></button>';
+    document.body.innerHTML = '<div id="hud"></div><div id="card"></div><div id="debriefGrid"></div><div id="debriefSub"></div><div id="debrief" class="hidden"></div><p id="debriefNote"></p><button id="debriefExtra"></button><button id="restartBtn"></button>';
     const hud = Object.create(Hud.prototype);
     hud.mission = mission;
     hud.route = mission.route;

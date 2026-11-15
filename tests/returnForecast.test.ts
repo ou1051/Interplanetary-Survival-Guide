@@ -3,6 +3,7 @@ import { forecastReturn, fieldGuidance } from '../src/sim/fieldGuidance.js';
 import { legOptions } from '../src/sim/legCheck.js';
 import { ROVER } from '../src/config/mission.js';
 import { Mission } from '../src/sim/mission.js';
+import { Route } from '../src/world/route.js';
 
 function fixture(length = 2700) {
   return {
@@ -85,8 +86,10 @@ describe('remaining return forecast', () => {
   });
 
   it('matches live consumption on a clear flat return within the acceleration and arrival allowance', () => {
-    const route = { ...fixture(450).route, stops: [], zonesAt: () => [] };
-    const m = new Mission(route, {}, {}, { surprises: false });
+    const terrain = { heightAt: () => 0 };
+    const route = new Route(terrain, { points: [[0, -40], [450, -40]], exact: true, stations: [], areaHazards: [] });
+    route.retracesOutbound = false;
+    const m = new Mission(route, terrain, {}, { surprises: false });
     m.start();
     m.speed = ROVER.maxSpeed;
     const forecast = forecastReturn(m);

@@ -2,9 +2,9 @@
 
 NASA Space Apps Challenge · *Interplanetary Survival Guide: Martian Map*
 
-The app opens on **Mars Surface Operations**. Select **Enter habitat**, then **Review route** to open the planner. **Original Delta Traverse** is selected by default. Select **S1** to compare three approaches from the habitat, each trading distance against risk: **Shortest** (293 m) takes the direct line across *unsurveyed ground* that the map cannot resolve (possible boulders, soft sand, small ledges), so the rover stops for a briefing and creeps through it; **Intermediate** (322 m) bends around that patch over mapped ground; **Longer** (419 m) is a western detour over the gentlest slopes. Each card shows the expected drive time, worked out with the same speed limits and hazard stops as the drive itself. Unsurveyed ground also hides one obstacle that is on no map (soft sand or a boulder on the route): the rover stops when it reaches it, and clearing it costs 2–4 minutes and the oxygen to match. All three join the original 1.8 km loop at S1. Choose **Go outside** to drive the selected route. Each science stop is a marked station (pad, signed mast with beacon, instruments, sample cache, work-area flags). After finishing a station the rover stays parked until you plan the next leg on the wrist navigator: pick the path on a small map (Fastest, Planned or Safest, each with its time and an Easy/Moderate/Hard rating), then what to do at the next station (full stop, quick stop, skip it, or go home). Each option is checked against oxygen (keeping the 30-minute reserve), daylight (home by twilight), the falling afternoon temperature (no work on foot below −40 °C), rover battery and dust; options that fail are locked.
+The app opens on **Mars Surface Operations**. Select **Enter habitat**, then **Review route** to open the planner. **Original Delta Traverse** is selected by default. Select **S1** to compare three approaches from the habitat, each trading distance against risk: **Shortest** (293 m) takes the direct line across *unsurveyed ground* that the map cannot resolve (possible boulders, soft sand, small ledges), so the rover stops for a briefing and creeps through it; **Intermediate** (322 m) bends around that patch over mapped ground; **Longer** (419 m) is a western detour over the gentlest slopes. Each card shows the expected drive time, worked out with the same speed limits and hazard stops as the drive itself. Unsurveyed ground also hides one obstacle that is on no map (soft sand or a boulder on the route): the rover stops when it reaches it, and clearing it costs 2–4 minutes and the oxygen to match. All three join the original 1.8 km loop at S1. Choose **Go outside** to drive the selected route. Each science stop is a marked station (pad, signed mast with beacon, instruments, sample cache, work-area flags). After finishing a station, the wrist navigator opens the next leg for planning: pick the path on a small map (Fastest, Planned or Safest, each with its time and an Easy/Moderate/Hard rating), then what to do at the next station (full stop, quick stop, skip it, or go home). Each option is checked against oxygen (keeping the 30-minute reserve), daylight (home by twilight), the falling afternoon temperature (no work on foot below −40 °C), rover battery and dust; options that fail are locked.
 
-Open **Departure forecast** in the habitat for the current outlook at Delta or Gale, visibility, outdoor work limits and return reserves. **Variable weather** is the default. In the Delta S1 briefing, compare proceeding through the amber dust-front segment, waiting at the habitat, and taking the mapped western detour. Each choice shows predicted oxygen, battery and local return time. After launch, **Weather now** on the rover or full-screen map opens the current readings and the costs of continuing or waiting. Weather advances with the mission clock. Waiting spends simulated time, oxygen and rover power. The forecast includes habitat ingress and the 30-minute oxygen reserve. Future gusts and undiscovered obstacles can change the estimate.
+Open **Departure forecast** in the habitat for the current outlook at Delta or Gale, visibility, outdoor work limits and return reserves. **Variable weather** is the default. In the Delta S1 briefing, compare proceeding through the amber dust-front segment, waiting at the habitat, and taking the mapped western detour. Each choice shows predicted oxygen, battery and local return time. After launch, **Weather now** on the rover or full-screen map opens the current readings and the costs of continuing or waiting. Weather advances with the mission clock. Driving or walking into the shortcut dust front reduces visibility even off the planned path. Waiting spends simulated time, oxygen and rover power. The forecast includes habitat ingress and the 30-minute oxygen reserve. Future gusts and undiscovered obstacles can change the estimate.
 
 The wrist and full-screen maps (**M**) show a dashed sight-range ring in dust. The mast camera picks up previously unmapped obstacles closer to the rover in poor visibility and marks each discovery. At a science stop, the station card and wrist map let you choose tasks individually. At **S2**, take the mudstone sample first, wait for clearer imaging, or record a dust-degraded panorama. A cold spell gives the crew a simulated **10-minute outdoor work window**. At **S4**, the five-minute dosimeter reading can fit while the twenty-minute panorama must wait. The debrief records the science actually returned. For a clear-weather training run, select **Rehearsal settings → Nominal conditions** before departure.
 
@@ -46,26 +46,36 @@ Run `npm run api` to plan a route or recalculate the remaining leg after a hazar
 
 ## Controls
 
-| Key | Action |
-| --- | --- |
-| `W` / `↑` (hold) | drive along the survival route |
-| `S` / `↓` / `Space` | brake |
-| `A` `D` / `←` `→` | steer inside the route corridor (±5 m) |
-| `C` | cruise control |
-| `Shift` (hold) | time ×3 · short boost that refills; off on yellow/red stretches |
-| `E` (hold) | run the active science task |
-| `Enter` | acknowledge a hazard briefing / resume traverse |
-| `1`–`4` | data layer: optical · slope · thermal inertia · mineralogy |
-| `M` | full route map + elevation profile |
-| `L` | headlights · `H` hide HUD · `V` recentre view · `N` mute |
-| drag | look around the cabin (double-click to recentre) |
+The planned route is a guide, not a rail: drive and walk anywhere. At a science station, complete the planned instrument observations or get out and collect its assigned finds on foot. Both count toward station progress. Rarer finds hide away from the route. Unsurveyed ground can hide an obstacle that stops the rover until you deal with it (Enter). When a station is done and more lie ahead, pick the next leg on the wrist navigator (`P`). Return to the habitat and press Enter to end the EVA.
 
-Touch devices get on-screen DRIVE / BRAKE / steer / TASK buttons.
+| Key | Driving | On foot |
+| --- | --- | --- |
+| `W` / `↑` | drive | walk forward |
+| `S` / `↓` / `Space` | brake (hold at a standstill to reverse) | walk back (`S` / `↓`) |
+| `A` `D` / `←` `→` | steer | step sideways |
+| `Shift` (hold) | time ×3 · short boost that refills; off on hazard ground and near a station | run |
+| `F` | get out (rover stopped) | board the rover (within 3 m) |
+| `E` (hold) | | collect the find in reach |
+| `T` | view: first person → third person → overhead | same |
+| `I` | artifact collection | same |
+| `C` | cruise control | |
+| `Enter` | deal with an obstacle · end the EVA at the habitat · open the leg check | same |
+| `1`–`4` | data layer: optical · slope · thermal inertia · mineralogy | same |
+| `M` | full route map + elevation profile | same |
+| `L` | headlights · `H` hide HUD · `V` recentre view · `N` mute | same |
+| drag · `Z` `X` · `B` | look around a full 360° · look back | look around; orbit the camera in the outside views |
+| wheel | zoom the third-person and overhead views | same |
+
+Touch devices get on-screen DRIVE / BRAKE / steer / TASK buttons, plus Get out / Board, Hold to collect, View and Collection buttons.
+
+### Artifacts
+
+Each station has three finds tied to its science (for example olivine at the crater floor, mudstone at the delta front, an iron meteorite at the fresh crater). Off-route finds such as a pallasite or opaline silica sit away from the planned route. Light beams in the rarity colour show where they are. Hold `E` next to one to collect it. The collection (`I`, or **Collection** on the habitat console) keeps every find in this browser, with a short description of the real Mars science behind it. Finds are simulated.
 
 ## What the screen shows
 
 - **Cockpit (diegetic):** roll cage, front deck, fenders and wheels with independent suspension,
-  co-pilot astronaut, hand controller that follows your input, and four live displays — heading-up
+  co-pilot astronaut in a procedural Apollo-style EVA suit (your own suited legs below you), hand controller that follows your input, and four live displays — heading-up
   NAV map, TRAVERSE (speed, pitch/roll, look-ahead elevation profile), SCIENCE (value of the active
   layer under the rover + next station objective) and a SUIT tablet.
 - **Helmet HUD:** compass tape with bearings to the next station and the habitat, life-support
@@ -114,6 +124,8 @@ src/
   world/atmosphere.js Mars sky, image-based lighting, dust motes, wheel dust
   rover/rover.js      cockpit model, suspension, animation
   rover/screens.js    in-cabin displays (canvas textures)
+  rover/suitGeometry.js  procedural EVA suit (folds, bent-knee legs, backpack, visor), no three.js
+  rover/astronaut.js  three.js meshes for the suit, seated co-pilot and driver's legs
   data/layers.js      data-layer samplers + legends
   sim/mission.js      traverse state machine + consumables
   sim/input.js        keyboard / mouse-look / touch

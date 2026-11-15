@@ -11,8 +11,9 @@ function atS1() {
   mission.start();
   const station = route.stations[0];
   mission.s = station.s;
-  mission.stopIndex = mission.stops.findIndex(stop => stop.ref === station);
-  mission.state = 'legcheck';
+  Object.assign(mission.rover, route.sample(station.s));
+  mission.pos = route.sample(station.s);
+  mission.legPending = station;
   station.done = true;
   return { mission, route, terrain };
 }
@@ -28,11 +29,17 @@ describe('weather and upstream leg-path integration', () => {
     const preview = buildLoopRoute(terrain, legs);
     const options = legOptions(mission, preview).options;
     const home = options.find(option => option.id === 'home');
-    expect(home.forecast).toEqual(forecastReturn(mission, { route: preview }));
-    expect(home.forecast.driveMinutes).not.toBeCloseTo(legOptions(mission).options.at(-1).forecast.driveMinutes, 3);
+    expect(home.forecast).toEqual(forecastReturn(mission, { route: preview, homeOnly: true }));
+    const onward = options.find(option => option.id === 'continue');
+    expect(onward.forecast.driveMinutes).not.toBeCloseTo(legOptions(mission).options[0].forecast.driveMinutes, 3);
     const clear = new Mission(preview, terrain, {}, { surprises: false });
+    clear.start();
     clear.s = mission.s;
-    expect(home.forecast.driveMinutes).toBeGreaterThan(forecastReturn(clear).driveMinutes);
+    clear.pos = { ...mission.pos };
+    Object.assign(clear.rover, mission.rover);
+    clear.legPending = preview.stations[0];
+    preview.stations[0].done = true;
+    expect(onward.forecast.driveMinutes).toBeGreaterThan(legOptions(clear).options[0].forecast.driveMinutes);
     expect(options.map(option => option.short)).toEqual(['Full stop', 'Quick stop', 'Skip S2', 'Go home']);
   });
 
@@ -41,6 +48,7 @@ describe('weather and upstream leg-path integration', () => {
     Object.assign(route.stations[0].tasks[0], { done: true, quality: 'dust-degraded', result: 'Acquired in dust' });
     Object.assign(route.stations[0].tasks[1], { skipped: true, deferred: true, result: 'Crew deferred panorama' });
     const records = mission.scienceResults;
+    const position = { ...mission.pos };
     const [, , safe] = legVariants(terrain, route.legs, 1);
     const legs = [...route.legs];
     legs[1] = safe.curve;
@@ -50,6 +58,7 @@ describe('weather and upstream leg-path integration', () => {
     expect(next.weatherExposure.from).toBeCloseTo(route.weatherExposure.from, 0);
     expect(next.weatherExposure.to).toBeCloseTo(route.weatherExposure.to, 0);
     expect(mission.weatherAt((next.weatherExposure.from + next.weatherExposure.to) / 2, 0).label).toBe('Dust front over shortcut');
-    expect(mission.s).toBe(route.stations[0].s);
+    expect(mission.pos).toEqual(position);
+    expect(Math.abs(mission.s - route.stations[0].s)).toBeLessThan(next.step);
   });
 });

@@ -7,7 +7,7 @@ import { CLEAR_WEATHER, SHORTCUT_FRONT } from '../sim/weather.js';
 import { ICON } from '../map/icons.ts';
 import { mountHabitatRoom } from './habitatRoom.js';
 import { mountHabitatExterior } from './habitatExterior.js';
-import { mountConsoleMap3D } from './consoleMap3D.js';
+import { mountConsoleMap3D, map3DSupport } from './consoleMap3D.js';
 import { SiteTopologyWidget } from './siteTopology.js';
 import { base, outcrop, gridPosition, imagery, observationSource, terrainSource, siteWidth, terrainSlope, planGaleRoutes } from '../data/galeSite.js';
 import './habitat.css';
@@ -36,6 +36,8 @@ export function mountHabitat(root, launch) {
   let view3d = true;
   let map3d = null;
   let map3dLoading = null;
+  let map3dOff = !map3DSupport().ok; // decided once: no 3D globe → the 2D map, without trying
+  if (map3dOff) view3d = false;
   let habTab = 'briefing';
   root.innerHTML = `
     <div class="hab-stage hab-before-entry" inert>
@@ -52,6 +54,7 @@ export function mountHabitat(root, launch) {
           </nav><span class="hab-eva"><i></i> EVA-01</span><nav class="hab-nav" aria-label="Mission navigation">
             <a href="./map.html">Explore Mars</a>
             <button type="button" id="sourcesBtn">Mission &amp; sources</button>
+            <button type="button" id="collectionBtn">Collection</button>
             <button type="button" data-review-close>← Habitat view</button>
           </nav></header>
           <div class="hab-topology-panel" data-hab-topology hidden></div>
@@ -424,12 +427,29 @@ export function mountHabitat(root, launch) {
 
   // ---------------------------------------------------------------- 3D map
   function ensureMap3D() {
-    if (map3d || map3dLoading || !view3d) return;
+    if (map3d || map3dLoading || !view3d || map3dOff) return;
     // the 2D map stays on screen while the 3D terrain streams in; it fades over once the site has loaded
     query('[data-map3d-status]').hidden = false;
-    map3dLoading = mountConsoleMap3D(query('[data-map3d]'), { onReady: () => { query('[data-map3d-status]').hidden = true; update(); } })
+    map3dLoading = mountConsoleMap3D(query('[data-map3d]'), {
+      onReady: () => { query('[data-map3d-status]').hidden = true; update(); },
+      onError: () => disableMap3D(),
+    })
       .then((m) => { map3d = m; m.setSpeed(zoomed ? 0.35 : 0.12); update(); })
-      .catch((error) => { console.error(error); view3d = false; query('[data-map3d-status]').hidden = true; update(); });
+      .catch((error) => { console.info(`3D Mars map unavailable: ${error.message}`); disableMap3D(); });
+  }
+  // No 3D globe here (one-file build, sandboxed preview, render failure): stay on the 2D map for good.
+  function disableMap3D() {
+    map3dOff = true;
+    view3d = false;
+    try { map3d?.destroy(); } catch { /* already torn down */ }
+    map3d = null;
+    query('[data-map3d]').hidden = true;
+    query('[data-map3d-status]').hidden = true;
+    for (const b of root.querySelectorAll('[data-view3d]')) {
+      b.disabled = true;
+      b.title = '3D Mars is not available in this view';
+    }
+    update();
   }
   function draw3D(delta) {
     const frame = query('.hab-mapframe');
@@ -438,7 +458,11 @@ export function mountHabitat(root, launch) {
     query('[data-map3d]').hidden = !view3d;
     query('[data-map3d]').classList.toggle('is-ready', shown);
     query('[data-map3d-status]').hidden = !view3d || shown;
-    for (const b of root.querySelectorAll('[data-view3d]')) b.setAttribute('aria-pressed', String((b.dataset.view3d === '3d') === view3d));
+    for (const b of root.querySelectorAll('[data-view3d]')) {
+      b.setAttribute('aria-pressed', String((b.dataset.view3d === '3d') === view3d));
+      b.disabled = map3dOff;
+      b.title = map3dOff ? '3D Mars is not available in this view' : '';
+    }
     query('[data-spin]').hidden = !view3d;
     if (!view3d || !map3d) return;
     query('[data-spin]').setAttribute('aria-pressed', String(map3d.spinning));
@@ -589,7 +613,10 @@ export function mountHabitat(root, launch) {
     for (const control of root.querySelectorAll('button, select')) control.disabled = true;
     try {
       await cycle;
-      await launch(planToLaunch, scenarioToLaunch, message => { progress.textContent = message; });
+      const plan = planToLaunch.traverse
+        ? { ...planToLaunch, frontSeconds: scenarioToLaunch === 'variable' ? frontSeconds : 0 }
+        : planToLaunch;
+      await launch(plan, scenarioToLaunch, message => { progress.textContent = message; });
       if (!motionReduced()) document.getElementById('viewport').animate(
         [{ opacity: 0 }, { opacity: 1 }], { duration: 370, easing: 'ease-out' });
       room?.dispose();
@@ -688,7 +715,7 @@ export function mountHabitat(root, launch) {
       if (mode === 'slope') view3d = false; // the slope layer is a 2D map
     }
     if (button.dataset.view3d) {
-      view3d = button.dataset.view3d === '3d';
+      view3d = button.dataset.view3d === '3d' && !map3dOff;
       if (view3d) { mode = 'orbital'; ensureMap3D(); }
     }
     if (button.hasAttribute('data-spin') && map3d) map3d.setSpin(!map3d.spinning);
@@ -698,7 +725,6 @@ export function mountHabitat(root, launch) {
     if (button.hasAttribute('data-launch') && selected && !button.disabled) {
       await runLaunchSequence(
         selected === original ? { ...approachChoice,
-          frontSeconds: query('[data-scenario]').value === 'variable' ? frontSeconds : 0,
           departureWaitSeconds: query('[data-scenario]').value === 'variable' ? departureWaitSeconds : 0,
         } : selected,
         query('[data-scenario]').value

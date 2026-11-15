@@ -97,6 +97,7 @@ export class Route {
 
     this._analyse();
     this._placeStations(stations);
+    this.areaHazards = areaHazards; // mapped hazards apply wherever the crew drives, on or off the route
     this._buildZones(areaHazards);
     this._buildStops();
   }

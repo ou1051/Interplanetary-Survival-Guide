@@ -8,18 +8,21 @@ export function driveMinutes(route, fromS, toS) {
     { fromS, toS, includeIngress: false }).driveMinutes;
 }
 
-const pendingTasks = (station) => station?.tasks.filter(task => !task.done && !task.skipped) ?? [];
+const pendingTasks = station => {
+  const tasks = station?.tasks ?? [];
+  return tasks.filter(task => !task.done && !task.skipped && (!tasks.some(item => item.artifact) || task.artifact));
+};
 
 // What each option would cost, given where the crew stands now.
 function plan(mission, { target, work, label, short, id, detail, route }) {
   const tasks = work;
   work = tasks.reduce((sum, task) => sum + task.minutes, 0);
   const targetS = target ? route.stations.find(station => station.id === target.id).s : mission.s;
-  const forecast = forecastReturn(mission, { workMinutes: work, workAtS: targetS, route });
+  const forecast = forecastReturn(mission, { workMinutes: work, workAtS: targetS, route, homeOnly: id === 'home' });
   const arrival = forecast.workStartMinutes;
   const legDrive = arrival;
   let taskElapsed = arrival * 60;
-  let outsideMinutes = mission.outsideMinutes ?? 0;
+  let outsideMinutes = (mission.outsideMinutes ?? 0) + forecast.walkingMinutes;
   let coldest = null;
   let coldOK = true;
   for (const task of tasks) {
@@ -79,7 +82,7 @@ function plan(mission, { target, work, label, short, id, detail, route }) {
 
 export function legOptions(mission, route = mission.route) {
   const remaining = mission.route.stations.filter((station) => !station.final && !station.done && !station.skipped
-    && station !== mission.currentStation);
+    && station !== (mission.legPending ?? mission.currentStation));
   const [next, after] = remaining;
   const options = [];
   if (next) {

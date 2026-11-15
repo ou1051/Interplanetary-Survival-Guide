@@ -112,6 +112,40 @@ kbd {
   color: var(--hud);
 }
 .layer-chip em { font-style: normal; color: var(--warn); }
+.look-chip {
+  position: absolute;
+  top: 118px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 4px 12px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hud-strong);
+  background: rgba(4, 10, 12, 0.55);
+  border: 1px solid var(--hud-faint);
+}
+
+/* crew actions: get out / board, view, collect, end EVA */
+.eva-actions {
+  position: absolute;
+  right: 18px;
+  bottom: 62px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  pointer-events: auto;
+  z-index: 15;
+}
+.eva-actions button { font-family: var(--mono); letter-spacing: 0.1em; cursor: pointer; }
+.eva-actions [hidden] { display: none; }
+.eva-crew, .eva-collect, .eva-end { font-size: 13px; padding: 10px 16px; border: 1px solid var(--hud); color: var(--ink); background: var(--hud); box-shadow: 0 0 18px rgba(154, 244, 255, 0.3); }
+.eva-crew:disabled { background: rgba(4, 10, 12, 0.55); color: var(--hud-dim); border-color: var(--hud-faint); box-shadow: none; cursor: default; }
+.eva-collect { background: var(--ok); border-color: var(--ok); touch-action: none; }
+.eva-end { background: #ffd76a; border-color: #ffd76a; }
+.eva-view { font-size: 11px; padding: 6px 12px; }
 
 .hud-left, .hud-right {
   position: absolute;
@@ -225,6 +259,9 @@ kbd {
 .marker.other { color: rgba(214, 251, 255, 0.75); opacity: 0.75; }
 .marker.gate { color: var(--danger); }
 .marker.gate.ack { color: var(--warn); }
+.marker.artifact { color: var(--rarity); font-size: 10px; }
+.marker.artifact .icon { width: 9px; height: 9px; }
+.marker.artifact.next .label { color: #fff; }
 .marker.edge .label, .marker.edge .dist { display: none; }
 .marker.edge .icon { animation: pulse 1.2s infinite; }
 
@@ -442,6 +479,9 @@ kbd {
 }
 .card.gate .cta { background: var(--danger); border-color: var(--danger); color: #fff; }
 .card .cta:disabled { background: transparent; color: var(--hud-dim); border-color: var(--hud-faint); cursor: default; }
+.card.compact { width: 330px; padding: 14px 16px; }
+#card { max-height: calc(100vh - 330px); }
+.card .hint { margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: var(--warn); }
 .card .basis { font-family: var(--mono); font-size: 10.5px; color: var(--warn); margin-top: 10px; line-height: 1.5; }
 
 /* ---------------- map overlay ---------------- */
@@ -522,6 +562,9 @@ button.ghost {
 .brief-grid div { border: 1px solid var(--hud-faint); padding: 10px 12px; background: rgba(4, 10, 12, 0.4); }
 .brief-grid span { display: block; font-size: 9px; letter-spacing: 0.18em; color: var(--hud-dim); }
 .brief-grid b { display: block; margin-top: 4px; font-size: 18px; color: #fff2e6; }
+.debrief-note { font-family: var(--sans); font-size: 15px; line-height: 1.6; color: rgba(255, 242, 230, 0.88); margin: 0 0 18px; max-width: 600px; }
+.debrief-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.debrief-actions [hidden] { display: none; }
 .brief-controls { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 11px; color: var(--hud-dim); margin-bottom: 26px; }
 button.primary {
   font-family: var(--mono);
@@ -554,6 +597,10 @@ button.primary:disabled { opacity: 0.5; cursor: progress; box-shadow: none; }
   .layers .panel-title, .legend { display: none; }
   .alert { top: 136px; font-size: 10px; }
   .touch { right: 10px; bottom: 96px; }
+  .eva-actions { flex-direction: row; flex-wrap: wrap; }
+  .eva-crew, .eva-collect, .eva-end { font-size: 12px; padding: 9px 12px; }
+  .card.compact { width: auto; }
+  #card { bottom: 214px; max-height: 38vh; }
   .hud-bottom .prompt { font-size: 11px; }
   .brief-grid { grid-template-columns: repeat(2, 1fr); }
   .overlay-body { grid-template-columns: 1fr; }

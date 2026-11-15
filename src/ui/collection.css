@@ -1,0 +1,80 @@
+/* Artifact collection and the find toast. */
+.collection {
+  width: min(1040px, 94vw);
+  max-height: 88vh;
+  padding: 18px 20px 14px;
+  overflow: auto;
+  color: var(--ops-text);
+  font-family: var(--ops-font);
+  background: var(--ops-bg);
+  border: 1px solid var(--ops-line);
+  border-radius: 3px;
+  box-shadow: 0 30px 80px #000c;
+}
+.collection::backdrop { background: #02070acc; backdrop-filter: blur(3px); }
+.collection header { flex-wrap: wrap; margin: -18px -20px 0; gap: 8px 12px; }
+.collection h2 { margin: 0; font-size: clamp(20px, 3vw, 26px); }
+.col-count { margin: 0 auto 0 0; font: 13px var(--ops-font); }
+.col-count b { font-size: 20px; color: #fff; }
+.col-count em { font-style: normal; color: #7dffb0; }
+.col-close, .col-filter button {
+  font: 600 11px var(--ops-font);
+  letter-spacing: 0.08em;
+  color: var(--ops-text);
+  background: var(--ops-panel);
+  border: 1px solid var(--ops-line);
+  border-radius: 3px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.col-close { margin-left: auto; width: 44px; height: 44px; padding: 0; font-size: 26px; background: transparent; border-color: #7fa2e0; }
+.col-filter { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0 10px; }
+.col-filter button[aria-pressed='true'] { background: var(--nasa-blue); border-color: var(--nasa-blue-hi); color: #fff; }
+.col-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+.col-card {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--ops-line);
+  border-left: 3px solid var(--rarity, var(--ops-line));
+  background: var(--ops-panel);
+}
+.col-card img { width: 72px; height: 72px; }
+.col-card b { display: block; font-size: 15px; }
+.col-card span { display: block; font: 600 10px/1.6 var(--mono, monospace); letter-spacing: 0.12em; text-transform: uppercase; }
+.col-card p { margin: 4px 0; font-size: 12.5px; line-height: 1.45; color: #b9d2d6; }
+.col-card small { font: 10.5px var(--mono, monospace); color: #7fa2a8; }
+.col-card.locked { opacity: 0.72; border-left-color: var(--ops-line); }
+.col-card.fresh { box-shadow: 0 0 0 1px var(--rarity) inset, 0 0 18px color-mix(in srgb, var(--rarity) 35%, transparent); }
+.col-note { margin: 10px 0 0; font-size: 11px; color: #7fa2a8; }
+
+.find-toast {
+  position: absolute;
+  left: 50%;
+  top: 140px;
+  transform: translateX(-50%);
+  z-index: 8;
+  display: grid;
+  grid-template-columns: 64px auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 16px 8px 8px;
+  background: linear-gradient(160deg, #0c1a20f0, #060d11f0);
+  border: 1px solid var(--rarity);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--rarity) 40%, transparent);
+  color: #f1fbfc;
+  font-family: var(--sans, system-ui, sans-serif);
+  pointer-events: none;
+}
+.find-toast[hidden] { display: none; }
+.find-toast.pop { animation: findPop 0.45s ease-out; }
+.find-toast span { display: block; font: 600 10px var(--mono, monospace); letter-spacing: 0.14em; text-transform: uppercase; }
+.find-toast b { display: block; font-size: 18px; margin: 2px 0; }
+.find-toast small { font: 10px var(--mono, monospace); color: #8fb3b9; }
+@keyframes findPop { from { opacity: 0; transform: translateX(-50%) scale(1.15); } }
+@media (max-width: 760px) {
+  .col-grid { grid-template-columns: 1fr; }
+  .find-toast { top: 96px; }
+}
