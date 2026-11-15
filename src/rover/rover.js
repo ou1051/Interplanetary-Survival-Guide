@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ROVER } from '../config/mission.js';
 import { damp, clamp } from '../core/math.js';
 import { createSuitMaterials, createSeatedAstronaut } from './astronaut.js';
+import { buildRoverV2 } from './roverModelV2.js';
 
 // ---------------------------------------------------------------------------
 // Pressurised-suit, open-frame rover seen from the driver's seat (left side).
@@ -48,34 +48,6 @@ function panelTexture(base = '#3a3e45', lines = '#24272c', stripe = true) {
   return t;
 }
 
-function meshTexture() {
-  const c = document.createElement('canvas');
-  c.width = 256;
-  c.height = 64;
-  const g = c.getContext('2d');
-  g.fillStyle = '#26282b';
-  g.fillRect(0, 0, 256, 64);
-  g.strokeStyle = '#b9bcc0';
-  g.lineWidth = 2;
-  for (let x = -64; x < 320; x += 12) {
-    g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 64, 64); g.stroke();
-    g.beginPath(); g.moveTo(x + 64, 0); g.lineTo(x, 64); g.stroke();
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.wrapS = THREE.RepeatWrapping;
-  t.repeat.set(5, 1);
-  return t;
-}
-
-function tube(points, radius, mat, closed = false) {
-  const curve = new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(...p)), closed, 'catmullrom', 0.2);
-  const geo = new THREE.TubeGeometry(curve, Math.max(24, points.length * 16), radius, 10, closed);
-  const m = new THREE.Mesh(geo, mat);
-  m.castShadow = true;
-  return m;
-}
-
 function screenCanvas(w, h) {
   const canvas = document.createElement('canvas');
   canvas.width = w;
@@ -96,29 +68,27 @@ export class Rover {
     const M = {
       frame: new THREE.MeshStandardMaterial({ color: 0xb7bcc4, metalness: 0.85, roughness: 0.3, envMap, envMapIntensity: 1.0 }),
       frameDark: new THREE.MeshStandardMaterial({ color: 0x5c6168, metalness: 0.7, roughness: 0.45, envMap }),
-      deck: new THREE.MeshStandardMaterial({ map: panelTexture(), metalness: 0.35, roughness: 0.62, envMap, envMapIntensity: 0.6 }),
       console: new THREE.MeshStandardMaterial({ map: panelTexture('#2b2f36', '#1b1d21', false), metalness: 0.3, roughness: 0.55, envMap, envMapIntensity: 0.5 }),
-      gold: new THREE.MeshStandardMaterial({ color: 0xd6a648, metalness: 1.0, roughness: 0.26, envMap, envMapIntensity: 1.2 }),
-      suit: new THREE.MeshStandardMaterial({ color: 0xece9e2, roughness: 0.82, metalness: 0.0, envMap, envMapIntensity: 0.35 }),
       seat: new THREE.MeshStandardMaterial({ color: 0x40444b, roughness: 0.9, metalness: 0.1 }),
-      wheel: new THREE.MeshStandardMaterial({ map: meshTexture(), metalness: 0.75, roughness: 0.45, envMap }),
-      tread: new THREE.MeshStandardMaterial({ color: 0x8d9197, metalness: 0.9, roughness: 0.35, envMap }),
-      glass: new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.05, transmission: 0, transparent: true, opacity: 0.07, envMap, envMapIntensity: 1.5, depthWrite: false }),
-      lamp: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff2d0, emissiveIntensity: 0.4 }),
       ledGreen: new THREE.MeshBasicMaterial({ color: 0x3dff8b, toneMapped: false }),
       ledAmber: new THREE.MeshBasicMaterial({ color: 0xffb02e, toneMapped: false }),
       ledRed: new THREE.MeshBasicMaterial({ color: 0xff4436, toneMapped: false }),
       ledBlue: new THREE.MeshBasicMaterial({ color: 0x55dfff, toneMapped: false }),
     };
+    // always-on light source for the post-processing bloom (the v2 headlight lenses qualify by emissive when on)
+    M.ledRed.userData.bloom = true;
     this.M = M;
     this.suitM = createSuitMaterials(envMap);
 
-    this._buildChassis();
-    this._buildWheels();
-    this._buildCage();
+    // v2 body (chassis, wheels, cage, roof gear, seats, cargo); the live screen
+    // console and the seated crew are still built here.
+    const v2 = buildRoverV2(envMap, { console: false, seat: { x: 0.42, y: 0.78, z: 0.28 } });
+    this.body.add(v2.group);
+    this.wheels = v2.wheels;
+    this.lampLenses = v2.lenses;
+    this.antennaTip = v2.antennaTip;
     this._buildConsole();
-    this._buildSeatsAndCrew();
-    this._buildEquipment();
+    this._buildCrew();
 
     this.body.traverse((o) => {
       if (o.isMesh) {
@@ -137,9 +107,9 @@ export class Rover {
 
     // Headlights.
     this.headlights = [];
-    for (const x of [-0.55, 0.55]) {
+    for (const x of [-0.42, 0.42]) {
       const l = new THREE.SpotLight(0xfff0d8, 0, 60, 0.42, 0.55, 1.4);
-      l.position.set(x, 0.92, -1.62);
+      l.position.set(x, 0.8, -1.72);
       l.target.position.set(x * 1.6, 0.0, -14);
       this.body.add(l, l.target);
       this.headlights.push(l);
@@ -148,152 +118,6 @@ export class Rover {
     this.pose = { y: 0, pitch: 0, roll: 0, yaw: 0, init: false };
     this.wheelSpin = 0;
     this.time = 0;
-  }
-
-  _buildChassis() {
-    const { body, M } = this;
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.08, 3.1), M.frameDark);
-    floor.position.set(0, 0.62, 0);
-    body.add(floor);
-    // front deck (visible over the console) with hazard stripe at the nose
-    const deck = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.1, 0.95), M.deck);
-    deck.position.set(0, 0.74, -1.18);
-    body.add(deck);
-    const nose = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.22, 0.08), M.frameDark);
-    nose.position.set(0, 0.68, -1.68);
-    body.add(nose);
-    // side rails
-    for (const sx of [-1, 1]) {
-      body.add(tube([[sx * 0.84, 0.66, -1.66], [sx * 0.86, 0.68, 0], [sx * 0.84, 0.66, 1.55]], 0.035, M.frame));
-    }
-    // rear deck with gold-foil battery / thermal boxes
-    const rear = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.1, 0.7), M.deck);
-    rear.position.set(0, 0.74, 1.25);
-    body.add(rear);
-    const batt = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.32, 0.5), M.gold);
-    batt.position.set(-0.4, 0.95, 1.28);
-    const batt2 = batt.clone();
-    batt2.position.x = 0.4;
-    body.add(batt, batt2);
-    // fenders over all four wheels (front ones frame the view)
-    const fenderGeo = new THREE.CylinderGeometry(WHEEL_R + 0.1, WHEEL_R + 0.1, 0.34, 28, 1, true, 0, Math.PI);
-    const fenderMat = M.frame.clone();
-    fenderMat.side = THREE.DoubleSide;
-    fenderGeo.rotateZ(Math.PI / 2);
-    for (const sx of [-1, 1]) {
-      for (const sz of [-1, 1]) {
-        const f = new THREE.Mesh(fenderGeo, fenderMat);
-        f.position.set(sx * WHEEL_X, WHEEL_R + 0.02, sz * WHEEL_Z);
-        body.add(f);
-      }
-    }
-    // headlamp housings on the nose
-    for (const x of [-0.55, 0.55]) {
-      const housing = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.1, 0.12, 20), M.frameDark);
-      housing.rotation.x = Math.PI / 2;
-      housing.position.set(x, 0.88, -1.6);
-      const lens = new THREE.Mesh(new THREE.CircleGeometry(0.075, 20), M.lamp);
-      lens.position.set(x, 0.88, -1.665);
-      lens.rotation.y = Math.PI;
-      body.add(housing, lens);
-      this.lampLenses = (this.lampLenses || []).concat(lens);
-    }
-  }
-
-  _buildWheels() {
-    const { body, M } = this;
-    this.wheels = [];
-    const tireGeo = new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, 0.24, 36, 1, true);
-    tireGeo.rotateZ(Math.PI / 2);
-    const chevrons = [];
-    for (let i = 0; i < 18; i++) {
-      const a = (i / 18) * Math.PI * 2;
-      for (const side of [-1, 1]) {
-        const g = new THREE.BoxGeometry(0.11, 0.025, 0.05);
-        g.rotateY(side * 0.5);
-        g.translate(side * 0.055, WHEEL_R + 0.01, 0);
-        g.rotateX(a);
-        chevrons.push(g);
-      }
-    }
-    const treadGeo = mergeGeometries(chevrons);
-    const hubGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.26, 20);
-    hubGeo.rotateZ(Math.PI / 2);
-    const rimGeo = new THREE.TorusGeometry(WHEEL_R - 0.01, 0.018, 8, 40);
-    rimGeo.rotateY(Math.PI / 2);
-    for (const sx of [-1, 1]) {
-      for (const sz of [-1, 1]) {
-        const pivot = new THREE.Group(); // steering + suspension
-        pivot.position.set(sx * WHEEL_X, WHEEL_R, sz * WHEEL_Z);
-        const spin = new THREE.Group();
-        spin.add(new THREE.Mesh(tireGeo, M.wheel));
-        spin.add(new THREE.Mesh(treadGeo, M.tread));
-        spin.add(new THREE.Mesh(hubGeo, M.frameDark));
-        for (const off of [-0.12, 0.12]) {
-          const rim = new THREE.Mesh(rimGeo, M.frame);
-          rim.position.x = off;
-          spin.add(rim);
-        }
-        pivot.add(spin);
-        // suspension arms back to the chassis
-        const arm = tube([[0, 0, 0], [-sx * 0.2, 0.12, -sz * 0.05], [-sx * 0.38, 0.24, -sz * 0.18]], 0.025, M.frame);
-        pivot.add(arm);
-        body.add(pivot);
-        this.wheels.push({ pivot, spin, sx, sz, offset: 0 });
-      }
-    }
-  }
-
-  _buildCage() {
-    const { body, M } = this;
-    const r = 0.028;
-    // front hoop (frames the windscreen view) and rear hoop
-    body.add(tube([[-0.82, 0.68, -0.6], [-0.83, 1.55, -0.52], [-0.72, 1.94, -0.44], [0, 1.99, -0.43], [0.72, 1.94, -0.44], [0.83, 1.55, -0.52], [0.82, 0.68, -0.6]], r, M.frame));
-    body.add(tube([[-0.82, 0.68, 0.98], [-0.83, 1.55, 0.95], [-0.72, 1.94, 0.93], [0, 1.99, 0.93], [0.72, 1.94, 0.93], [0.83, 1.55, 0.95], [0.82, 0.68, 0.98]], r, M.frame));
-    // longitudinal top rails + diagonal braces
-    for (const sx of [-1, 1]) {
-      body.add(tube([[sx * 0.72, 1.94, -0.44], [sx * 0.72, 1.96, 0.25], [sx * 0.72, 1.94, 0.93]], r * 0.9, M.frame));
-      // low side rail (arm rest height) between the hoops
-      body.add(tube([[sx * 0.83, 1.05, -0.56], [sx * 0.84, 1.08, 0.2], [sx * 0.83, 1.05, 0.96]], r * 0.7, M.frame));
-    }
-    // top equipment rack over the rear half
-    const rack = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.03, 0.75), M.frameDark);
-    rack.position.set(0, 2.0, 0.56);
-    body.add(rack);
-    for (let i = -3; i <= 3; i++) {
-      const slat = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.04, 0.75), M.frame);
-      slat.position.set(i * 0.2, 2.03, 0.56);
-      body.add(slat);
-    }
-    // antennas & instruments on the rack (silhouettes visible when looking up)
-    const ant = (x, z, h, rad = 0.008) => {
-      const a = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, h, 6), M.frame);
-      a.position.set(x, 2.03 + h / 2, z);
-      body.add(a);
-      const tip = new THREE.Mesh(new THREE.SphereGeometry(rad * 2.2, 8, 6), M.ledRed);
-      tip.position.set(x, 2.03 + h, z);
-      body.add(tip);
-      return tip;
-    };
-    this.antennaTip = ant(-0.6, 0.3, 0.95);
-    ant(-0.45, 0.32, 0.7);
-    ant(0.62, 0.3, 0.82);
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.11, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), M.suit);
-    dome.position.set(0.2, 2.03, 0.55);
-    body.add(dome);
-    const box = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.16, 0.22), M.gold);
-    box.position.set(-0.15, 2.11, 0.62);
-    body.add(box);
-    // high-gain antenna (umbrella dish) on a mast behind the crew
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, 1.0, 8), M.frame);
-    mast.position.set(0.55, 2.5, 1.12);
-    body.add(mast);
-    const dish = new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.16, 24, 1, true), M.suit);
-    dish.material = M.suit.clone();
-    dish.material.side = THREE.DoubleSide;
-    dish.position.set(0.55, 3.02, 1.12);
-    dish.rotation.x = -0.6;
-    body.add(dish);
   }
 
   _buildConsole() {
@@ -383,24 +207,8 @@ export class Rover {
     body.add(tab2);
   }
 
-  _buildSeatsAndCrew() {
-    const { body, M } = this;
-    for (const sx of [-1, 1]) {
-      const seat = new THREE.Group();
-      seat.position.set(sx * 0.42, 0.84, 0.28);
-      const pan = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.06, 0.52), M.seat);
-      const backrest = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.66, 0.06), M.seat);
-      backrest.position.set(0, 0.34, 0.28);
-      backrest.rotation.x = 0.16;
-      const frame = tube([[-0.27, 0, -0.26], [-0.27, 0, 0.27], [-0.27, 0.66, 0.38], [0.27, 0.66, 0.38], [0.27, 0, 0.27], [0.27, 0, -0.26]], 0.015, M.frame);
-      seat.add(pan, backrest, frame);
-      body.add(seat);
-      // footrest
-      const foot = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.03, 0.28), M.frameDark);
-      foot.position.set(sx * 0.42, 0.7, -0.55);
-      body.add(foot);
-    }
-
+  _buildCrew() {
+    const { body } = this;
     // Driver's own suited legs (seen when looking down). Hidden when the driver is
     // out of the rover or drawn whole for the outside views.
     this.driverLegs = createSeatedAstronaut(this.suitM, { seatX: -0.42, upperBody: false }).group;
@@ -415,29 +223,6 @@ export class Rover {
     const copilot = createSeatedAstronaut(this.suitM, { seatX: 0.42 });
     this.copilotHead = copilot.head;
     body.add(copilot.group);
-  }
-
-  _buildEquipment() {
-    const { body, M } = this;
-    // front-mounted survey camera on a short mast (centre of the deck)
-    const cam = new THREE.Group();
-    cam.position.set(0.12, 0.79, -1.42);
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, 0.1, 8), M.frame);
-    post.position.y = 0.05;
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.15), M.suit);
-    head.position.y = 0.13;
-    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.034, 0.06, 16), M.frameDark);
-    lens.rotation.x = Math.PI / 2;
-    lens.position.set(0, 0.13, -0.1);
-    cam.add(post, head, lens);
-    body.add(cam);
-    // tool carrier & sample bags on the deck sides
-    const toolbox = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.16, 0.42), M.gold);
-    toolbox.position.set(0.52, 0.87, -1.15);
-    body.add(toolbox);
-    const bag = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.2, 12), M.suit);
-    bag.position.set(-0.6, 0.89, -1.3);
-    body.add(bag);
   }
 
   // Place the rover on the terrain. (x, z) is the chassis centre, yaw heading.

@@ -48,6 +48,7 @@ export default defineConfig(({ mode }) => ({
             input: {
               main: resolve(import.meta.dirname, 'index.html'),
               map: resolve(import.meta.dirname, 'map.html'), // mission map + 3D Mars globe (src/map)
+              modelPreview: resolve(import.meta.dirname, 'model-preview.html'), // v2 rover + marker post review
             },
           },
   },

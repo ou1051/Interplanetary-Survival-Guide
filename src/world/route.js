@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createMarkerPost } from './markerPost.js';
 import { createStationPost } from './stationPost.js';
 import { ROUTE_POINTS, STATIONS, AREA_HAZARDS, HAB, ROVER, SLOPE_CLASSES } from '../config/mission.js';
 import { clamp, DEG } from '../core/math.js';
@@ -591,31 +592,23 @@ export class RouteVisuals {
 
   _buildGates() {
     this.gates = [];
-    const postGeo = new THREE.CylinderGeometry(0.06, 0.07, 1.8, 8);
-    postGeo.translate(0, 0.9, 0);
-    const postMat = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.5, metalness: 0.4 });
-    const stripeMat = new THREE.MeshStandardMaterial({ color: 0xffb020, emissive: 0xff8a00, emissiveIntensity: 0.35 });
     const p = {};
     for (const z of this.route.zones) {
       if (z.severity !== 'danger') continue;
       this.route.sample(z.s0, p);
       const g = new THREE.Group();
       const lights = [];
+      // reflectors face the approaching rover (local -Z → against the route tangent)
+      const yaw = Math.atan2(p.tx, p.tz);
+      // one reflector material per gate so each blinks / dims with its own acknowledgement
+      const reflector = createMarkerPost().materials.reflector.clone();
       for (const side of [-1, 1]) {
         const x = p.x + p.rx * side * 3.2;
         const zz = p.z + p.rz * side * 3.2;
-        const post = new THREE.Mesh(postGeo, postMat);
+        const { group: post, reflector: light } = createMarkerPost();
         post.position.set(x, this.terrain.heightAt(x, zz) - 0.05, zz);
-        post.castShadow = true;
-        const stripe = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.35, 8), stripeMat);
-        stripe.position.y = 1.2;
-        post.add(stripe);
-        const light = new THREE.Mesh(
-          new THREE.SphereGeometry(0.11, 12, 10),
-          new THREE.MeshStandardMaterial({ color: 0xff5040, emissive: 0xff3020, emissiveIntensity: 3 }),
-        );
-        light.position.y = 1.85;
-        post.add(light);
+        post.rotation.y = yaw;
+        light.material = reflector;
         lights.push(light);
         g.add(post);
       }

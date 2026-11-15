@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Model Preview</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #1a120e; color: #f3e6da; font: 13px/1.4 ui-monospace, Menlo, monospace; overflow: hidden; }
+    #ui { position: fixed; left: 16px; top: 16px; display: flex; gap: 6px; flex-wrap: wrap; z-index: 2; }
+    button { background: #2b1d16; color: inherit; border: 1px solid #6b4a36; padding: 6px 10px; cursor: pointer; font: inherit; }
+    button[aria-pressed="true"] { background: #b6f0f2; color: #111; border-color: #b6f0f2; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <button data-view="hero" aria-pressed="true">Hero</button>
+    <button data-view="front">Front</button>
+    <button data-view="side">Side</button>
+    <button data-view="top">Top</button>
+    <button data-view="post">Marker post</button>
+    <button data-view="compare">Old vs new</button>
+  </div>
+  <script type="module" src="/src/preview/modelPreview.js"></script>
+</body>
+</html>

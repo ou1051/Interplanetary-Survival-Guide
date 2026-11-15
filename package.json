@@ -26,6 +26,8 @@
   "dependencies": {
     "cesium": "^1.147.0",
     "lerc": "^3.0.0",
+    "n8ao": "^2.0.2",
+    "postprocessing": "^6.39.6",
     "three": "^0.187.0"
   },
   "devDependencies": {
@@ -39,4 +41,3 @@
   "type": "module",
   "private": true
 }
-

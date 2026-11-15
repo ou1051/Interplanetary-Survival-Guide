@@ -26,7 +26,7 @@ export const STEEP_BLOCK = 32; // degrees: above the steepest ground any planned
 export const STATION_RADIUS = 30; // m: entering this ring "arrives" at a station
 export const HOME_RADIUS = 30; // m: End EVA is offered inside this ring around the habitat
 export const HAB_RADIUS = 10; // m: habitat footprint (collision)
-export const WALK = { speed: 1.3, run: 2.4, reach: 2.4, board: 3.4, maxSlope: 32, hardSlope: 18 };
+export const WALK = { speed: 2.0, run: 3.6, reach: 2.4, board: 3.4, maxSlope: 32, hardSlope: 18 };
 const ROVER_RADIUS = 1.9;
 const REVERSE_SPEED = 1.2;
 const BOOST_STOP_NEAR = 25; // m: Shift does nothing this close to the next station
@@ -458,7 +458,7 @@ export class Mission {
     let top = run ? WALK.run : WALK.speed;
     if (ground.tilt > WALK.hardSlope) top *= 0.55;
     // Accelerate toward the wanted velocity (suits are heavy, footing loose).
-    const k = Math.min(1, dt * 5);
+    const k = Math.min(1, dt * 8);
     w.vx += (mx * top - w.vx) * k;
     w.vz += (mz * top - w.vz) * k;
     if (len) {

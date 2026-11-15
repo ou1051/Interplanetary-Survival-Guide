@@ -15,8 +15,44 @@ export const EYE_HEIGHT = 1.68;
 
 const SCALE = 0.95;
 const LEG_LENGTH = 0.86; // hip joint to sole, suit units
-const KNEE = 0.14; // the walking legs keep a slight bend (baked into the fabric mesh)
-const LEGS = { 1: { a: 0, B: KNEE }, '-1': { a: 0, B: KNEE } };
+const KNEE = 0.14; // resting knee bend while standing
+const KNEE_SWING = 0.95; // extra knee flex while the leg swings through
+// The legs are built straight; the knee bend is applied in the vertex shader (see bendableLeg)
+// so it can change every frame.
+const LEGS = { 1: { a: 0, B: 0 }, '-1': { a: 0, B: 0 } };
+const KNEE_Y = -0.36; // knee pivot in leg-mesh space (= -THIGH in suitGeometry.js)
+
+// Same smooth-blended knee rotation suitGeometry.legMesh() bakes in, done on the GPU with a uniform.
+function bendableLeg(mesh) {
+  const uniform = { value: KNEE };
+  const material = mesh.material.clone();
+  const prev = material.onBeforeCompile;
+  material.onBeforeCompile = (shader, renderer) => {
+    prev?.call(material, shader, renderer);
+    shader.uniforms.uKnee = uniform;
+    const bend = `
+      float kt = clamp((position.y - (-0.31)) / (-0.41 - (-0.31)), 0.0, 1.0);
+      float ka = uKnee * kt * kt * (3.0 - 2.0 * kt);
+      float kc = cos(ka), ks = sin(ka);`;
+    shader.vertexShader = shader.vertexShader
+      .replace('void main() {', 'uniform float uKnee;\nvoid main() {')
+      .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
+      ${bend}
+      objectNormal = vec3(objectNormal.x, objectNormal.y * kc - objectNormal.z * ks, objectNormal.y * ks + objectNormal.z * kc);`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+      {
+        ${bend}
+        float dy = transformed.y - (${KNEE_Y.toFixed(3)});
+        float dz = transformed.z;
+        transformed.y = ${KNEE_Y.toFixed(3)} + dy * kc - dz * ks;
+        transformed.z = dy * ks + dz * kc;
+      }`);
+  };
+  const key = material.customProgramCacheKey?.bind(material);
+  material.customProgramCacheKey = () => `${key ? key() : ''}|kneeBend`;
+  mesh.material = material;
+  return uniform;
+}
 const ARMS = { 1: { x: -0.08, y: 0, z: 0.2, e: -0.42, ez: 0 }, '-1': { x: -0.08, y: 0, z: 0.2, e: -0.42, ez: 0 } };
 
 export class Astronaut {
@@ -46,7 +82,12 @@ export class Astronaut {
     const rest = (n) => n.object.rotation.clone();
     this.legs = [1, -1].map((side) => {
       const hip = graph.hips.find((h) => Math.sign(h.p[0]) === side);
-      return { side, hip: hip.object, boot: P.boots[side].object, hip0: rest(hip), boot0: rest(P.boots[side]) };
+      // the fabric leg is the largest mesh hanging directly off the hip
+      const legMesh = hip.object.children.filter((c) => c.isMesh).sort((a, b) => b.geometry.attributes.position.count - a.geometry.attributes.position.count)[0];
+      return {
+        side, hip: hip.object, knee: P.knees[side].object, boot: P.boots[side].object,
+        hip0: rest(hip), boot0: rest(P.boots[side]), bend: bendableLeg(legMesh),
+      };
     });
     this.arms = [1, -1].map((side) => ({
       side,
@@ -55,6 +96,7 @@ export class Astronaut {
     }));
     this.upper = P.upper.object;
     this.upper0 = this.upper.rotation.x;
+    this.upper0y = this.upper.rotation.y;
     this.phase = 0;
     this.reach = 0;
     this._swing = 0;
@@ -62,28 +104,41 @@ export class Astronaut {
 
   // Walking speed in m/s drives the gait; standing still settles the pose.
   setWalk(speed, dt) {
-    const amount = Math.min(1, speed / 1.4);
-    this.phase += dt * (2.2 + speed * 2.4);
-    const k = Math.min(1, dt * 10);
-    this._swing += (Math.sin(this.phase) * amount - this._swing) * k;
-    const s = this._swing;
+    const amount = Math.min(1, speed / 1.8);
+    // cadence rises with speed; a loping, low-gravity stride rather than a march
+    this.phase += dt * (2.6 + speed * 2.2);
+    // the swing follows the phase directly; only the stride size is smoothed
+    this._amount = (this._amount ?? 0) + (amount - (this._amount ?? 0)) * Math.min(1, dt * 6);
+    const a = this._amount;
+    const s = Math.sin(this.phase) * a;
+    this._swing = s;
     for (const leg of this.legs) {
       // Suit faces +Z inside the figure: a negative hip pitch swings the leg forward.
-      const pitch = leg.hip0.x - s * leg.side * 0.42;
+      const pitch = leg.hip0.x - s * leg.side * 0.55;
       leg.hip.rotation.x = pitch;
+      // the knee folds while the leg swings forward (cos > 0 for this side) and straightens to plant
+      const swing = Math.max(0, Math.cos(this.phase) * leg.side);
+      const B = KNEE + KNEE_SWING * swing * swing * a + this.reach * 0.6;
+      leg.knee.rotation.x = B;
+      leg.bend.value = B;
       // keep the sole level with the ground through the swing
-      leg.boot.rotation.x = leg.boot0.x - (pitch - leg.hip0.x);
+      leg.boot.rotation.x = leg.boot0.x - (pitch - leg.hip0.x) - B;
     }
     for (const arm of this.arms) {
       const reach = this.reach;
-      arm.shoulder.rotation.x = arm.shoulder0.x + s * arm.side * 0.32 - reach * 0.95;
-      arm.elbow.rotation.x = arm.elbow0.x - 0.18 * amount - reach * 0.2;
+      // arms counter-swing with a slight lag, elbows flex more at speed
+      const lag = Math.sin(this.phase - 0.35) * a;
+      arm.shoulder.rotation.x = arm.shoulder0.x + lag * arm.side * 0.45 - reach * 0.95;
+      arm.elbow.rotation.x = arm.elbow0.x - 0.3 * a - reach * 0.2;
     }
-    this.upper.rotation.x = this.upper0 + 0.06 * amount + this.reach * 0.55;
+    // lean into the walk, sway the torso and roll the hips with each step
+    this.upper.rotation.x = this.upper0 + 0.1 * a + this.reach * 0.55;
+    this.upper.rotation.y = this.upper0y + Math.sin(this.phase) * 0.08 * a;
+    this.body.rotation.z = Math.sin(this.phase) * 0.035 * a;
     // Swinging both legs from the hips lifts the feet; drop the body so the boots keep touching the
-    // ground at full stride, with a light bounce between steps.
-    const drop = LEG_LENGTH * (1 - Math.cos(s * 0.42)) * SCALE;
-    this.body.position.y = -drop + Math.abs(Math.cos(this.phase)) * 0.012 * amount;
+    // ground at full stride, plus a springy bound between steps (low gravity).
+    const drop = LEG_LENGTH * (1 - Math.cos(s * 0.55)) * SCALE;
+    this.body.position.y = -drop + Math.abs(Math.sin(this.phase)) * 0.05 * a;
   }
 
   // Bend down to pick something up (0 → 1); applied on the next setWalk().

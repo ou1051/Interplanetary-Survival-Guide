@@ -410,6 +410,28 @@ export function mountHabitat(root, launch) {
   const enter = query('[data-intro-enter]');
   const airlock = query('[data-airlock]');
   const motionReduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // The three approach cards shake one after another, with a glow in their route
+  // colour, so it is obvious the paths have been generated.
+  const shakeApproaches = () => {
+    const cards = [...root.querySelectorAll('[data-approach]')];
+    cards.forEach((card, i) => {
+      const glow = 'var(--route-color)';
+      const opts = { duration: 1300, delay: 250 + i * 260, easing: 'ease-in-out' };
+      if (motionReduced()) {
+        card.animate([{ boxShadow: `0 0 0 2px ${glow}` }, { boxShadow: '0 0 0 0 transparent' }], opts);
+        return;
+      }
+      card.animate([
+        { transform: 'translateX(0) rotate(0)', boxShadow: '0 0 0 0 transparent' },
+        { transform: 'translateX(-6px) rotate(-1.2deg)', boxShadow: `0 0 0 2px ${glow}, 0 0 18px ${glow}`, offset: 0.15 },
+        { transform: 'translateX(5px) rotate(1deg)', offset: 0.32 },
+        { transform: 'translateX(-4px) rotate(-.6deg)', offset: 0.5 },
+        { transform: 'translateX(3px) rotate(.4deg)', boxShadow: `0 0 0 1px ${glow}, 0 0 10px ${glow}`, offset: 0.68 },
+        { transform: 'translateX(-1px) rotate(0)', offset: 0.85 },
+        { transform: 'translateX(0) rotate(0)', boxShadow: '0 0 0 0 transparent' },
+      ], opts);
+    });
+  };
   const room = mountHabitatRoom(query('[data-room]'), (bounds) => {
     for (const [key, value] of Object.entries(bounds)) stage.style.setProperty(`--screen-${key}`, `${value}%`);
   });
@@ -591,6 +613,7 @@ export function mountHabitat(root, launch) {
           { opacity: .4, transform: focus ? 'scale(.93)' : 'scale(1.03)' },
           { opacity: 1, transform: 'none' },
         ], { duration: 310, easing: 'ease-out' });
+        if (focus) shakeApproaches();
         query(focus ? '[data-approach]' : '[data-s1-overview] button').focus({ preventScroll: true });
       }
     }
