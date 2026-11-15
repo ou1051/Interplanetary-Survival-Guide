@@ -951,7 +951,12 @@ export function buildSiteSandboxPlan(site, chosenRoute, existingTerrain = null) 
   let sAccum = 0;
   const stationS = site.stations.map((st, idx) => {
     sAccum += curves[idx]?.getLength() ?? 0;
-    return { ...st, s: sAccum };
+    return {
+      ...st,
+      objective: st.objective ?? st.tasks[0].label,
+      why: st.why ?? [st.science],
+      s: sAccum,
+    };
   });
 
   const path = joinCurves(curves);

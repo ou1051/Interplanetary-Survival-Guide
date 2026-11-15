@@ -1,23 +1,26 @@
 # Interplanetary Survival Guide — Martian Map
 
-NASA Space Apps Challenge · *Interplanetary Survival Guide: Martian Map*
+**Team Gohan · NASA Space Apps Heilbronn 2026**
 
-The app opens on **Mars Surface Operations**. Select **Enter habitat**, then **Review route** to open the planner. **Original Delta Traverse** is selected by default. Select **S1** to compare three approaches from the habitat, each trading distance against risk: **Shortest** (293 m) takes the direct line across *unsurveyed ground* that the map cannot resolve (possible boulders, soft sand, small ledges), so the rover stops for a briefing and creeps through it; **Intermediate** (322 m) bends around that patch over mapped ground; **Longer** (419 m) is a western detour over the gentlest slopes. Each card shows the expected drive time, worked out with the same speed limits and hazard stops as the drive itself. Unsurveyed ground also hides one obstacle that is on no map (soft sand or a boulder on the route): the rover stops when it reaches it, and clearing it costs 2–4 minutes and the oxygen to match. All three join the original 1.8 km loop at S1. Choose **Go outside** to drive the selected route. Each science stop is a marked station (pad, signed mast with beacon, instruments, sample cache, work-area flags). After finishing a station, the wrist navigator opens the next leg for planning: pick the path on a small map (Fastest, Planned or Safest, each with its time and an Easy/Moderate/Hard rating), then what to do at the next station (full stop, quick stop, skip it, or go home). Each option is checked against oxygen (keeping the 30-minute reserve), daylight (home by twilight), the falling afternoon temperature (no work on foot below −40 °C), rover battery and dust; options that fail are locked.
+[Play the prototype](https://ou1051.github.io/Interplanetary-Survival-Guide/) · [View the demo slides (PDF)](https://ou1051.github.io/Interplanetary-Survival-Guide/demo/martian-map.pdf) · [Official challenge: Interplanetary Survival Guide: Martian Map](https://www.spaceappschallenge.org/2026/challenges/interplanetary-survival-guide-martian-map/)
 
-Open **Departure forecast** in the habitat for the current outlook at Delta or Gale, visibility, outdoor work limits and return reserves. **Variable weather** is the default. In the Delta S1 briefing, compare proceeding through the amber dust-front segment, waiting at the habitat, and taking the mapped western detour. Each choice shows predicted oxygen, battery and local return time. After launch, **Weather now** on the rover or full-screen map opens the current readings and the costs of continuing or waiting. Weather advances with the mission clock. Driving or walking into the shortcut dust front reduces visibility even off the planned path. Waiting spends simulated time, oxygen and rover power. The forecast includes habitat ingress and the 30-minute oxygen reserve. Future gusts and undiscovered obstacles can change the estimate.
+At Gale Crater, would you take the 2.37 km route over steeper ground or drive another 680 m for a gentler crossing? In this browser-based Marswalk rehearsal, you choose a route in the habitat, drive it, and decide how much science you can do before you need to head home. The map brings orbital imagery and elevation into the same decision as science stops and simulated oxygen, daylight, and battery limits.
 
-The wrist and full-screen maps (**M**) show a dashed sight-range ring in dust. The mast camera picks up previously unmapped obstacles closer to the rover in poor visibility and marks each discovery. At a science stop, the station card and wrist map let you choose tasks individually. At **S2**, take the mudstone sample first, wait for clearer imaging, or record a dust-degraded panorama. A cold spell gives the crew a simulated **10-minute outdoor work window**. At **S4**, the five-minute dosimeter reading can fit while the twenty-minute panorama must wait. The debrief records the science actually returned. For a clear-weather training run, select **Rehearsal settings → Nominal conditions** before departure.
+## Try a mission
 
-In dust, the arrow under **Weather now** shows which way the wind blows relative to the rover. If it points right, tap left to hold your line. Gusts leave about 120 m of sight, blowing dust 50 m, and the Delta shortcut front 40 m. Cold frosts the edges of the first-person windshield or visor. The timer under **Weather now** shows how much outdoor work time remains.
+1. **Enter habitat → Review route.** Pick one of five sites on the globe: Gale Crater, Jezero Crater, Aeolis Mons (Mount Sharp), Valles Marineris, or Olympus Mons. Start with **Gale Crater · Vera Rubin Ridge** to reproduce the example below.
+2. Select **Open Route Briefing → Find Safest Path**. The planner compares three round trips through the same four science stops. At Gale, **Safest** shows 3.05 km and a maximum modeled slope of 9.4°; **Balanced**, 2.59 km and 12.4°; **Direct Shortest**, 2.37 km and 35.4°. Toggle **View Site Analysis** to inspect the terrain behind the choice.
+3. Select a route and **Go outside · Deploy Rover**. Press **M** for the map or **P** for the wrist navigator. Stop the rover and press **F** to get out. Hold **E** near a find to collect it, then return to the habitat and press **Enter** to see what you brought back.
 
-Select **Gale Crater · Vera Rubin Ridge** to compare a gentler route and a shorter route to a layered outcrop, consult a Curiosity observation, and collect paired samples. Select **Dust front ahead** before launch to try an early return in Gale. When the front stops the rover, you can see about 30 m ahead. Open **Wrist navigator → Turn around and return** to drive home through 45 seconds of blowing dust. Press **P** or click **Wrist navigator** in either mission for the next stop, nearby hazards, and estimated oxygen on return.
+## NASA data and what we simulate
 
-For Gale Crater, the wall map and rover terrain share a crop of an archived Mars Reconnaissance Orbiter HiRISE elevation product. The two route cards report the steepest sampled terrain slope along each route. The rover also measures pitch and roll along the corridor, so its hazard gates use a different measure. The science stop and habitat are demo placements, and weather, oxygen and sample results are simulated.
+| Source | What it contributes |
+| --- | --- |
+| [Mars Reconnaissance Orbiter: HiRISE Gale stereo terrain and orbital image](https://www.uahirise.org/dtm/dtm.php?ID=PSP_009149_1750) · NASA/JPL-Caltech/University of Arizona, distributed through [USGS](https://stac.astrogeology.usgs.gov/docs/data/mars/hirise_dtms/) | A 640 m Gale crop (elevation resampled at 4 m) contributes relief and image detail at Vera Rubin Ridge. The site pipeline blends these inputs with regional terrain and Context Camera (CTX) imagery; route-card slopes are estimates from the resulting model. |
+| [NASA Mars Trek](https://trek.nasa.gov/mars/) and [NASA’s Mars globe assets](https://github.com/nasa/NASA-3D-Resources) | Orbital imagery provides regional context. The globe combines Viking/MOLA colour with Mars Global Surveyor laser-altimeter (MOLA) relief to place the five sites on the planet. |
+| [Curiosity Mastcam, Sol 1790, PIA21851](https://science.nasa.gov/photojournal/looking-up-at-layers-of-vera-rubin-ridge-on-sol-1790/) · NASA/JPL-Caltech/MSSS | The panorama shows sedimentary layers at Vera Rubin Ridge and gives the Gale sampling tasks a geological reference. It is a regional observation, not a photo from a simulated station. |
 
-- **Orbital and elevation**: [HiRISE DTEEC_009149_1750_009294_1750_U01 and PSP_009149_1750_RED_A_01_ORTHO](https://www.uahirise.org/dtm/dtm.php?ID=PSP_009149_1750), NASA/JPL-Caltech/University of Arizona, [USGS Analysis Ready Data](https://stac.astrogeology.usgs.gov/docs/data/mars/hirise_dtms/). The local assets are made from a 640 m crop in Mars 2015 equirectangular coordinates, with elevation resampled to 4 m and slopes derived from that grid. The wall display frames a 320 m portion. Outside the crop the simulation extends the edge elevations.
-- **Science reference**: [Curiosity Mastcam Sol 1790, PIA21851](https://science.nasa.gov/photojournal/looking-up-at-layers-of-vera-rubin-ridge-on-sol-1790/), NASA/JPL-Caltech/MSSS. This is a regional reference for the visible bedding, not a photograph from the exact simulated station.
-- **Site Topology globe**: colour from the NASA Viking/MOLA Mars mosaic ([nasa/NASA-3D-Resources](https://github.com/nasa/NASA-3D-Resources), public domain); relief from the MGS MOLA global DEM 463 m mosaic (NASA/JPL/GSFC via USGS Astrogeology), resampled to 2048×1024 in `public/mars/`. Rendered in WebGL with per-pixel relief lighting; drag to spin.
-- The **3D route briefing** uses orbital imagery from [JPL Mars Trek](https://trek.nasa.gov/mars/).
+The planner estimates route costs from processed terrain and modeled hazards. The drive uses simplified relief scaled for the rehearsal; the Jezero driving terrain is procedural. Habitats, station placements, weather, life support, and sample results are simulated. These estimates are for comparing choices in the game, not for navigating on Mars.
 
 ### References studied
 
@@ -94,18 +97,9 @@ Comms line-of-sight to the habitat mast is ray-marched over the same terrain.
 
 Hazards smaller than the elevation grid are outside the scope of the slope analysis. The demo provides simulated guidance for the selected scenario.
 
-## Optional simulation layers
+## Simulation layers
 
-| Placeholder | File | Replace with |
-| --- | --- | --- |
-| Elevation (`rawHeight`) | `src/world/terrain.js` | HiRISE DTM (1 m/px) or CTX DTM; MOLA for the horizon |
-| Optical layer | `src/data/layers.js` | HiRISE / CTX orthoimage |
-| Thermal inertia layer | `src/data/layers.js` | THEMIS night-time IR derived thermal inertia |
-| Mineralogy layer | `src/data/layers.js` | CRISM / OMEGA spectral parameter maps |
-| Route, stations, hazards | `src/config/mission.js` | your planned EVA |
-| Dose rate | `src/config/mission.js` | MSL/RAD surface measurements |
-
-Each layer exposes `source`, `future` and `legend`, which the UI already displays.
+In the rover, the optical, thermal-inertia and mineralogy scanner colours are illustrative; they do not represent measured THEMIS temperatures or CRISM mineral detections. The scanner samplers and legends are in [src/data/layers.js](src/data/layers.js).
 
 ## Project structure
 
@@ -118,7 +112,10 @@ src/
   routes/pathfinding.js  A* search and live hazard rerouting
   physics/traverse.js    travel time and consumable estimates shared by routing and simulation
   config/mission.js   site, route, stations, area hazards, rover & life-support numbers (mock)
-  world/terrain.js    procedural DEM, grid mesh, exact surface sampling
+  data/galeSite.js    archived Gale terrain and Curiosity reference
+  data/siteDatasets.js site assets, stations and driveable terrain
+  ui/siteTopology.js  globe, site briefing and three route policies
+  world/terrain.js    terrain mesh and surface sampling
   world/route.js      route spline, hazard analysis, ribbon / beacons / gates
   world/scenery.js    instanced rocks, habitat, ascent vehicle
   world/atmosphere.js Mars sky, image-based lighting, dust motes, wheel dust
@@ -144,7 +141,5 @@ src/
 
 ### 日本語メモ
 
-- **今の状態:** NASAデータ未接続。地形・データレイヤーはすべて手続き生成のダミーです。
-- **遊び方:** `W` を押し続けるとルートに沿って前進します。危険ゲートで停止したら `Enter` で安全確認、科学ステーションでは `E` を長押ししてタスクを完了します。
-- **実データの差し替え先:** 標高は `src/world/terrain.js` の `rawHeight`、各レイヤーは `src/data/layers.js` のサンプラー、ルートや地点は `src/config/mission.js`。
-
+- **データ:** ゲール・クレーターの地形には HiRISE の標高データと軌道画像を使用しています。Curiosity の写真は地層を理解するための地域資料です。表示される斜度はモデルによる推定値で、天候、酸素消費、採取結果はシミュレーションです。
+- **遊び方:** 「Enter habitat」→「Review route」で地点を選び、「Open Route Briefing」→「Find Safest Path」でルートを比較してから出発します。停車中に `F` で降車し、試料のそばで `E` を長押しして採取します。
