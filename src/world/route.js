@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createStationPost } from './stationPost.js';
 import { ROUTE_POINTS, STATIONS, AREA_HAZARDS, HAB, ROVER, SLOPE_CLASSES } from '../config/mission.js';
 import { clamp, DEG } from '../core/math.js';
 
@@ -7,12 +8,45 @@ import { clamp, DEG } from '../core/math.js';
 // evaluates the hand-planned traverse against the elevation data.
 // ---------------------------------------------------------------------------
 
+// Join curves end to end into one path, parameterised by arc length (each curve needs getLength/getPointAt).
+export function joinCurves(curves) {
+  const lengths = curves.map((curve) => curve.getLength());
+  const total = lengths.reduce((a, b) => a + b, 0);
+  return {
+    curves,
+    lengths,
+    getLength: () => total,
+    getPoint(t) {
+      let d = clamp(t, 0, 1) * total;
+      for (let i = 0; i < curves.length; i++) {
+        if (d <= lengths[i] || i === curves.length - 1) return curves[i].getPointAt(clamp(d / lengths[i], 0, 1));
+        d -= lengths[i];
+      }
+      return curves[curves.length - 1].getPointAt(1);
+    },
+  };
+}
+
+// A stretch [s0, s1] of an existing route as a curve, so it can be reused as a leg.
+export function routeSegment(route, s0, s1) {
+  const length = s1 - s0;
+  return {
+    getLength: () => length,
+    getPointAt(u) {
+      const p = route.sample(s0 + clamp(u, 0, 1) * length);
+      return new THREE.Vector3(p.x, 0, p.z);
+    },
+  };
+}
+
 export class Route {
-  constructor(terrain, { points = ROUTE_POINTS, stations = STATIONS, areaHazards = AREA_HAZARDS, exact = false, approach = null } = {}) {
+  // `path`: a ready-made curve ({ getLength(), getPoint(t) }), e.g. legs joined by joinCurves().
+  constructor(terrain, { points = ROUTE_POINTS, stations = STATIONS, areaHazards = AREA_HAZARDS, exact = false, approach = null, path = null } = {}) {
     this.terrain = terrain;
     const pts = points.map(([x, z]) => new THREE.Vector3(x, 0, z));
     let curve;
-    if (exact) {
+    if (path) curve = path;
+    else if (exact) {
       curve = new THREE.CurvePath();
       for (let i = 1; i < pts.length; i++) curve.add(new THREE.LineCurve3(pts[i - 1], pts[i]));
     } else {
@@ -33,7 +67,7 @@ export class Route {
         },
       };
     }
-    this.exactPath = exact || approach ? curve : null;
+    this.exactPath = exact || approach || path ? curve : null;
     this.length = curve.getLength();
     const steps = exact ? Math.ceil(this.length / 2) * 2 : Math.ceil(this.length);
     this.step = this.length / steps;
@@ -546,25 +580,10 @@ export class RouteVisuals {
         new THREE.MeshBasicMaterial({ color: 0x56e0ff, transparent: true, opacity: 0.85, depthWrite: false, fog: true }),
       );
       ring.position.y = 0.15;
-      // science marker tripod
-      const tri = new THREE.Group();
-      const legMat = new THREE.MeshStandardMaterial({ color: 0xd8d8d8, metalness: 0.6, roughness: 0.35 });
-      for (let i = 0; i < 3; i++) {
-        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.6, 6), legMat);
-        const a = (i / 3) * Math.PI * 2;
-        leg.position.set(Math.cos(a) * 0.3, 0.75, Math.sin(a) * 0.3);
-        leg.rotation.set(Math.sin(a) * 0.35, 0, -Math.cos(a) * 0.35);
-        tri.add(leg);
-      }
-      const lamp = new THREE.Mesh(
-        new THREE.SphereGeometry(0.12, 16, 12),
-        new THREE.MeshStandardMaterial({ color: 0x9ff0ff, emissive: 0x56e0ff, emissiveIntensity: 3 }),
-      );
-      lamp.position.y = 1.6;
-      tri.add(lamp);
-      tri.position.set(4.5, 0, 0);
-      tri.traverse((o) => (o.castShadow = true));
-      g.add(beam, ring, tri);
+      // the station checkpoint itself: pad, mast and sign, instruments, cache, flags
+      const { group: post, lamp } = createStationPost(st, this.route, this.terrain);
+      post.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      g.add(beam, ring, post);
       this.group.add(g);
       this.beacons.push({ station: st, group: g, beam, ring, lamp });
     }
@@ -611,9 +630,9 @@ export class RouteVisuals {
     for (const b of this.beacons) {
       const st = b.station;
       const isNext = st.id === nextStationId;
-      const col = st.done ? 0x5cff9a : isNext ? 0x56e0ff : 0xbfd6e0;
+      const col = st.done ? 0x5cff9a : st.skipped ? 0x6b7680 : isNext ? 0x56e0ff : 0xbfd6e0;
       b.beam.material.uniforms.uColor.value.setHex(col);
-      b.beam.material.uniforms.uIntensity.value = st.done ? 0.35 : isNext ? 1.0 : 0.45;
+      b.beam.material.uniforms.uIntensity.value = st.done ? 0.35 : st.skipped ? 0.12 : isNext ? 1.0 : 0.45;
       b.ring.material.color.setHex(col);
       b.lamp.material.emissive.setHex(col);
     }

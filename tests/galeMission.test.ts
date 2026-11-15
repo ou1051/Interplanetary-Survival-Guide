@@ -1,4 +1,4 @@
-import { buildDeltaTraverse, buildDeltaApproaches } from '../src/data/deltaTraverse.js';
+import { buildDeltaTraverse, buildDeltaApproaches, legVariants, buildLoopRoute } from '../src/data/deltaTraverse.js';
 import { describe, expect, it } from 'vitest';
 import { planGaleRoutes, missionHeight, outcrop, worldPosition, sampleMinutes } from '../src/data/galeSite.js';
 import { Route } from '../src/world/route.js';
@@ -195,4 +195,241 @@ it('offers three ordered approaches and preserves the original path after S1', (
       expect(reached.z).toBeCloseTo(expected.z, 2);
     }
   }
+});
+
+it('estimates each approach with the live rules and flags the possible delay only on unsurveyed ground', () => {
+  const [shortest, intermediate, longer] = buildDeltaApproaches(buildDeltaTraverse());
+  // creeping through the unsurveyed patch makes the shortest line the slowest one
+  expect(shortest.estimate.minutes).toBeGreaterThan(longer.estimate.minutes);
+  expect(longer.estimate.minutes).toBeGreaterThan(intermediate.estimate.minutes);
+  expect(shortest.estimate.extraMinutes).toEqual([2, 4]);
+  expect(intermediate.estimate.extraMinutes).toBeNull();
+  expect(longer.estimate.extraMinutes).toBeNull();
+});
+
+it('hides one obstacle in unsurveyed ground that stops the rover and costs time', () => {
+  const [shortest, intermediate] = buildDeltaApproaches(buildDeltaTraverse());
+  const { route, terrain } = shortest.traverse;
+  const patch = route.areaHazards.find(hz => hz.unsurveyed);
+  const mission = new Mission(route, terrain, { x: 0, y: 0, z: 0 }, { random: () => 0 });
+  mission.start();
+  const seen: string[] = [];
+  for (let step = 0; mission.state === 'drive' && step < 30 * 900; step++) {
+    mission.update(dt, mission.autopilot(), 0);
+    if (mission.state === 'drive' && mission.nextKnownStop) seen.push(mission.nextKnownStop.ref.type);
+  }
+  expect(mission.state).toBe('gate');
+  const hit = mission.nextKnownStop.ref;
+  expect(hit.type).toBe('SOFT SAND · WHEEL SINKING');
+  expect(Math.hypot(hit.at.x - patch.cx, hit.at.z - patch.cz)).toBeLessThan(patch.radius);
+  // while driving, the displays never named it before the rover got there
+  expect(seen).not.toContain(hit.type);
+  // the rover stays put until the crew deals with it, which costs time
+  const at = { ...mission.rover };
+  mission.update(1, mission.autopilot(), 0);
+  expect(Math.hypot(mission.rover.x - at.x, mission.rover.z - at.z)).toBe(0);
+  const before = mission.met;
+  expect(mission.acknowledge()).toBe(true);
+  expect(mission.met - before).toBeCloseTo(4 * 60, 5);
+  expect(mission.state).toBe('drive');
+  // one per patch: driving on through it meets nothing more
+  for (let i = 0; i < 30 * 20; i++) mission.update(dt, mission.autopilot(), 0);
+  expect(mission.state).toBe('drive');
+  // a mapped approach does not cross the patch: following it meets nothing on the way to S1
+  const mapped = new Mission(intermediate.traverse.route, intermediate.traverse.terrain, { x: 0, y: 0, z: 0 }, { random: () => 0 });
+  expect(intermediate.traverse.route.zones.some(z => z.unsurveyed)).toBe(false);
+  mapped.start();
+  for (let step = 0; step < 30 * 600 && mapped.currentStation?.id !== 'S1'; step++) mapped.update(dt, mapped.autopilot(), 0);
+  expect(mapped.currentStation?.id).toBe('S1');
+  expect(mapped.surprises.some(sp => sp.found)).toBe(false);
+});
+
+it('meets the hidden obstacle on any line through the unsurveyed patch, not only the planned one', () => {
+  const [shortest] = buildDeltaApproaches(buildDeltaTraverse());
+  const { route, terrain } = shortest.traverse;
+  const patch = route.areaHazards.find(hz => hz.unsurveyed);
+  const mission = new Mission(route, terrain, { x: 0, y: 0, z: 0 }, { random: () => 0.99 });
+  mission.start();
+  // start at the edge of the patch, aimed straight across its middle
+  const a = Math.atan2(route.x[0] - patch.cx, route.z[0] - patch.cz) + 0.9;
+  Object.assign(mission.rover, { x: patch.cx + Math.sin(a) * (patch.radius + 3), z: patch.cz + Math.cos(a) * (patch.radius + 3), heading: a, speed: 0 });
+  for (let step = 0; mission.state === 'drive' && step < 30 * 300; step++) mission.update(dt, { throttle: true, steer: 0 }, 0);
+  expect(mission.state).toBe('gate');
+  expect(mission.nextKnownStop.ref.type).toBe('BOULDER ON THE ROUTE');
+});
+
+describe('leg check at stations', () => {
+  // drive the intermediate approach to S1, get out and collect every S1 find
+  async function atFirstStationDone() {
+    const { legOptions } = await import('../src/sim/legCheck.js');
+    const [, intermediate] = buildDeltaApproaches(buildDeltaTraverse());
+    const { route, terrain } = intermediate.traverse;
+    route.site = { name: 'Delta Front' };
+    const mission = new Mission(route, terrain, { x: 0, y: 0, z: 0 }, { surprises: false });
+    mission.setArtifacts(placeArtifacts({ route, terrain, site: route.site, seed: 5 }));
+    const events: string[] = [];
+    mission.on((type) => events.push(type));
+    mission.start();
+    drive(mission, () => mission.currentStation?.id === 'S1');
+    expect(mission.exitRover()).toBe(true);
+    const s1 = mission.route.stations[0];
+    for (const task of s1.tasks) {
+      const find = task.artifact;
+      expect(walkTo(mission, find.x, find.z, WALK.reach - 0.4)).toBe(true);
+      expect(mission.collect(find)).toBe(true);
+    }
+    return { mission, legOptions, events, s1 };
+  }
+
+  it('cools through the afternoon like the Gale records', async () => {
+    const { temperatureAt, COLD_WORK_LIMIT_C } = await import('../src/sim/legCheck.js');
+    expect(temperatureAt(14 * 60)).toBeGreaterThan(-20);
+    expect(temperatureAt(17 * 60)).toBeLessThan(temperatureAt(15 * 60));
+    expect(temperatureAt(20 * 60)).toBeLessThan(COLD_WORK_LIMIT_C);
+  });
+
+  it('asks for the next leg once a station is done and applies an allowed choice', async () => {
+    const { mission, legOptions, events, s1 } = await atFirstStationDone();
+    expect(s1.done).toBe(true);
+    expect(mission.legPending).toBe(s1);
+    expect(events).toContain('legcheck');
+    const check = legOptions(mission);
+    expect(check.options.map(o => o.id)).toEqual(['continue', 'quick', 'skip', 'home']);
+    expect(check.recommended.id).toBe('continue');
+    expect(mission.chooseLeg({ ...check.options[0], allowed: false })).toBe(false);
+    expect(mission.legPending).toBe(s1);
+    const skip = check.options.find(o => o.id === 'skip');
+    expect(mission.chooseLeg(skip)).toBe(true);
+    expect(mission.legPending).toBe(null);
+    expect(mission.nextStation.id).toBe('S3');
+    expect(mission.route.stations.find(st => st.id === 'S2').skipped).toBe(true);
+  });
+
+  it('locks legs that would break the oxygen reserve, twilight or the cold limit', async () => {
+    const { mission, legOptions } = await atFirstStationDone();
+    const { TWILIGHT_LIMIT } = await import('../src/sim/legCheck.js');
+    // late in the afternoon: a full stop at the next station would bring the crew home after twilight
+    const met = mission.met;
+    mission.met += (TWILIGHT_LIMIT - 10 - mission.lmst) * 60;
+    let check = legOptions(mission);
+    const late = check.options.find(o => o.id === 'continue');
+    expect(late.allowed).toBe(false);
+    expect(late.checks.find(c => c.id === 'daylight').ok).toBe(false);
+    expect(check.options.find(o => o.id === 'home').allowed).toBe(true);
+    // oxygen nearly gone: only heading home remains
+    mission.met = met;
+    mission.o2Used = 8 * 60 - 60;
+    check = legOptions(mission);
+    expect(check.options.filter(o => o.allowed).map(o => o.id)).toEqual(['home']);
+    expect(check.options[0].checks.find(c => c.id === 'oxygen').ok).toBe(false);
+  });
+
+  it('a quick stop leaves only the first find at the next station', async () => {
+    const { mission, legOptions } = await atFirstStationDone();
+    const quick = legOptions(mission).options.find(o => o.id === 'quick');
+    expect(mission.chooseLeg(quick)).toBe(true);
+    const s2 = mission.route.stations.find(st => st.id === 'S2');
+    expect(s2.tasks.map(t => !!t.skipped)).toEqual([false, true, true]);
+    // collecting that one find completes S2
+    mission.state = 'walk';
+    const find = s2.tasks[0].artifact;
+    Object.assign(mission.walker, { x: find.x + 1, z: find.z });
+    expect(mission.collect(find)).toBe(true);
+    expect(s2.done).toBe(true);
+  });
+});
+
+describe('choosing a path between stations', () => {
+  it('offers fastest, planned and safest paths for every leg after S1', () => {
+    const original = buildDeltaTraverse();
+    const [, intermediate] = buildDeltaApproaches(original);
+    const { route, terrain } = intermediate.traverse;
+    for (const index of [1, 2, 3, 4]) {
+      const [fast, planned, safe] = legVariants(terrain, route.legs, index);
+      expect([fast.id, planned.id, safe.id]).toEqual(['fast', 'planned', 'safe']);
+      expect(fast.minutes).toBeLessThanOrEqual(planned.minutes + 1e-6);
+      expect(safe.danger).toBeLessThanOrEqual(planned.danger);
+      expect(['Easy', 'Moderate', 'Hard']).toContain(safe.difficulty);
+    }
+  });
+
+  it('swaps only the leg ahead and keeps the crew, stations and finds where they are', () => {
+    const original = buildDeltaTraverse();
+    const [, intermediate] = buildDeltaApproaches(original);
+    const { route, terrain } = intermediate.traverse;
+    route.site = { name: 'Delta Front' };
+    const mission = new Mission(route, terrain, { x: 0, y: 0, z: 0 }, { surprises: false });
+    mission.setArtifacts(placeArtifacts({ route, terrain, site: route.site, seed: 5 }));
+    mission.start();
+    const s1 = route.stations[0];
+    drive(mission, () => mission.currentStation?.id === 'S1');
+    const at = { x: mission.rover.x, z: mission.rover.z, s: mission.s };
+    s1.done = true;
+    const s1Tasks = s1.tasks;
+    const [, , safe] = legVariants(terrain, route.legs, 1);
+    const legs = [...route.legs];
+    legs[1] = safe.curve;
+    const next = buildLoopRoute(terrain, legs);
+    mission.replaceRoute(next);
+    expect(mission.route).toBe(next);
+    expect(next.stations[0].s).toBeCloseTo(s1.s, 6);
+    expect(next.stations[0].done).toBe(true);
+    expect(next.stations[0].tasks).toBe(s1Tasks);
+    // the new S2 sits as far along as the safe path is long
+    expect(next.stations[1].s - next.stations[0].s).toBeCloseTo(safe.distance, 0);
+    const before = route.sample(s1.s - 10);
+    const after = next.sample(s1.s - 10);
+    expect(after.x).toBeCloseTo(before.x, 3);
+    expect(after.z).toBeCloseTo(before.z, 3);
+    // the rover has not moved and is found on the new plan where it was on the old one
+    expect(mission.rover.x).toBe(at.x);
+    expect(mission.rover.z).toBe(at.z);
+    expect(mission.s).toBeCloseTo(at.s, -1);
+    expect(mission.nextStation.id).toBe('S2');
+  });
+});
+
+it('limits the Shift time boost: short charge, none on hazard ground or near a station', () => {
+  const [, intermediate] = buildDeltaApproaches(buildDeltaTraverse());
+  const { route, terrain } = intermediate.traverse;
+  const boost = { throttle: true, brake: false, steer: 0, action: false, boost: true };
+  const mission = new Mission(route, terrain, { x: 0, y: 0, z: 0 }, { surprises: false });
+  mission.start();
+  const park = (x: number, z: number) => Object.assign(mission.rover, { x, z, speed: 0 });
+  // open, flat ground away from the stations: boost works and drains
+  const flat = (() => {
+    for (let i = 0; i < route.count; i++) {
+      const x = route.x[i], z = route.z[i];
+      park(x, z);
+      const g = mission._ground(x, z, mission.rover.heading);
+      const near = route.stations.some(st => !st.final && Math.hypot(st.x - x, st.z - z) < 40);
+      if (!g.zones.length && !near) return { x, z };
+    }
+    return null;
+  })();
+  expect(flat).not.toBeNull();
+  park(flat.x, flat.z);
+  mission.update(0.1, boost, 0);
+  expect(mission.boosting).toBe(true);
+  expect(mission.boostCharge).toBeLessThan(1);
+  // held until empty: it stops and refills before it can be used again
+  for (let i = 0; i < 200 && mission.boostBlocked !== 'RECHARGING'; i++) { park(flat.x, flat.z); mission.update(0.1, boost, 0); }
+  expect(mission.boostBlocked).toBe('RECHARGING');
+  expect(mission.boosting).toBe(false);
+  // inside a mapped hazard area it never works
+  const hz = route.areaHazards[0];
+  mission.boostCharge = 1;
+  mission._boostEmpty = false;
+  park(hz.cx, hz.cz);
+  mission.update(0.1, boost, 0);
+  expect(mission.boosting).toBe(false);
+  expect(mission.boostBlocked).toBe('HAZARD STRETCH');
+  // nor right next to the next station
+  const s1 = route.stations[0];
+  mission.boostCharge = 1;
+  mission._boostEmpty = false;
+  park(s1.x + 5, s1.z);
+  mission.update(0.1, boost, 0);
+  expect(['STOP AHEAD', 'HAZARD STRETCH']).toContain(mission.boostBlocked);
+  expect(mission.boosting).toBe(false);
 });

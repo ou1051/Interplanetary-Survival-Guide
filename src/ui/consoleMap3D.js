@@ -13,7 +13,29 @@ const MARS_R = 3396190;
 const DEG = 180 / Math.PI;
 const LIFT = 8; // metres above ground for lines and markers, so they sit together
 
-export async function mountConsoleMap3D(container, { onReady } = {}) {
+// CesiumJS decodes terrain in web workers loaded from ./cesium/Workers. The one-file build has no such
+// folder, and sandboxed previews (opaque origins, blocked blob: URLs) cannot start workers at all; in
+// either case the globe would stop with a render error, so the console keeps its 2D map instead.
+export function map3DSupport() {
+  if (import.meta.env.MODE === 'single') return { ok: false, reason: 'The one-file build has no 3D globe data' };
+  if (typeof Worker === 'undefined') return { ok: false, reason: 'Web workers are not available' };
+  try {
+    const url = URL.createObjectURL(new Blob([''], { type: 'text/javascript' }));
+    try {
+      new Worker(url).terminate();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  } catch (error) {
+    return { ok: false, reason: `Web workers are blocked here (${error?.name ?? 'error'})` };
+  }
+  return { ok: true, reason: '' };
+}
+
+export async function mountConsoleMap3D(container, { onReady, onError } = {}) {
+  if (import.meta.env.MODE === 'single') throw new Error('3D Mars is not part of the one-file build');
+  const support = map3DSupport();
+  if (!support.ok) throw new Error(support.reason);
   const [{ MarsGlobe }, C] = await Promise.all([import('../map/globe/MarsGlobe.ts'), import('cesium')]);
   const credits = document.createElement('div');
   credits.className = 'hab-map3d-credit';
@@ -21,6 +43,13 @@ export async function mountConsoleMap3D(container, { onReady } = {}) {
   const globe = new MarsGlobe(container, { creditContainer: credits, exaggeration: 1.6 });
   const viewer = globe.viewer;
   const scene = viewer.scene;
+  // A failure while rendering (a worker that cannot start, a lost GPU context) hands the console back to
+  // the 2D map instead of leaving Cesium's error panel on screen.
+  viewer.showRenderLoopErrors = false;
+  scene.renderError.addEventListener((_scene, error) => {
+    console.warn('3D Mars map stopped; showing the 2D map instead.', error);
+    onError?.(error);
+  });
   // Console-sized view: the globe defaults are tuned for full-screen exploring. Here a coarser detail
   // target means far fewer NASA tiles to stream, and the sky is never in frame, so skip drawing it.
   scene.globe.maximumScreenSpaceError = 6;

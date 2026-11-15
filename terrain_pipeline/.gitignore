@@ -1,0 +1,7 @@
+*.tif
+*.tiff
+*.png
+*.jpg
+*.jpeg
+__pycache__/
+mars_env/

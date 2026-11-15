@@ -3,7 +3,8 @@ import { makeDeltaOverview } from './deltaOverview.js';
 import { AREA_HAZARDS } from '../config/mission.js';
 import { mountHabitatRoom } from './habitatRoom.js';
 import { mountHabitatExterior } from './habitatExterior.js';
-import { mountConsoleMap3D } from './consoleMap3D.js';
+import { mountConsoleMap3D, map3DSupport } from './consoleMap3D.js';
+import { SiteTopologyWidget } from './siteTopology.js';
 import { base, outcrop, gridPosition, imagery, observationSource, terrainSource, siteWidth, terrainSlope, planGaleRoutes } from '../data/galeSite.js';
 import './habitat.css';
 
@@ -28,6 +29,9 @@ export function mountHabitat(root, launch) {
   let view3d = true;
   let map3d = null;
   let map3dLoading = null;
+  let map3dOff = !map3DSupport().ok; // decided once: no 3D globe → the 2D map, without trying
+  if (map3dOff) view3d = false;
+  let habTab = 'briefing';
   root.innerHTML = `
     <div class="hab-stage hab-before-entry" inert>
       <canvas class="hab-room" data-room aria-hidden="true"></canvas>
@@ -37,13 +41,17 @@ export function mountHabitat(root, launch) {
       </header>
       <div class="hab-wall">
         <div class="hab-screen">
-          <header class="hab-header"><h1>Mission briefing</h1><span class="hab-eva"><i></i> EVA-01</span><nav class="hab-nav" aria-label="Mission navigation">
+          <header class="hab-header"><h1>Mission briefing</h1><nav class="hab-console-tabs" aria-label="Console views">
+            <button type="button" data-hab-tab="briefing" aria-pressed="true">Route Briefing</button>
+            <button type="button" data-hab-tab="topology" aria-pressed="false">Site Topology</button>
+          </nav><span class="hab-eva"><i></i> EVA-01</span><nav class="hab-nav" aria-label="Mission navigation">
             <a href="./map.html">Explore Mars</a>
             <button type="button" id="sourcesBtn">Mission &amp; sources</button>
             <button type="button" id="collectionBtn">Collection</button>
             <button type="button" data-review-close>← Habitat view</button>
           </nav></header>
-          <div class="hab-console-grid">
+          <div class="hab-topology-panel" data-hab-topology hidden></div>
+          <div class="hab-console-grid" data-hab-console-grid>
           <div class="hab-layout">
             <aside class="hab-metrics" aria-label="Selected route">
               <div><span>Objective</span><b data-objective-short>Visit four science stations</b></div>
@@ -231,8 +239,8 @@ export function mountHabitat(root, launch) {
       approaches = buildDeltaApproaches(original.traverse);
       deltaMap = makeDeltaOverview(route, canvas.width, canvas.height, approaches);
       query('[data-approaches]').innerHTML = approaches.map(option => `<button type="button" data-approach="${option.id}" style="--route-color:${option.color}">
-        <b>${option.label}</b><span>${fmt(option.distance)} m</span><small>${option.detail} · ${option.maxTilt.toFixed(1)}° max tilt</small>
-        <i class="hab-risk${option.unknowns.length ? ' is-unknown' : ''}">${option.unknowns.length ? '⚠ ' : ''}${option.risk}</i>
+        <b>${option.label}</b><span>${fmt(option.distance)} m · ≈ ${option.estimate.minutes.toFixed(1)} min</span><small>${option.detail} · ${option.maxTilt.toFixed(1)}° max tilt</small>
+        <i class="hab-risk${option.unknowns.length ? ' is-unknown' : ''}">${option.unknowns.length ? '⚠ ' : ''}${option.risk}${option.estimate.extraMinutes ? ` · +${option.estimate.extraMinutes.join('–')} min` : ''}</i>
       </button>`).join('');
       const stations = route.stations.filter(stop => !stop.final);
       const gates = route.stops.filter(stop => stop.kind === 'gate').length;
@@ -271,7 +279,8 @@ export function mountHabitat(root, launch) {
       query('[data-unknowns]').innerHTML = unknowns.map(zone => `<b>⚠ ${zone.type.toLowerCase().replace(/^./, c => c.toUpperCase())} · ${fmt(zone.s1 - zone.s0)} m</b>
         <p>No high-resolution map covers this stretch. It may hide:</p>
         <ul>${zone.obstacles.map(item => `<li>${item}</li>`).join('')}</ul>
-        <small>Rover stops for a briefing, then creeps through at ≤ ${(zone.limit * 3.6).toFixed(0)} km/h.</small>`).join('');
+        <small>Rover stops for a briefing, then creeps through at ≤ ${(zone.limit * 3.6).toFixed(0)} km/h.
+        Planned ≈ ${approachChoice.estimate.minutes.toFixed(1)} min to S1; if something is hiding there, add ${approachChoice.estimate.extraMinutes.join('–')} min (and the oxygen to match).</small>`).join('');
       for (const button of root.querySelectorAll('[data-approach]')) {
         button.setAttribute('aria-pressed', String(button.dataset.approach === approachChoice?.id));
       }
@@ -328,12 +337,29 @@ export function mountHabitat(root, launch) {
 
   // ---------------------------------------------------------------- 3D map
   function ensureMap3D() {
-    if (map3d || map3dLoading || !view3d) return;
+    if (map3d || map3dLoading || !view3d || map3dOff) return;
     // the 2D map stays on screen while the 3D terrain streams in; it fades over once the site has loaded
     query('[data-map3d-status]').hidden = false;
-    map3dLoading = mountConsoleMap3D(query('[data-map3d]'), { onReady: () => { query('[data-map3d-status]').hidden = true; update(); } })
+    map3dLoading = mountConsoleMap3D(query('[data-map3d]'), {
+      onReady: () => { query('[data-map3d-status]').hidden = true; update(); },
+      onError: () => disableMap3D(),
+    })
       .then((m) => { map3d = m; m.setSpeed(zoomed ? 0.35 : 0.12); update(); })
-      .catch((error) => { console.error(error); view3d = false; query('[data-map3d-status]').hidden = true; update(); });
+      .catch((error) => { console.info(`3D Mars map unavailable: ${error.message}`); disableMap3D(); });
+  }
+  // No 3D globe here (one-file build, sandboxed preview, render failure): stay on the 2D map for good.
+  function disableMap3D() {
+    map3dOff = true;
+    view3d = false;
+    try { map3d?.destroy(); } catch { /* already torn down */ }
+    map3d = null;
+    query('[data-map3d]').hidden = true;
+    query('[data-map3d-status]').hidden = true;
+    for (const b of root.querySelectorAll('[data-view3d]')) {
+      b.disabled = true;
+      b.title = '3D Mars is not available in this view';
+    }
+    update();
   }
   function draw3D(delta) {
     const frame = query('.hab-mapframe');
@@ -342,7 +368,11 @@ export function mountHabitat(root, launch) {
     query('[data-map3d]').hidden = !view3d;
     query('[data-map3d]').classList.toggle('is-ready', shown);
     query('[data-map3d-status]').hidden = !view3d || shown;
-    for (const b of root.querySelectorAll('[data-view3d]')) b.setAttribute('aria-pressed', String((b.dataset.view3d === '3d') === view3d));
+    for (const b of root.querySelectorAll('[data-view3d]')) {
+      b.setAttribute('aria-pressed', String((b.dataset.view3d === '3d') === view3d));
+      b.disabled = map3dOff;
+      b.title = map3dOff ? '3D Mars is not available in this view' : '';
+    }
     query('[data-spin]').hidden = !view3d;
     if (!view3d || !map3d) return;
     query('[data-spin]').setAttribute('aria-pressed', String(map3d.spinning));
@@ -452,15 +482,83 @@ export function mountHabitat(root, launch) {
         { transformOrigin: '0 0', transform: `translate(${before.left - after.left}px, ${before.top - after.top}px) scale(${before.width / after.width}, ${before.height / after.height})` },
         { transformOrigin: '0 0', transform: 'none' },
       ], { duration: 340, easing: 'cubic-bezier(.22,.75,.18,1)' });
+      zoomAnimation.finished.then(() => { if (habTab === 'topology') topoWidget?._scheduleDraw(); }).catch(() => {});
     }
+    if (habTab === 'topology') topoWidget?._scheduleDraw();
     (open ? reviewClose : lastZoomTrigger).focus({ preventScroll: true });
   }
   let lastZoomTrigger = reviewOpen;
   let scrollBeforeZoom = 0;
   const observation = query('[data-photo-dialog]');
+  const topoPanel = query('[data-hab-topology]');
+  const consoleGrid = query('[data-hab-console-grid]');
   let launching = false;
+
+  async function runLaunchSequence(planToLaunch, scenarioToLaunch = 'clear') {
+    if (launching || !planToLaunch) return;
+    launching = true;
+    const launchBtn = query('[data-launch]');
+    if (launchBtn) launchBtn.textContent = 'Opening airlock…';
+    stage.inert = true;
+    airlock.hidden = false;
+    root.scrollTop = 0;
+    query('.hab-airlock-status').focus({ preventScroll: true });
+    const progress = query('[data-airlock-progress]');
+    const cycle = motionReduced() ? Promise.resolve() : airlock.animate(
+      [{ opacity: .15 }, { opacity: 1 }], { duration: 570, easing: 'ease-out' }).finished;
+    for (const control of root.querySelectorAll('button, select')) control.disabled = true;
+    try {
+      await cycle;
+      await launch(planToLaunch, scenarioToLaunch, message => { progress.textContent = message; });
+      if (!motionReduced()) document.getElementById('viewport').animate(
+        [{ opacity: 0 }, { opacity: 1 }], { duration: 370, easing: 'ease-out' });
+      room?.dispose();
+    } catch (error) {
+      console.error(error);
+      launching = false;
+      airlock.hidden = true;
+      stage.inert = false;
+      reviewClose.disabled = false;
+      const st = query('[data-status]');
+      if (st) st.textContent = 'The 3D simulation could not start. Reload to retry.';
+    }
+  }
+
+  const topoWidget = new SiteTopologyWidget(topoPanel, {
+    onDeploy: ({ site, pathId }) => {
+      if (!approaches) {
+        original.traverse = buildDeltaTraverse();
+        approaches = buildDeltaApproaches(original.traverse);
+      }
+      const chosenApproach = approaches.find(a => a.id === pathId) || approaches[1] || approaches[0];
+      const customPlan = {
+        ...chosenApproach,
+        name: `${site.name.split('·')[0].trim()} · ${chosenApproach.label} to S1`,
+        site: { name: site.name, eva: 'EVA-01', sol: 214 },
+      };
+      runLaunchSequence(customPlan, 'clear');
+    },
+  });
+
+  function setHabTab(nextTab) {
+    habTab = nextTab;
+    const isTopo = habTab === 'topology';
+    topoPanel.hidden = !isTopo;
+    consoleGrid.hidden = isTopo;
+    brief.hidden = isTopo;
+    root.classList.toggle('hab-topology-mode', isTopo);
+    for (const tabBtn of root.querySelectorAll('[data-hab-tab]')) {
+      tabBtn.setAttribute('aria-pressed', String(tabBtn.dataset.habTab === habTab));
+    }
+    if (isTopo) {
+      if (!zoomed) setZoom(true, screenOpen);
+      topoWidget._scheduleDraw();
+    }
+  }
+
   window.addEventListener('keydown', (event) => {
-    if (document.querySelector('dialog[open]')) return;
+    if (document.querySelector('dialog[open]') || launching) return;
+    if (habTab === 'topology' && zoomed && !root.classList.contains('hidden') && intro.hidden && topoWidget.handleKeyDown(event)) return;
     if (event.key.toLowerCase() === 'e' && !event.repeat && !event.altKey && !event.ctrlKey &&
         !event.metaKey && intro.hidden && !root.classList.contains('hidden') && !zoomed) {
       event.preventDefault();
@@ -479,6 +577,10 @@ export function mountHabitat(root, launch) {
     if (button === enter) enterHabitat();
     if (button === reviewOpen || button === screenOpen) setZoom(true, button);
     if (button === reviewClose) setZoom(false);
+    if (button.dataset.habTab) {
+      setHabTab(button.dataset.habTab);
+      return;
+    }
     if (button.hasAttribute('data-s1') || button.hasAttribute('data-s1-back')) {
       const focus = button.hasAttribute('data-s1');
       if (!zoomed) setZoom(true, screenOpen);
@@ -498,7 +600,7 @@ export function mountHabitat(root, launch) {
       if (mode === 'slope') view3d = false; // the slope layer is a 2D map
     }
     if (button.dataset.view3d) {
-      view3d = button.dataset.view3d === '3d';
+      view3d = button.dataset.view3d === '3d' && !map3dOff;
       if (view3d) { mode = 'orbital'; ensureMap3D(); }
     }
     if (button.hasAttribute('data-spin') && map3d) map3d.setSpin(!map3d.spinning);
@@ -506,30 +608,10 @@ export function mountHabitat(root, launch) {
     if (button.hasAttribute('data-observation')) observation.showModal();
     if (button.hasAttribute('data-photo-close')) observation.close();
     if (button.hasAttribute('data-launch') && selected && !button.disabled) {
-      launching = true;
-      button.textContent = 'Opening airlock…';
-      stage.inert = true;
-      airlock.hidden = false;
-      root.scrollTop = 0;
-      query('.hab-airlock-status').focus({ preventScroll: true });
-      const progress = query('[data-airlock-progress]');
-      const cycle = motionReduced() ? Promise.resolve() : airlock.animate(
-        [{ opacity: .15 }, { opacity: 1 }], { duration: 570, easing: 'ease-out' }).finished;
-      for (const control of root.querySelectorAll('button, select')) control.disabled = true;
-      try {
-        await cycle;
-        await launch(selected === original ? approachChoice : selected, selected === original ? 'clear' : query('[data-scenario]').value, message => { progress.textContent = message; });
-        if (!motionReduced()) document.getElementById('viewport').animate(
-          [{ opacity: 0 }, { opacity: 1 }], { duration: 370, easing: 'ease-out' });
-        room?.dispose();
-      } catch (error) {
-        console.error(error);
-        launching = false;
-        airlock.hidden = true;
-        stage.inert = false;
-        reviewClose.disabled = false;
-        query('[data-status]').textContent = 'The 3D simulation could not start. Reload to retry.';
-      }
+      await runLaunchSequence(
+        selected === original ? approachChoice : selected,
+        selected === original ? 'clear' : query('[data-scenario]').value
+      );
       return;
     }
     update();

@@ -2,7 +2,7 @@
 
 NASA Space Apps Challenge · *Interplanetary Survival Guide: Martian Map*
 
-The app opens on **Mars Surface Operations**. Select **Enter habitat**, then **Review route** to open the planner. **Original Delta Traverse** is selected by default. Select **S1** to compare three approaches from the habitat, each trading distance against risk: **Shortest** (293 m) takes the direct line across *unsurveyed ground* that the map cannot resolve (possible boulders, soft sand, small ledges), so the rover stops for a briefing and creeps through it; **Intermediate** (322 m) bends around that patch over mapped ground; **Longer** (419 m) is a western detour over the gentlest slopes. All three join the original 1.8 km loop at S1. Choose **Go outside** to drive the selected route.
+The app opens on **Mars Surface Operations**. Select **Enter habitat**, then **Review route** to open the planner. **Original Delta Traverse** is selected by default. Select **S1** to compare three approaches from the habitat, each trading distance against risk: **Shortest** (293 m) takes the direct line across *unsurveyed ground* that the map cannot resolve (possible boulders, soft sand, small ledges), so the rover stops for a briefing and creeps through it; **Intermediate** (322 m) bends around that patch over mapped ground; **Longer** (419 m) is a western detour over the gentlest slopes. Each card shows the expected drive time, worked out with the same speed limits and hazard stops as the drive itself. Unsurveyed ground also hides one obstacle that is on no map (soft sand or a boulder on the route): the rover stops when it reaches it, and clearing it costs 2–4 minutes and the oxygen to match. All three join the original 1.8 km loop at S1. Choose **Go outside** to drive the selected route. Each science stop is a marked station (pad, signed mast with beacon, instruments, sample cache, work-area flags). After finishing a station the rover stays parked until you plan the next leg on the wrist navigator: pick the path on a small map (Fastest, Planned or Safest, each with its time and an Easy/Moderate/Hard rating), then what to do at the next station (full stop, quick stop, skip it, or go home). Each option is checked against oxygen (keeping the 30-minute reserve), daylight (home by twilight), the falling afternoon temperature (no work on foot below −40 °C), rover battery and dust; options that fail are locked.
 
 Select **Gale Crater · Vera Rubin Ridge** to compare a gentler route and a shorter route to a layered outcrop, consult a Curiosity observation, and collect paired samples. Select **Dust front ahead** before launch to try an early return in Gale. Press **P** or click **Wrist navigator** in either mission for the next stop, nearby hazards, and estimated oxygen on return.
 
@@ -10,6 +10,7 @@ For Gale Crater, the wall map and rover terrain share a crop of an archived Mars
 
 - **Orbital and elevation**: [HiRISE DTEEC_009149_1750_009294_1750_U01 and PSP_009149_1750_RED_A_01_ORTHO](https://www.uahirise.org/dtm/dtm.php?ID=PSP_009149_1750), NASA/JPL-Caltech/University of Arizona, [USGS Analysis Ready Data](https://stac.astrogeology.usgs.gov/docs/data/mars/hirise_dtms/). The local assets are made from a 640 m crop in Mars 2015 equirectangular coordinates, with elevation resampled to 4 m and slopes derived from that grid. The wall display frames a 320 m portion. Outside the crop the simulation extends the edge elevations.
 - **Science reference**: [Curiosity Mastcam Sol 1790, PIA21851](https://science.nasa.gov/photojournal/looking-up-at-layers-of-vera-rubin-ridge-on-sol-1790/), NASA/JPL-Caltech/MSSS. This is a regional reference for the visible bedding, not a photograph from the exact simulated station.
+- **Site Topology globe**: colour from the NASA Viking/MOLA Mars mosaic ([nasa/NASA-3D-Resources](https://github.com/nasa/NASA-3D-Resources), public domain); relief from the MGS MOLA global DEM 463 m mosaic (NASA/JPL/GSFC via USGS Astrogeology), resampled to 2048×1024 in `public/mars/`. Rendered in WebGL with per-pixel relief lighting; drag to spin.
 - **Globe**: [JPL Mars Trek](https://trek.nasa.gov/mars/) continues to provide imagery for the separate scouting map.
 
 ### References studied
@@ -41,20 +42,20 @@ Run `npm run api` to plan a route or recalculate the remaining leg after a hazar
 
 ## Controls
 
-The planned route is a guide, not a rail: drive and walk anywhere. Stop at a science station, get out and collect its artifacts on foot. Rarer finds hide away from the route. Return to the habitat and press Enter to end the EVA.
+The planned route is a guide, not a rail: drive and walk anywhere. Stop at a science station, get out and collect its artifacts on foot. Rarer finds hide away from the route. Unsurveyed ground can hide an obstacle that stops the rover until you deal with it (Enter). When a station is done and more lie ahead, pick the next leg on the wrist navigator (`P`). Return to the habitat and press Enter to end the EVA.
 
 | Key | Driving | On foot |
 | --- | --- | --- |
 | `W` / `↑` | drive | walk forward |
 | `S` / `↓` / `Space` | brake (hold at a standstill to reverse) | walk back (`S` / `↓`) |
 | `A` `D` / `←` `→` | steer | step sideways |
-| `Shift` (hold) | time ×3 | run |
+| `Shift` (hold) | time ×3 · short boost that refills; off on hazard ground and near a station | run |
 | `F` | get out (rover stopped) | board the rover (within 3 m) |
 | `E` (hold) | | collect the find in reach |
 | `T` | view: first person → third person → overhead | same |
 | `I` | artifact collection | same |
 | `C` | cruise control | |
-| `Enter` | end the EVA at the habitat | same |
+| `Enter` | deal with an obstacle · end the EVA at the habitat · open the leg check | same |
 | `1`–`4` | data layer: optical · slope · thermal inertia · mineralogy | same |
 | `M` | full route map + elevation profile | same |
 | `L` | headlights · `H` hide HUD · `V` recentre view · `N` mute | same |

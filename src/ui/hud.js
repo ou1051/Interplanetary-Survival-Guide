@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { consumptionEstimate } from '../physics/traverse.js';
 import { SITE, ROVER, LIFE_SUPPORT, SLOPE_CLASSES } from '../config/mission.js';
 import { RARITY } from '../sim/artifacts.js';
 import { formatHMS, formatHM, formatDist, clamp } from '../core/math.js';
@@ -418,19 +419,26 @@ export class Hud {
     let html = '';
     if (M.state === 'drive') {
       const st = M.currentStation;
-      const open = st ? st.tasks.filter((t) => !t.done).length : 0;
+      const open = st && !st.skipped ? st.tasks.filter((t) => !t.done && !t.skipped).length : 0;
+      const charge = `${Math.round(M.boostCharge * 100)}%`;
+      const boost = M.boosting ? `TIME ×${ROVER.timeBoost} · BOOST ${charge}`
+        : M.boostBlocked ? `<span class="boost-off">⇧ BOOST OFF · ${M.boostBlocked}${M.boostBlocked === 'RECHARGING' ? ` ${charge}` : ''}</span>` : '';
       if (M.atHome) html = `<span class="pulse">AT THE HABITAT · <kbd>↵</kbd> END EVA · <kbd>F</kbd> GET OUT</span>`;
+      else if (M.legPending) html = `<span class="pulse">${M.legPending.id} DONE · CHOOSE THE NEXT LEG ON YOUR WRIST NAVIGATOR <kbd>P</kbd></span>`;
       else if (st && open && M.speed < 0.3) html = `<span class="pulse">${st.id} · <kbd>F</kbd> GET OUT AND COLLECT ${open} ARTIFACT${open > 1 ? 'S' : ''}</span>`;
       else if (st && open) html = `${st.id} · STOP HERE TO COLLECT ARTIFACTS`;
-      else if (M.cruise) html = `CRUISE ON · <kbd>S</kbd> to cancel${M.boosting ? ' · TIME ×3' : ''}`;
+      else if (M.cruise) html = `CRUISE ON · <kbd>S</kbd> to cancel${boost ? ` · ${boost}` : ''}`;
       else if (M.speed < 0.15 && !this.input.throttle) html = `<span class="pulse">HOLD <kbd>W</kbd> TO DRIVE · THE ROUTE IS A GUIDE, GO ANYWHERE</span>`;
-      else if (M.boosting) html = 'TIME ×3';
+      else if (boost) html = boost;
+    } else if (M.state === 'gate') {
+      html = `<span class="pulse">NOT ON THE MAP · ROVER STOPPED — PRESS <kbd>ENTER</kbd> TO DEAL WITH IT</span>`;
     } else if (M.state === 'walk') {
       if (C.reach) {
         const p = Math.round((C.collecting || 0) * 100);
         html = `<span class="pulse">HOLD <kbd>E</kbd> — COLLECT ${C.reach.name.toUpperCase()}${p ? ` · ${p} %` : ''}</span>`;
       } else if (M.canBoard) html = `<span class="pulse">PRESS <kbd>F</kbd> TO BOARD THE ROVER</span>`;
       else if (M.atHome) html = `AT THE HABITAT · <kbd>↵</kbd> END EVA`;
+      else if (M.legPending) html = `<span class="pulse">${M.legPending.id} DONE · CHOOSE THE NEXT LEG ON YOUR WRIST NAVIGATOR <kbd>P</kbd></span>`;
       else html = `<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> WALK · <kbd>⇧</kbd> RUN · FOLLOW THE BEAMS TO ARTIFACTS`;
     }
     if (el.innerHTML !== html) el.innerHTML = html;
@@ -452,17 +460,19 @@ export class Hud {
   _updateCard() {
     const M = this.mission;
     const card = $('card');
+    const gate = M.state === 'gate' && M.surprise ? M.surprise.ref : null;
     const st = ['drive', 'walk'].includes(M.state) ? M.currentStation : null;
     const home = !st && M.atHome && ['drive', 'walk'].includes(M.state);
     // Inside a mapped area hazard: its briefing, without stopping the rover.
     const hazard = !st && !home && M.state === 'drive' ? M.activeZones.find((z) => z.area && z.procedure?.length) : null;
-    const key = st ? `s:${st.id}:${M.state}` : home ? 'home' : hazard ? `h:${hazard.id}` : '';
+    const key = gate ? `g:${gate.id}` : st ? `s:${st.id}:${M.state}:${st.skipped ? 1 : 0}` : home ? 'home' : hazard ? `h:${hazard.id}` : '';
     if (key !== this.cardKey) {
       this.cardKey = key;
       if (!key) {
         card.classList.add('hidden');
         card.innerHTML = '';
-      } else if (home) this._homeCard(card);
+      } else if (gate) this._gateCard(card, gate);
+      else if (home) this._homeCard(card);
       else if (hazard) this._hazardCard(card, hazard);
       else this._stationCard(card, st);
     }
@@ -470,13 +480,15 @@ export class Hud {
       card.querySelectorAll('.task').forEach((el, i) => {
         const t = st.tasks[i];
         el.classList.toggle('done', t.done);
+        el.classList.toggle('skipped', !!t.skipped && !t.done);
         el.classList.toggle('active', !t.done && t.artifact === this.context.reach);
         const res = el.querySelector('.res');
         if (t.done && res.textContent === '') res.textContent = '→ collected';
       });
-      const left = st.tasks.filter((t) => !t.done).length;
+      const left = st.tasks.filter((t) => !t.done && !t.skipped).length;
       const hint = card.querySelector('.hint');
-      const text = !left ? `${st.id} complete. Board the rover and head for the next station.`
+      const text = st.skipped ? `${st.id} is skipped on this EVA.`
+        : !left ? `${st.id} complete.${M.legPending === st ? ' Choose the next leg on your wrist navigator [P].' : ' Board the rover and head for the next station.'}`
         : M.onFoot ? 'Follow the light beams. Stand next to a find and hold E to collect it.'
           : 'Stop the rover and press F to get out. Artifacts can only be collected on foot.';
       if (hint.textContent !== text) hint.textContent = text;
@@ -504,6 +516,24 @@ export class Hud {
       <div class="obj">${done} of ${M.stations.length} stations complete · ${M.collected.length} artifacts aboard. End the EVA here, or head out again.</div>
       <button class="cta">END EVA [ENTER]</button>`;
     card.querySelector('.cta').addEventListener('click', () => M.endEva());
+  }
+
+  // An obstacle the orbital map could not show: the rover is stopped until the crew deals with it.
+  _gateCard(card, z) {
+    card.className = 'card gate surprise';
+    card.innerHTML = `
+      <div class="kicker">NOT ON THE MAP · ROVER STOPPED</div>
+      <h2>${z.type}</h2>
+      <div class="facts">
+        <div class="fact"><span>DELAY</span><b>+${z.delayMinutes} min</b></div>
+        <div class="fact"><span>O₂ COST</span><b>+${consumptionEstimate(z.delayMinutes * 60, { work: true }).oxygenMinutes.toFixed(1)} min</b></div>
+        <div class="fact"><span>TILT HERE</span><b>${z.maxTilt.toFixed(1)}°</b></div>
+      </div>
+      <h3>PROCEDURE</h3>
+      <ul>${z.procedure.map((p) => `<li>${p}</li>`).join('')}</ul>
+      <div class="basis">DATA BASIS · ${z.basis}</div>
+      <button class="cta">DEAL WITH IT &amp; PROCEED [ENTER]</button>`;
+    card.querySelector('.cta').addEventListener('click', () => this.mission.acknowledge());
   }
 
   _stationCard(card, st) {

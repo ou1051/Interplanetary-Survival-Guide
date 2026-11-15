@@ -1,4 +1,4 @@
-import { ROVER, LIFE_SUPPORT, HAB, SITE, SLOPE_CLASSES } from '../config/mission.js';
+import { ROVER, LIFE_SUPPORT, HAB, SITE, SLOPE_CLASSES, SURPRISES } from '../config/mission.js';
 import { clamp, DEG, wrapAngle } from '../core/math.js';
 import { consumptionEstimate } from '../physics/traverse.js';
 
@@ -6,6 +6,7 @@ import { consumptionEstimate } from '../physics/traverse.js';
 // EVA state machine + consumables.
 //
 //   brief ─▶ drive ⇄ walk ─▶ complete (End EVA near the habitat)
+//              └─▶ gate (an obstacle the map could not show) ─▶ drive
 //
 // The rover drives freely over the terrain: the planned route is guidance, not
 // a rail. Speed is governed by the ground under the rover (slope, mapped area
@@ -13,9 +14,14 @@ import { consumptionEstimate } from '../physics/traverse.js';
 // The crew can get out and walk anywhere; station work means collecting the
 // station's artifacts on foot. `s` is the rover's progress projected onto the
 // planned route, kept for the route displays.
+//
+// Unsurveyed ground hides one obstacle per patch (SURPRISES): the rover meets
+// it somewhere inside the patch, whatever line it drives, and dealing with it
+// costs time and oxygen. When a station's work is done and more stations lie
+// ahead, the crew picks the next leg on the wrist navigator (sim/legCheck.js).
 // ---------------------------------------------------------------------------
 
-const BOOST = 3;
+const BOOST = ROVER.timeBoost ?? 3;
 export const STEEP_BLOCK = 32; // degrees: above the steepest ground any planned route crosses (Gale shortest ≈ 29°)
 export const STATION_RADIUS = 30; // m: entering this ring "arrives" at a station
 export const HOME_RADIUS = 30; // m: End EVA is offered inside this ring around the habitat
@@ -23,10 +29,41 @@ export const HAB_RADIUS = 10; // m: habitat footprint (collision)
 export const WALK = { speed: 1.3, run: 2.4, reach: 2.4, board: 3.4, maxSlope: 32, hardSlope: 18 };
 const ROVER_RADIUS = 1.9;
 const REVERSE_SPEED = 1.2;
+const BOOST_STOP_NEAR = 25; // m: Shift does nothing this close to the next station
+
+// One hidden obstacle per unsurveyed patch the plan crosses, met after driving
+// part of the way into the patch.
+function hiddenSurprises(route, random) {
+  return (route.areaHazards ?? []).filter((hz) => hz.unsurveyed).map((hz) => {
+    const kind = SURPRISES[Math.floor(random() * SURPRISES.length) % SURPRISES.length];
+    return {
+      hazard: hz,
+      after: hz.radius * (0.5 + random() * 0.7), // metres driven inside the patch
+      driven: 0,
+      found: false,
+      ref: {
+        ...kind,
+        id: `${kind.id}-${hz.id}`,
+        surprise: true,
+        severity: 'danger',
+        limit: hz.limit,
+        maxTilt: 0,
+        basis: 'Found on site; too small for the orbital map that covers this ground',
+      },
+    };
+  });
+}
 
 export class Mission {
-  constructor(route, terrain, habAntenna) {
+  constructor(route, terrain, habAntenna, { random = Math.random, surprises = true, legCheck = true } = {}) {
     this.route = route;
+    this.random = random;
+    this.surprisesOn = surprises;
+    this.legCheck = legCheck;
+    this.surprises = surprises ? hiddenSurprises(route, random) : [];
+    this.surprise = null; // the obstacle the rover is stopped at
+    this.legPending = null; // station just finished; the next leg is still to be chosen
+    this.lastLeg = null;
     this.terrain = terrain;
     this.habAntenna = habAntenna;
     this.state = 'brief';
@@ -50,6 +87,8 @@ export class Mission {
     this.limitReason = '';
     this.governed = false;
     this.boosting = false;
+    this.boostCharge = 1; // 0–1; drains while Shift is held, refills slowly
+    this.boostBlocked = ''; // why Shift does nothing right now
     this.offRoute = false;
     this.blocked = false; // rover facing ground too steep to climb
     this.bumped = 0;
@@ -75,11 +114,16 @@ export class Mission {
   // The next station in plan order that still has work; the habitat once all are done.
   get nextStation() {
     if (this.aborted) return this.home;
-    return this.stations.find((st) => !st.done) ?? this.home;
+    return this.stations.find((st) => !st.done && !st.skipped) ?? this.home;
   }
   get nextStop() {
     const st = this.nextStation;
     return st ? { kind: 'station', s: st.s, ref: st } : null;
+  }
+  // What the displays may show next: the obstacle while stopped at one, else the next station.
+  get nextKnownStop() {
+    if (this.state === 'gate' && this.surprise) return { kind: 'gate', s: this.s, ref: this.surprise.ref };
+    return this.nextStop;
   }
   // The station whose area the crew is in, if any.
   get currentStation() {
@@ -154,6 +198,7 @@ export class Mission {
 
   endEva() {
     if (!['drive', 'walk'].includes(this.state) || !this.atHome) return false;
+    this.legPending = null;
     const home = this.home;
     if (home) home.done = true;
     this.rover.speed = this.speed = 0;
@@ -177,6 +222,60 @@ export class Mission {
     return true;
   }
 
+  // Deal with an obstacle the rover is stopped at (time and oxygen), then drive on.
+  acknowledge() {
+    if (this.state !== 'gate' || !this.surprise) return false;
+    const z = this.surprise.ref;
+    this._consume(z.delayMinutes * 60, { work: true });
+    this.emit('log', { text: `${z.type} cleared · +${z.delayMinutes} min`, tone: 'warn' });
+    this.surprise = null;
+    this.state = 'drive';
+    this.emit('state', { state: this.state });
+    return true;
+  }
+
+  // Apply the leg the crew picked after a station (see sim/legCheck.js).
+  //   continue: every artifact at the next station · quick: the first one only
+  //   skip: pass the next station by · home: no more stations
+  chooseLeg(option) {
+    if (!this.legPending || !option?.allowed) return false;
+    const ahead = this.stations.filter((st) => !st.done && !st.skipped && st !== this.legPending);
+    if (option.id === 'quick' && ahead[0]) ahead[0].tasks.slice(1).forEach((task) => { if (!task.done) task.skipped = true; });
+    if (option.id === 'skip' && ahead[0]) ahead[0].skipped = true;
+    if (option.id === 'home') ahead.forEach((st) => { st.skipped = true; });
+    for (const st of ahead) if (!st.skipped && st.tasks.every((t) => t.done || t.skipped)) st.done = true;
+    this.lastLeg = option.id;
+    this.legPending = null;
+    const next = this.nextStation;
+    this.emit('log', { text: `Leg confirmed: ${option.label} · next: ${next && !next.final ? `${next.id} · ${next.name}` : 'HAB'}`, tone: 'ok' });
+    this.emit('leg', { option });
+    return true;
+  }
+
+  // Take over a new planned route (a different path picked for the leg ahead).
+  // Stations keep their identity, work and artifacts; the crew stays where it is.
+  replaceRoute(route) {
+    for (const st of route.stations) {
+      const before = this.route.stations.find((old) => old.id === st.id);
+      if (!before) continue;
+      st.tasks = before.tasks;
+      st.done = before.done;
+      st.skipped = before.skipped;
+      st.visited = before.visited;
+    }
+    const found = this.surprises.filter((sp) => sp.found);
+    const fresh = this.surprisesOn ? hiddenSurprises(route, this.random).filter((sp) => !found.some((f) => f.hazard.id === sp.hazard.id)) : [];
+    this.route = route;
+    this.surprises = [...found, ...fresh];
+    this._zoneIds = new Set();
+    this._searchTimer = 0;
+    if (this.pos) {
+      // Find the crew on the new plan from scratch.
+      this.s = 0;
+      this._track(0, true);
+    }
+  }
+
   collect(artifact) {
     if (!artifact || artifact.collected || this.state !== 'walk') return false;
     artifact.collected = true;
@@ -185,14 +284,24 @@ export class Mission {
     this._consume(artifact.minutes * 60, { work: true });
     const st = artifact.stationId ? this.stations.find((x) => x.id === artifact.stationId) : null;
     const task = st?.tasks.find((t) => t.artifact === artifact);
-    if (task) { task.done = true; task.progress = 1; }
+    if (task) { task.done = true; task.skipped = false; task.progress = 1; }
     this.emit('log', { text: `${st ? `${st.id} ✓ ` : ''}Collected ${artifact.name}`, tone: 'ok' });
     this.emit('artifact', { artifact, station: st });
-    if (st && !st.done && st.tasks.every((t) => t.done)) {
+    if (st && !st.done && st.tasks.every((t) => t.done || t.skipped)) {
       st.done = true;
-      const next = this.nextStation;
-      this.emit('log', { text: `${st.id} complete · next: ${next?.final ? 'habitat' : `${next.id} · ${next.name}`}`, tone: 'ok' });
-      this.emit('station', { station: st, done: true });
+      st.skipped = false;
+      const ahead = this.stations.some((x) => !x.done && !x.skipped);
+      if (this.legCheck && ahead) {
+        // More science ahead: the crew picks the next leg on the wrist navigator.
+        this.legPending = st;
+        this.emit('log', { text: `${st.id} complete · choose the next leg on your wrist navigator [P]`, tone: 'info' });
+        this.emit('station', { station: st, done: true });
+        this.emit('legcheck', { station: st });
+      } else {
+        const next = this.nextStation;
+        this.emit('log', { text: `${st.id} complete · next: ${next?.final ? 'habitat' : `${next.id} · ${next.name}`}`, tone: 'ok' });
+        this.emit('station', { station: st, done: true });
+      }
     }
     return true;
   }
@@ -241,14 +350,22 @@ export class Mission {
 
   _drive(dt, input, pitchDeg) {
     const r = this.rover;
-    this.boosting = Boolean(input.boost);
+    const ground = this._ground(r.x, r.z, r.heading);
+    // Shift speeds up time, but only on easy ground, away from the next station, and only for a short while.
+    const st = this.nextStation;
+    const stopNear = st && !st.final && Math.hypot(st.x - r.x, st.z - r.z) < BOOST_STOP_NEAR;
+    const empty = this.boostCharge <= 0.02 || (this._boostEmpty && this.boostCharge < 0.3);
+    this._boostEmpty = empty;
+    this.boostBlocked = !input.boost ? '' : ground.zones.length ? 'HAZARD STRETCH' : stopNear ? 'STOP AHEAD' : empty ? 'RECHARGING' : '';
+    this.boosting = Boolean(input.boost) && !this.boostBlocked;
+    if (this.boosting) this.boostCharge = Math.max(0, this.boostCharge - dt / (ROVER.boostSeconds ?? 12));
+    else this.boostCharge = Math.min(1, this.boostCharge + dt / (ROVER.boostRechargeSeconds ?? 20));
     const sdt = dt * (this.boosting ? BOOST : 1);
     const throttle = !this.dustWarning && (input.throttle || this.cruise);
     const brake = this.dustWarning || input.brake;
     if (brake) this.cruise = false;
     this._brakeHeld = brake && r.speed <= 0.05 ? this._brakeHeld + dt : 0;
 
-    const ground = this._ground(r.x, r.z, r.heading);
     let limit = ROVER.maxSpeed;
     let reason = '';
     for (const z of ground.zones) if (z.limit < limit) { limit = z.limit; reason = z.type; }
@@ -302,6 +419,27 @@ export class Mission {
     this._consume(sdt, { moving: moved, pitch: (pitchDeg / DEG) * (dir || 1) });
     this.pos = { x: r.x, y: this.terrain.heightAt(r.x, r.z), z: r.z };
     this._zones(ground.zones);
+    this._hidden(moved);
+  }
+
+  // Driving across unsurveyed ground: meet its hidden obstacle part of the way in.
+  _hidden(moved) {
+    const r = this.rover;
+    for (const sp of this.surprises) {
+      if (sp.found || Math.hypot(r.x - sp.hazard.cx, r.z - sp.hazard.cz) > sp.hazard.radius) continue;
+      sp.driven += moved;
+      if (sp.driven < sp.after) continue;
+      sp.found = true;
+      sp.ref.maxTilt = this._ground(r.x, r.z, r.heading).tilt;
+      sp.ref.at = { x: r.x, z: r.z };
+      this.surprise = sp;
+      r.speed = this.speed = 0;
+      this.cruise = false;
+      this.state = 'gate';
+      this.emit('log', { text: `NOT ON THE MAP — ${sp.ref.type}`, tone: 'danger' });
+      this.emit('state', { state: this.state, surprise: sp.ref });
+      return;
+    }
   }
 
   _walk(dt, input) {
@@ -382,7 +520,7 @@ export class Mission {
   }
 
   // Project the crew's position onto the planned route (route displays, guidance).
-  _track(dt) {
+  _track(dt, full = false) {
     const R = this.route;
     if (!R.count) return;
     const { x, z } = this.pos;
@@ -406,7 +544,7 @@ export class Mission {
     const ahead = Math.ceil(80 / R.step), behind = Math.ceil(12 / R.step);
     let [i, d] = this.aborted && R.retracesOutbound !== false ? best(at - ahead, at + behind) : best(at - behind, at + ahead);
     this._searchTimer -= dt;
-    if (d > 40 && this._searchTimer <= 0) {
+    if (full || (d > 40 && this._searchTimer <= 0)) {
       // Far from the last known stretch: search the whole route once in a while.
       this._searchTimer = 0.5;
       [i, d] = best(0, R.count - 1);

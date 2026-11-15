@@ -172,10 +172,40 @@ export const AREA_HAZARDS = [
   },
 ];
 
+// What unsurveyed ground can hide. Each drive across an unsurveyed patch meets one of these, at a
+// point the crew cannot know in advance; it costs time (and with it oxygen) before they can go on.
+export const SURPRISES = [
+  {
+    id: 'SURPRISE-SAND',
+    type: 'SOFT SAND · WHEEL SINKING',
+    delayMinutes: 4,
+    procedure: [
+      'Stop at once; do not spin the wheels',
+      'Reverse slowly along your own tracks',
+      'Crew member 2 probes a firmer line 2 m to the side',
+    ],
+  },
+  {
+    id: 'SURPRISE-BOULDER',
+    type: 'BOULDER ON THE ROUTE',
+    delayMinutes: 2,
+    procedure: [
+      'Stop 5 m short; crew member 2 walks ahead to guide',
+      'Steer around on the uphill side with 0.5 m wheel clearance',
+      'Mark the boulder on the map for the next crew',
+    ],
+  },
+];
+
 export const ROVER = {
   maxSpeed: 4.5, // m/s (~16 km/h)
-  cautionSpeed: 2.8,
-  dangerSlopeSpeed: 1.6,
+  cautionSpeed: 2.8, // yellow: moderate slope (10 km/h)
+  dangerSlopeSpeed: 1.6, // red: steep slope (6 km/h)
+  // Hold Shift to speed up time. It is limited: a short charge that drains while held and refills
+  // slowly, and it does not work on yellow/red stretches or close to a stop.
+  timeBoost: 3,
+  boostSeconds: 12, // full charge lasts this long (real seconds)
+  boostRechargeSeconds: 20, // empty to full while not boosting
   accel: 1.1,
   brake: 2.6,
   coast: 0.35,

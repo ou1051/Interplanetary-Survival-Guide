@@ -449,6 +449,7 @@ kbd {
 .task.done .chk { border-color: var(--ok); background: var(--ok); }
 .task.active { border-color: var(--hud); }
 .task.locked { opacity: 0.45; cursor: default; }
+.task.skipped { opacity: 0.35; cursor: default; text-decoration: line-through; } /* dropped by a quick-stop leg choice */
 .card .cta {
   margin-top: 16px;
   width: 100%;
@@ -603,3 +604,5 @@ button.primary:disabled { opacity: 0.5; cursor: progress; box-shadow: none; }
 }
 button:focus-visible, a:focus-visible { outline: 2px solid #d3edb9; outline-offset: 5px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
+
+.boost-off { color: #ffb36b; } /* Shift pressed where the time boost is not allowed */

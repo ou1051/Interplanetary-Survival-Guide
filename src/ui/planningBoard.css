@@ -418,3 +418,48 @@
 .field-alert { position: absolute; z-index: 16; left: 50%; bottom: 85px; transform: translateX(-50%); color: #ffcf9a; background: #1e140d; padding: 8px 12px; width: max-content; max-width: 90vw; }
 .station-observation { display:block; color:var(--hud); font-size:11px; margin-top:8px; }
 .station-observation img { display:block; width:100%; max-height:70px; object-fit:cover; }
+
+/* Next leg: map of the three paths, path cards, plan buttons, one-line verdict, check chips */
+.wd-legmap canvas { display: block; width: 100%; height: auto; border: 1px solid var(--trace); background: #0a190e; margin-bottom: 5px; }
+.wd-page [data-leg] .wd-h { margin-bottom: 4px; }
+.wd-paths { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 6px; }
+.wd-screen .wd-paths button { position: relative; text-align: left; border: 1px solid var(--trace); border-top: 3px solid var(--path); padding: 3px 6px; line-height: 1.2; }
+.wd-screen .wd-paths button b { display: block; color: var(--path); }
+.wd-screen .wd-paths button span, .wd-screen .wd-paths button small { display: block; font-size: .82em; color: var(--dim); }
+.wd-screen .wd-paths button em { position: absolute; top: 4px; right: 6px; font-style: normal; font-size: .72em; padding: 0 4px; border: 1px solid currentColor; }
+.wd-paths .lvl-easy { color: #8ff07a; }
+.wd-paths .lvl-moderate { color: #ffd36b; }
+.wd-paths .lvl-hard { color: #ff8a6b; }
+.wd-screen .wd-paths button[aria-checked="true"] { box-shadow: inset 0 0 0 1px var(--path); background: #a4f67c10; }
+.wd-plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin-bottom: 6px; }
+.wd-screen .wd-plans button { border: 1px solid var(--trace); padding: 4px 2px; text-align: center; font-size: .9em; }
+.wd-screen .wd-plans button[aria-checked="true"] { border-color: var(--phosphor); background: var(--phosphor); color: var(--tube); text-shadow: none; }
+.wd-screen .wd-plans button.is-locked { opacity: .5; border-style: dashed; }
+.wd-screen .wd-plans button.is-locked[aria-checked="true"] { background: #ffb36b; border-color: #ffb36b; }
+.wd-legstatus { margin: 0 0 4px; font-weight: 700; }
+.wd-legstatus.fail { color: #ffb36b; }
+.wd-chips { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.wd-chips li { border: 1px solid var(--trace); padding: 0 6px; font-size: .82em; }
+.wd-chips li.fail { color: #ffb36b; border-color: #ffb36b; }
+.wd-screen .wd-confirm { display: block; width: 100%; text-align: center; }
+.wd-screen .wd-confirm:disabled { opacity: .45; cursor: not-allowed; }
+.wd-screen .wd-confirm:disabled:hover { background: none; color: inherit; }
+
+/* Suit Data & Site Topology inside Tablet UI */
+.wd-suit-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.wd-screen .wd-preset-btn {
+  flex: 1;
+  min-width: 110px;
+  border: 1px solid var(--trace);
+  padding: 6px 8px;
+  background: rgba(16, 38, 22, 0.6);
+}
+.wd-screen .wd-preset-btn.on {
+  border-color: var(--signal);
+  background: rgba(35, 82, 42, 0.85);
+}
+.wd-preset-btn b, .wd-preset-btn small { display: block; }
+.wd-preset-btn small { font-size: 0.8em; color: var(--dim); }
+.wd-suit-sliders { display: grid; gap: 6px; margin-top: 8px; }
+.wd-suit-slider { display: grid; gap: 2px; font-size: 0.85em; }
+.wd-suit-slider input[type="range"] { width: 100%; accent-color: var(--signal); }

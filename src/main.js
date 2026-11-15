@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Terrain, featureMasks, sampleContext } from './world/terrain.js';
 import { Route, RouteVisuals } from './world/route.js';
+import { ROVER } from './config/mission.js';
 import { createRocks, createHabitat } from './world/scenery.js';
 import { createSky, createEnvironment, DustMotes, WheelDust, SUN_DIR, HORIZON } from './world/atmosphere.js';
 import { Rover, EYE } from './rover/rover.js';
@@ -45,7 +46,7 @@ async function initSurface(plan, scenario, status) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   viewport.appendChild(renderer.domElement);
 
   const input = new Input(viewport);
@@ -77,7 +78,7 @@ async function initSurface(plan, scenario, status) {
 
   status('PLANNING ROUTE…');
   await nextFrame();
-  const route = plan.traverse?.route ?? new Route(terrain, { points: plan.points, exact: true, areaHazards: [], stations: [{
+  let route = plan.traverse?.route ?? new Route(terrain, { points: plan.points, exact: true, areaHazards: [], stations: [{
     id: 'S1', name: 'Layered outcrop', at: worldPosition(outcrop),
     objective: 'Use the Curiosity field reference to identify two beds and collect a sample from each.',
     why: ['Compare rock textures above and below the visible contact.'],
@@ -87,12 +88,12 @@ async function initSurface(plan, scenario, status) {
   route.planName = plan.name;
   route.retracesOutbound = !plan.traverse;
   route.site = plan.site;
-  const visuals = new RouteVisuals(route, terrain);
+  let visuals = new RouteVisuals(route, terrain);
   scene.add(visuals.group);
 
   status('PLACING ROCKS…');
   await nextFrame();
-  const rocks = createRocks(terrain, route);
+  let rocks = createRocks(terrain, route);
   scene.add(rocks);
   const hab = createHabitat(terrain);
   scene.add(hab);
@@ -159,7 +160,40 @@ async function initSurface(plan, scenario, status) {
   status('RENDERING DATA LAYERS…');
   await nextFrame();
   setLayer('optical');
-  planningBoard.connectTraverse(mission);
+  planningBoard.connectTraverse(mission, { terrain, swapRoute });
+
+  // A different path was picked for the leg ahead: rebuild everything drawn from the route.
+  function swapRoute(next) {
+    next.planName = route.planName;
+    next.site = route.site;
+    next.retracesOutbound = route.retracesOutbound;
+    for (const old of [visuals.group, rocks]) {
+      scene.remove(old);
+      old.traverse((o) => { o.geometry?.dispose(); });
+    }
+    route = next;
+    visuals = new RouteVisuals(route, terrain);
+    scene.add(visuals.group);
+    rocks = createRocks(terrain, route);
+    scene.add(rocks);
+    map.route = route;
+    map._buildRoutePath();
+    hud.route = route;
+    document.getElementById('markers').innerHTML = '';
+    hud._buildMarkers();
+    mission.replaceRoute(route);
+    if (window.__isg) window.__isg.route = route;
+  }
+  planningBoard.setDeployHandler(({ site, pathId }) => {
+    const label = pathId.charAt(0).toUpperCase() + pathId.slice(1);
+    route.planName = `${site.name.split('·')[0].trim()} · ${label} to S1`;
+    route.site = { ...route.site, name: site.name };
+    const siteEl = document.getElementById('siteName');
+    if (siteEl) siteEl.textContent = site.name.toUpperCase();
+    // The rover drives freely: only the plan's name and target change, the crew stays where it is.
+    planningBoard.updateField();
+    hud.log(`Survey target updated: ${route.planName}`, 'ok');
+  });
   hud.onLayerClick((id) => {
     setLayer(id);
     hud.log(`Layer: ${layer.name} (${layer.source})`, 'info');
@@ -180,6 +214,8 @@ async function initSurface(plan, scenario, status) {
       collection.announce(p.artifact, isNew);
     }
     if (type === 'state' && p.state === 'complete') setTimeout(() => hud.showDebrief(() => location.reload(), debriefSummary()), 1400);
+    // finished a station with more ahead: the wrist navigator opens on the leg check
+    if (type === 'legcheck') planningBoard.toggle(true);
   });
 
   function debriefSummary() {
@@ -312,7 +348,7 @@ async function initSurface(plan, scenario, status) {
     return { s: +mission.s.toFixed(1), v: +mission.speed.toFixed(2), state: mission.state };
   };
   window.__isg = {
-    renderer, input, mission, route, rover, terrain, setLayer, hud, simulate, artifacts, collection,
+    renderer, input, mission, route, rover, terrain, setLayer, hud, simulate, artifacts, collection, planningBoard,
     crewAction, cycleView, get viewMode() { return viewMode; },
   };
 
@@ -343,7 +379,11 @@ async function initSurface(plan, scenario, status) {
         mission.cruise = !mission.cruise;
         hud.log(`Cruise ${mission.cruise ? 'ON' : 'OFF'}`, 'info');
       }
-      if (input.hit('enter') && mission.atHome) mission.endEva();
+      if (input.hit('enter')) {
+        if (mission.state === 'gate') mission.acknowledge();
+        else if (mission.atHome) mission.endEva();
+        else if (mission.legPending) planningBoard.toggle(true);
+      }
     }
 
     // ---- simulation
@@ -403,7 +443,7 @@ async function initSurface(plan, scenario, status) {
     let copilotLook = 0;
     if (station) copilotLook = -wrapAngle(bearingTo(R.x, R.z, station.x, station.z) - headingRad);
     const driving = mission.state === 'drive';
-    const roverSpeed = R.speed * (mission.boosting && driving ? 3 : 1);
+    const roverSpeed = R.speed * (mission.boosting && driving ? ROVER.timeBoost : 1);
     rover.animate(dt, {
       speed: roverSpeed,
       throttle: driving && (input.throttle || mission.cruise) ? 1 : 0,
