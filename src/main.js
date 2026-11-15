@@ -111,16 +111,11 @@ async function initSurface(plan, scenario, status) {
 
 
   // ---------------------------------------------------------------- crew, finds
-  // The driver as a whole figure: seated in the rover for the outside views,
-  // walking when out of the rover.
-  const walker = new Astronaut(env);
+  // The driver as a whole figure: in the rover seat for the outside views
+  // (rover.driver), walking when out of the rover. Same suit and materials as the rover crew.
+  const walker = new Astronaut(rover.suitM);
   walker.root.visible = false;
   scene.add(walker.root);
-  const seated = new Astronaut(env);
-  seated.setSeated(true);
-  seated.root.position.set(-0.42, -0.08, 0.34);
-  seated.root.visible = false;
-  rover.body.add(seated.root);
   // World camera for walking and the outside views (the cockpit camera rides the rover).
   const freeCam = new THREE.PerspectiveCamera(72, 1, 0.05, 30000);
   freeCam.rotation.order = 'YXZ';
@@ -474,7 +469,7 @@ async function initSurface(plan, scenario, status) {
     const outside = viewMode !== 'pov';
     const inRover = !onFoot; // driving, or the EVA has ended with the crew aboard
     rover.driverLegs.visible = inRover && !outside;
-    seated.root.visible = inRover && outside;
+    rover.driver.visible = inRover && outside;
     walker.root.visible = onFoot && outside;
     const W = mission.walker;
     const groundW = terrain.heightAt(W.x, W.z);

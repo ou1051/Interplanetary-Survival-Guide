@@ -71,7 +71,7 @@ Each station has three finds tied to its science (for example olivine at the cra
 ## What the screen shows
 
 - **Cockpit (diegetic):** roll cage, front deck, fenders and wheels with independent suspension,
-  co-pilot astronaut, hand controller that follows your input, and four live displays — heading-up
+  co-pilot astronaut in a procedural Apollo-style EVA suit (your own suited legs below you), hand controller that follows your input, and four live displays — heading-up
   NAV map, TRAVERSE (speed, pitch/roll, look-ahead elevation profile), SCIENCE (value of the active
   layer under the rover + next station objective) and a SUIT tablet.
 - **Helmet HUD:** compass tape with bearings to the next station and the habitat, life-support
@@ -120,6 +120,8 @@ src/
   world/atmosphere.js Mars sky, image-based lighting, dust motes, wheel dust
   rover/rover.js      cockpit model, suspension, animation
   rover/screens.js    in-cabin displays (canvas textures)
+  rover/suitGeometry.js  procedural EVA suit (folds, bent-knee legs, backpack, visor), no three.js
+  rover/astronaut.js  three.js meshes for the suit, seated co-pilot and driver's legs
   data/layers.js      data-layer samplers + legends
   sim/mission.js      traverse state machine + consumables
   sim/input.js        keyboard / mouse-look / touch
