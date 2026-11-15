@@ -138,7 +138,15 @@
         </div>
       </section>
 
-      <section id="habitat" aria-label="Habitat mission control"></section>
+      <section id="habitat" aria-label="Habitat mission control">
+        <div id="localLaunch" class="screen hidden">
+          <div class="screen-inner">
+            <h1>Mars Surface Operations</h1>
+            <p><a href="./dist-single/index.html">Open the offline game</a></p>
+            <p>To build or update the offline game, run <code>npm run build:single</code> in the project folder.</p>
+          </div>
+        </div>
+      </section>
 
       <dialog id="sourcesDialog" class="sources-dialog" aria-labelledby="sourcesTitle">
         <header class="source-header">
@@ -181,7 +189,8 @@
         </div>
       </section>
     </div>
-    <script type="module" src="./src/main.js"></script>
+    <script type="module" src="./src/main.js"
+      onerror="if (location.protocol === 'file:') document.getElementById('localLaunch').classList.remove('hidden')"></script>
   </body>
 </html>
 

@@ -102,7 +102,6 @@ export class Hud {
     } else if (lg.type === 'gradient') {
       html = `<div class="grad" style="background:linear-gradient(90deg,${lg.stops.join(',')})"></div><span>${lg.lo}</span><span style="margin-left:auto">${lg.hi}</span>`;
     } else html = `<span>${lg.text}</span>`;
-    html += `<span class="src">SOURCE: ${layer.source} → planned: ${layer.future}</span>`;
     $('legend').innerHTML = html;
     $('mapSub').textContent = `Layer: ${layer.name} (${layer.source}) · planned source: ${layer.future}`;
   }
