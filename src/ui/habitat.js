@@ -1,6 +1,10 @@
 import { deltaPlan, buildDeltaTraverse, buildDeltaApproaches } from '../data/deltaTraverse.js';
 import { makeDeltaOverview } from './deltaOverview.js';
 import { AREA_HAZARDS } from '../config/mission.js';
+import { Mission } from '../sim/mission.js';
+import { forecastReturn } from '../sim/legCheck.js';
+import { CLEAR_WEATHER, SHORTCUT_FRONT } from '../sim/weather.js';
+import { ICON } from '../map/icons.ts';
 import { mountHabitatRoom } from './habitatRoom.js';
 import { mountHabitatExterior } from './habitatExterior.js';
 import { mountConsoleMap3D, map3DSupport } from './consoleMap3D.js';
@@ -25,6 +29,9 @@ export function mountHabitat(root, launch) {
   let deltaMap, s1Map, approaches;
   let s1Focused = false;
   let approachChoice;
+  let departureWaitSeconds = 0;
+  const frontSeconds = 360 + Math.round(Math.random() * 240);
+  const departureForecasts = new Map();
   let mode = 'orbital';
   let view3d = true;
   let map3d = null;
@@ -92,6 +99,20 @@ export function mountHabitat(root, launch) {
             <label class="hab-scenario">Mission site
               <select data-site-select><option value="delta">Original Delta Traverse</option><option value="gale"${plans.length ? '' : ' disabled'}>Gale Crater · Vera Rubin Ridge</option></select>
             </label>
+            <details class="hab-cabin-weather" data-cabin-weather>
+              <summary class="weather-control" data-tone="variable">
+                <span class="weather-symbol" aria-hidden="true">${ICON.wind}</span>
+                <span class="weather-reading"><small>Departure forecast · simulated</small>
+                  <strong data-cabin-conditions></strong><span data-cabin-outlook></span>
+                </span>
+              </summary>
+              <div class="hab-forecast-details">
+                <p data-cabin-visibility></p>
+                <p><b>Outdoor work:</b> cold spells reduce the work window to 10 minutes. Short readings may fit; longer tasks may need a wait.</p>
+                <p><b>Return reserve:</b> keep 30 minutes of oxygen and 10% rover battery. Route estimates include work and habitat ingress; return by twilight.</p>
+                <p>Plan here, then adapt in the field. Gusts and cold spells can develop after launch; their timing is uncertain. Check your wrist map as conditions change.</p>
+              </div>
+            </details>
             <section data-delta-brief>
               <h3 class="hab-objective">Original Delta Traverse</h3>
               <p data-delta-summary></p>
@@ -101,6 +122,16 @@ export function mountHabitat(root, launch) {
                 <button type="button" class="hab-step" data-s1-back>← Full traverse</button>
                 <h3>Habitat → S1 · Crater Floor Unit</h3>
                 <div class="hab-routes hab-approaches" data-approaches role="group" aria-label="Approaches to S1"></div>
+                <div class="hab-unknowns hab-weather" data-departure-weather hidden>
+                  <h4>Shortcut weather forecast</h4>
+                  <p data-weather-forecast></p>
+                  <div class="hab-routes hab-approaches" role="group" aria-label="Weather departure decision">
+                    <button type="button" data-departure="proceed"><b>Proceed on shortcut</b><small data-weather-proceed></small></button>
+                    <button type="button" data-departure="wait"><b data-wait-label>Wait, then shortcut</b><small data-weather-wait></small></button>
+                    <button type="button" data-departure="detour"><b>Take mapped western detour</b><small data-weather-detour></small></button>
+                  </div>
+                </div>
+                <p class="hab-note" data-departure-forecast></p>
                 <div class="hab-unknowns" data-unknowns hidden></div>
               </div>
             </section>
@@ -118,10 +149,18 @@ export function mountHabitat(root, launch) {
                 <small>${plan.surfaceSlope.toFixed(1)}° max mapped slope</small></button>`).join('')}
             </div>
             <p class="hab-reason" data-reason></p>
-            <label class="hab-scenario">Simulation conditions
-              <select data-scenario><option value="clear">Nominal conditions</option><option value="dust">Dust front ahead</option></select>
-            </label>
             </div>
+            <details class="hab-rehearsal-settings" data-rehearsal-settings>
+              <summary>Rehearsal settings</summary>
+              <label class="hab-scenario">Simulation conditions
+                <select data-scenario>
+                  <option value="variable">Variable weather</option>
+                  <option value="clear">Nominal conditions</option>
+                  <option value="dust" data-gale-only>Dust front ahead</option>
+                </select>
+              </label>
+              <p>Choose a training mode before launch. Variable weather is the default; nominal conditions stay clear, and the dust-front exercise practices an early return.</p>
+            </details>
             <button type="button" data-launch class="hab-launch">Go outside <span>→</span></button>
             <p class="hab-note" data-status role="status">Oxygen and weather are simulated.</p>
           </section>
@@ -216,7 +255,7 @@ export function mountHabitat(root, launch) {
       const rect = canvas.getBoundingClientRect();
       const choice = s1Map.pick(ctx, (event.clientX - rect.left) * canvas.width / rect.width,
         (event.clientY - rect.top) * canvas.height / rect.height);
-      if (choice) { approachChoice = choice; update(); }
+      if (choice) { approachChoice = choice; departureWaitSeconds = 0; update(); }
       return;
     }
     const plan = routeUnderPointer(event);
@@ -255,6 +294,26 @@ export function mountHabitat(root, launch) {
     for (const element of root.querySelectorAll('[data-gale-only], .hab-mapframe > img, .hab-pin:not(.hab-s1), .hab-base, .hab-scale')) {
       element.hidden = delta;
     }
+    const conditions = query('[data-scenario]');
+    if (delta && conditions.value === 'dust') conditions.value = 'variable';
+    const nominal = conditions.value === 'clear';
+    const dustExercise = conditions.value === 'dust';
+    const cabin = query('[data-cabin-weather]');
+    cabin.querySelector('summary').dataset.tone = dustExercise ? 'dust' : nominal ? 'clear' : 'variable';
+    query('[data-cabin-conditions]').textContent = `${dustExercise ? 'Dust-front rehearsal' : 'Clear at habitat'} · ${delta ? 'Delta Front' : 'Gale Crater'}`;
+    query('[data-cabin-outlook]').textContent = nominal ? 'Nominal rehearsal · clear conditions held for this run.'
+      : dustExercise ? 'Practice an early return when the simulated front arrives.'
+        : delta ? (!approachChoice || approachChoice.id === 'shortest'
+          ? 'Shortcut dust may ease in 6–10 min; later gusts and cold spells are uncertain.'
+          : `${approachChoice.label} approach avoids forecast dust; later gusts and cold spells are uncertain.`)
+          : `${routeName(selected.id)} route · gusts or cold spells possible; timing uncertain.`;
+    query('[data-cabin-visibility]').textContent = dustExercise
+      ? 'Visibility: starts clear, then falls in the scripted dust-front exercise. Prepare to return on the same track.'
+      : `Visibility: about ${(CLEAR_WEATHER.visibilityM / 1000).toFixed(1)} km at departure.` + (!nominal && delta && (!approachChoice || approachChoice.id === 'shortest')
+        ? ` Dust over the shortcut may reduce this to about ${Math.round(SHORTCUT_FRONT.visibilityM)} m and slow the rover; mapped approaches avoid that stretch.`
+        : !nominal ? ' Dust gusts may reduce visibility later; follow the reduced speed limit.' : ' No weather events in this nominal rehearsal.');
+    const variable = conditions.value === 'variable';
+    query('[data-departure-weather]').hidden = !delta || !s1Focused || !variable;
     query('[data-delta-brief]').hidden = !delta;
     root.classList.toggle('hab-s1-focused', delta && s1Focused);
     query('[data-s1-picker]').hidden = !s1Focused;
@@ -269,7 +328,7 @@ export function mountHabitat(root, launch) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (delta) {
       const map = s1Focused ? (s1Map ??= makeDeltaOverview(original.traverse.route, canvas.width, canvas.height, approaches, true)) : deltaMap;
-      map.draw(ctx, mode, approachChoice);
+      map.draw(ctx, mode, approachChoice, variable);
       const pin = query('.hab-s1');
       pin.style.left = `${map.s1[0] / canvas.width * 100}%`;
       pin.style.top = `${map.s1[1] / canvas.height * 100}%`;
@@ -283,6 +342,37 @@ export function mountHabitat(root, launch) {
         Planned ≈ ${approachChoice.estimate.minutes.toFixed(1)} min to S1; if something is hiding there, add ${approachChoice.estimate.extraMinutes.join('–')} min (and the oxygen to match).</small>`).join('');
       for (const button of root.querySelectorAll('[data-approach]')) {
         button.setAttribute('aria-pressed', String(button.dataset.approach === approachChoice?.id));
+      }
+      if (s1Focused) {
+        const forecast = (option, waitSeconds = 0) => {
+          const key = `${conditions.value}/${option.id}/${waitSeconds}`;
+          if (!departureForecasts.has(key)) {
+            const { route, terrain } = option.traverse;
+            const preview = new Mission(route, terrain, {}, { surprises: false, frontSeconds: variable ? frontSeconds : 0 });
+            const s1 = route.stations[0];
+            departureForecasts.set(key, forecastReturn(preview, {
+              workMinutes: s1.tasks.reduce((sum, task) => sum + task.minutes, 0),
+              workAtS: s1.s, waitSeconds, fromS: 0, route,
+            }));
+          }
+          return departureForecasts.get(key);
+        };
+        const summary = result => `O₂ ${oxygen(result.oxygenLeft)} · battery ${Math.round(result.batteryPct)}% · home ${result.backAt} · ${Math.round(result.daylightMinutes)} min to sunset${result.reserveOK ? '' : ' · reserve warning'}`;
+        const [shortcut, , detour] = approaches;
+        const span = shortcut.traverse.route.weatherExposure;
+        const preview = new Mission(shortcut.traverse.route, shortcut.traverse.terrain, {}, { surprises: false, frontSeconds });
+        const weather = preview.weatherAt((span.from + span.to) / 2, 0);
+        query('[data-weather-forecast]').textContent = `Dust forecast on the amber shortcut stretch, ${fmt(span.from)}–${fmt(span.to)} m from habitat. Expected to ease in 6–10 min; timing remains uncertain. Visibility ≈ ${Math.round(weather.visibilityM)} m; speed ≤ ${(weather.speedLimit * 3.6).toFixed(1)} km/h while inside. Mapped routes avoid this stretch. Unsurveyed obstacles remain unknown.`;
+        query('[data-wait-label]').textContent = `Wait ${(frontSeconds / 60).toFixed(1)} min, then shortcut`;
+        query('[data-weather-proceed]').textContent = summary(forecast(shortcut));
+        query('[data-weather-wait]').textContent = summary(forecast(shortcut, frontSeconds));
+        query('[data-weather-detour]').textContent = `${fmt(detour.distance)} m to S1 · ${summary(forecast(detour))}`;
+        query('[data-departure-forecast]').textContent = approachChoice
+          ? `S1 full science, then drive home: ${summary(forecast(approachChoice, variable ? departureWaitSeconds : 0))}. Ingress included. Unknown obstacle delays excluded.` : '';
+        for (const button of root.querySelectorAll('[data-departure]')) {
+          const active = button.dataset.departure === (departureWaitSeconds ? 'wait' : approachChoice?.id === 'shortest' ? 'proceed' : approachChoice?.id === 'longer' ? 'detour' : '');
+          button.setAttribute('aria-pressed', String(active));
+        }
       }
       query('[data-layer-note]').textContent = mode === 'slope' ? 'Green <9° · Amber 9–15° · Red ≥15°' : s1Focused ? 'Approach to S1 · Simulated terrain' : 'Original loop · Three approaches to S1';
     } else {
@@ -391,8 +481,21 @@ export function mountHabitat(root, launch) {
         const on = approachChoice?.id === option.id;
         lines.push({ points: pts, color: option.color, width: on ? 6 : 3, dashed: !on && !!approachChoice });
       }
+      if (query('[data-scenario]').value === 'variable') {
+        const shortcut = approaches[0].traverse.route;
+        const { from, to } = shortcut.weatherExposure;
+        const points = Array.from({ length: 25 }, (_, i) => {
+          const p = shortcut.sample(from + (to - from) * i / 24);
+          return [p.x, p.z];
+        });
+        lines.push({ points, color: '#ffad47', width: 10, dashed: true });
+        const p = shortcut.sample((from + to) / 2);
+        markers.push({ at: [p.x, p.z], text: 'Dust · unsurveyed', color: '#ffad47' });
+      }
       route.stations.forEach((st, i) => markers.push({ at: [st.x, st.z], text: st.final ? 'HAB' : `S${i + 1}`, color: st.final ? '#ffffff' : '#9fe7ff' }));
-      for (const hz of AREA_HAZARDS.filter(h => h.unsurveyed)) markers.push({ at: [hz.cx, hz.cz], text: '? Unsurveyed', color: '#ffc178' });
+      if (query('[data-scenario]').value !== 'variable') {
+        for (const hz of AREA_HAZARDS.filter(h => h.unsurveyed)) markers.push({ at: [hz.cx, hz.cz], text: '? Unsurveyed', color: '#ffc178' });
+      }
     } else {
       for (const plan of plans) {
         const on = plan === selected;
@@ -416,14 +519,15 @@ export function mountHabitat(root, launch) {
   stage.classList.toggle('hab-has-room', Boolean(room));
   // Outside first: the habitat at dusk. Entering flies to the lit window, cuts
   // inside through a warm flash, then pushes into the console screen.
-  const exterior = mountHabitatExterior(query('[data-exterior]'));
+  const directBriefing = location.hash === '#briefing';
+  const exterior = directBriefing ? null : mountHabitatExterior(query('[data-exterior]'));
   const cut = query('[data-cut]');
   let entering = false;
   const enterHabitat = async () => {
     if (entering) return;
     entering = true;
     enter.disabled = true;
-    const still = motionReduced();
+    const still = directBriefing || motionReduced();
     if (!still) {
       query('.hab-intro-card').animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(-28px)' }],
         { duration: 260, easing: 'ease-in', fill: 'forwards' });
@@ -494,7 +598,7 @@ export function mountHabitat(root, launch) {
   const consoleGrid = query('[data-hab-console-grid]');
   let launching = false;
 
-  async function runLaunchSequence(planToLaunch, scenarioToLaunch = 'clear') {
+  async function runLaunchSequence(planToLaunch, scenarioToLaunch = 'variable') {
     if (launching || !planToLaunch) return;
     launching = true;
     const launchBtn = query('[data-launch]');
@@ -509,7 +613,10 @@ export function mountHabitat(root, launch) {
     for (const control of root.querySelectorAll('button, select')) control.disabled = true;
     try {
       await cycle;
-      await launch(planToLaunch, scenarioToLaunch, message => { progress.textContent = message; });
+      const plan = planToLaunch.traverse
+        ? { ...planToLaunch, frontSeconds: scenarioToLaunch === 'variable' ? frontSeconds : 0 }
+        : planToLaunch;
+      await launch(plan, scenarioToLaunch, message => { progress.textContent = message; });
       if (!motionReduced()) document.getElementById('viewport').animate(
         [{ opacity: 0 }, { opacity: 1 }], { duration: 370, easing: 'ease-out' });
       room?.dispose();
@@ -536,7 +643,7 @@ export function mountHabitat(root, launch) {
         name: `${site.name.split('·')[0].trim()} · ${chosenApproach.label} to S1`,
         site: { name: site.name, eva: 'EVA-01', sol: 214 },
       };
-      runLaunchSequence(customPlan, 'clear');
+      runLaunchSequence(customPlan, query('[data-scenario]').value === 'clear' ? 'clear' : 'variable');
     },
   });
 
@@ -571,6 +678,7 @@ export function mountHabitat(root, launch) {
     mode = 'orbital';
     update();
   });
+  query('[data-scenario]').addEventListener('change', () => { departureWaitSeconds = 0; update(); });
   root.addEventListener('click', async (event) => {
     const button = event.target.closest('button');
     if (!button || launching) return;
@@ -594,7 +702,14 @@ export function mountHabitat(root, launch) {
         query(focus ? '[data-approach]' : '[data-s1-overview] button').focus({ preventScroll: true });
       }
     }
-    if (button.dataset.approach) approachChoice = approaches.find(option => option.id === button.dataset.approach);
+    if (button.dataset.approach) {
+      approachChoice = approaches.find(option => option.id === button.dataset.approach);
+      departureWaitSeconds = 0;
+    }
+    if (button.dataset.departure) {
+      approachChoice = approaches.find(option => option.id === (button.dataset.departure === 'detour' ? 'longer' : 'shortest'));
+      departureWaitSeconds = button.dataset.departure === 'wait' ? frontSeconds : 0;
+    }
     if (button.dataset.layer) {
       mode = button.dataset.layer;
       if (mode === 'slope') view3d = false; // the slope layer is a 2D map
@@ -609,8 +724,10 @@ export function mountHabitat(root, launch) {
     if (button.hasAttribute('data-photo-close')) observation.close();
     if (button.hasAttribute('data-launch') && selected && !button.disabled) {
       await runLaunchSequence(
-        selected === original ? approachChoice : selected,
-        selected === original ? 'clear' : query('[data-scenario]').value
+        selected === original ? { ...approachChoice,
+          departureWaitSeconds: query('[data-scenario]').value === 'variable' ? departureWaitSeconds : 0,
+        } : selected,
+        query('[data-scenario]').value
       );
       return;
     }
@@ -618,4 +735,5 @@ export function mountHabitat(root, launch) {
   });
   reviewClose.hidden = true;
   update();
+  if (directBriefing) enterHabitat().then(() => setZoom(true));
 }

@@ -77,7 +77,7 @@ export function makeDeltaOverview(route, width, height, approaches, focused = fa
       }
     }
   }
-  function draw(ctx, mode, selected) {
+  function draw(ctx, mode, selected, weatherForecast = false) {
     ctx.drawImage(layers[mode === 'slope' ? 1 : 0], 0, 0, width, height);
     drawUnsurveyed(ctx, selected?.unknowns?.length > 0);
     if (!focused) {
@@ -99,6 +99,26 @@ export function makeDeltaOverview(route, width, height, approaches, focused = fa
       ctx.lineWidth = option === selected ? 5 : 3;
       ctx.setLineDash(option === selected ? [] : option.id === 'shortest' ? [4, 5] : option.id === 'longer' ? [11, 5] : []);
       ctx.stroke(path);
+    }
+    if (weatherForecast) {
+      const shortcut = approaches[0].traverse.route;
+      const { from, to } = shortcut.weatherExposure;
+      ctx.beginPath();
+      for (let i = 0; i <= 24; i++) {
+        const p = shortcut.sample(from + (to - from) * i / 24);
+        if (i) ctx.lineTo(...point(p.x, p.z));
+        else ctx.moveTo(...point(p.x, p.z));
+      }
+      ctx.strokeStyle = '#ffad47';
+      ctx.lineWidth = 10;
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      const p = shortcut.sample((from + to) / 2);
+      const [x, y] = point(p.x, p.z);
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffcf90';
+      ctx.fillText('DUST FORECAST', x + 12, y - 10);
     }
     ctx.setLineDash([]);
     ctx.font = 'bold 14px monospace';

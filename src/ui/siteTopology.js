@@ -143,7 +143,7 @@ function layerImageFilename(heights, steepness, craters) {
 export class SiteTopologyWidget {
   /**
    * @param {HTMLElement} container
-   * @param {{ onDeploy?: (selection: { site: typeof MARS_SITES[0], pathId: string }) => void }} options
+   * @param {{ onDeploy?: (selection: { site: typeof MARS_SITES[0], pathId: string }) => void, actionLabel?: string }} options
    */
   constructor(container, options = {}) {
     this.container = container;
@@ -179,7 +179,7 @@ export class SiteTopologyWidget {
     this.pinScreenCoords = [];
     this._raf = 0;
 
-    this._renderShell();
+    this._renderShell(options.actionLabel ?? 'Deploy rover');
     this._bindEvents();
     this._loadAssets();
     this._scheduleDraw();
@@ -249,7 +249,7 @@ export class SiteTopologyWidget {
     }
   }
 
-  _renderShell() {
+  _renderShell(actionLabel) {
     this.container.innerHTML = `
       <div class="st-root" data-stage="globe">
         <!-- STAGE 1: MARS GLOBE WITH 5 SITES & TOP-LEFT PREVIEW CARD -->
@@ -268,9 +268,9 @@ export class SiteTopologyWidget {
                 <small class="st-preview-coords" data-preview-coords>${MARS_SITES[0].coords}</small>
                 <p class="st-preview-desc" data-preview-desc>${MARS_SITES[0].summary}</p>
                 <div class="st-preview-actions">
-                  <button type="button" class="st-nav-btn" data-site-prev title="Previous site (Left Arrow)">◀</button>
-                  <button type="button" class="st-zoom-btn" data-site-zoom>Zoom In [Enter] →</button>
-                  <button type="button" class="st-nav-btn" data-site-next title="Next site (Right Arrow)">▶</button>
+                  <button type="button" class="st-nav-btn" data-site-prev aria-label="Previous site" title="Previous site (←)">◀</button>
+                  <button type="button" class="st-zoom-btn" data-site-zoom title="Inspect site (Enter)">Inspect site</button>
+                  <button type="button" class="st-nav-btn" data-site-next aria-label="Next site" title="Next site (→)">▶</button>
                 </div>
               </div>
             </aside>
@@ -283,10 +283,6 @@ export class SiteTopologyWidget {
                 </button>`
               ).join('')}
             </div>
-          </div>
-          <div class="st-globe-footer">
-            <span><kbd>←</kbd> <kbd>→</kbd> Switch site (1–5)</span>
-            <span><kbd>Enter</kbd> or <b>Click site</b> to zoom in &amp; inspect topography</span>
           </div>
         </div>
 
@@ -362,7 +358,7 @@ export class SiteTopologyWidget {
               </div>
 
               <button type="button" class="st-deploy-btn" data-deploy-rover>
-                Deploy Rover to 3D Surface <span>→</span>
+                ${actionLabel}
               </button>
             </aside>
           </div>

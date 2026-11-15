@@ -1,7 +1,8 @@
-/* Mission screen: toolbar + 3D globe + site plan. Tokens: tokens.css (Apple HIG, dark). */
+/* Mission screen: toolbar + 3D globe + site plan. Tokens: tokens.css (mission operations). */
 @import './tokens.css';
 
 .ms {
+  --bar-h: 52px;
   position: fixed;
   inset: 0;
   overflow: hidden;
@@ -9,7 +10,7 @@
 }
 .ms *, .ms *::before, .ms *::after { box-sizing: border-box; }
 .ms button { font: inherit; letter-spacing: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
-.ms :focus-visible { outline: 3px solid color-mix(in srgb, var(--blue) 70%, transparent); outline-offset: 2px; }
+.ms :focus-visible { outline: 2px solid var(--nasa-blue-hi); outline-offset: 2px; }
 
 /* materials (few, small surfaces: blur over WebGL is not free) */
 .ms-bar, .ms-assign, .ms-tools, .ms-explore, .ms-nav, .ms-status, .ms-banner {
@@ -27,13 +28,14 @@
   position: absolute; z-index: 30; top: 0; left: 0; right: 0; height: var(--bar-h);
   display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--s4);
   padding: 0 var(--s4) 0 var(--s5);
-  border-bottom: 0.5px solid var(--separator);
+  border-bottom: 1px solid var(--nasa-blue-hi);
+  border-left: 6px solid var(--nasa-red); background: var(--nasa-blue);
 }
 .ms-lead { grid-column: 1; display: flex; align-items: center; gap: var(--s5); min-width: 0; }
 .ms-brand { display: flex; align-items: center; gap: var(--s3); flex: none; }
 .ms-logo svg { width: 26px; height: 26px; display: block; }
-.ms-brand b { display: block; font: var(--t-subhead); font-weight: 600; letter-spacing: var(--t-subhead-ls); }
-.ms-brand small { display: block; font: var(--t-caption); letter-spacing: var(--t-caption-ls); color: var(--label-2); }
+.ms-brand b { display: block; font: 700 13px var(--font); letter-spacing: .14em; text-transform: uppercase; }
+.ms-brand small { display: block; font: var(--t-caption); letter-spacing: var(--t-caption-ls); color: #d6e2f7; }
 .ms-crumbs {
   display: flex; align-items: center; gap: 2px; min-width: 0; padding-left: var(--s5); border-left: 0.5px solid var(--separator); height: 22px;
   font: var(--t-subhead); letter-spacing: var(--t-subhead-ls); color: var(--label-2);
@@ -43,19 +45,19 @@
 .ms-crumbs i { display: inline-flex; color: var(--label-3); }
 .ms-crumbs i svg { width: 12px; height: 12px; }
 
-/* segmented control (UISegmentedControl, dark) */
+/* Console view selection */
 .ms-switch {
   grid-column: 2; display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr;
-  padding: 2px; border-radius: 9px; background: var(--fill-3);
+  padding: 2px; border-radius: 3px; background: var(--ops-bg); border: 1px solid #7fa2e0;
 }
 .ms-switch button {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; min-width: 112px; padding: 0 var(--s3);
-  border: 0; border-radius: 7px; background: none; cursor: pointer;
+  border: 0; border-radius: 2px; background: none; cursor: pointer;
   font: var(--t-subhead); font-weight: 500; letter-spacing: var(--t-subhead-ls); color: var(--label);
   transition: background 0.2s var(--ease), box-shadow 0.2s var(--ease);
 }
 .ms-switch button svg { width: 15px; height: 15px; opacity: 0.85; }
-.ms-switch button.on { background: #636366; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 3px 1px rgba(0, 0, 0, 0.04); font-weight: 600; }
+.ms-switch button.on { background: #fff; color: var(--ops-bg); font-weight: 700; }
 
 .ms-clock { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: var(--s3); }
 .ms .mm-turn { display: flex; align-items: baseline; gap: var(--s2); }
@@ -74,7 +76,7 @@
 .ms-globe, .ms-site { position: absolute; inset: 0; transition: opacity 0.35s var(--ease), transform 0.5s var(--ease), visibility 0.35s; }
 .ms[data-view='globe'] .ms-site { opacity: 0; visibility: hidden; transform: scale(1.015); pointer-events: none; }
 .ms[data-view='site'] .ms-globe { opacity: 0; visibility: hidden; transform: scale(0.985); pointer-events: none; }
-.ms-site .mm { position: absolute; inset: 0; }
+.ms-site .mm { position: absolute; inset: 0; --mm-top: var(--bar-h); }
 
 .ms-cesium { position: absolute; inset: 0; }
 .ms-cesium .cesium-viewer, .ms-cesium .cesium-widget, .ms-cesium canvas { width: 100%; height: 100%; }
@@ -85,6 +87,7 @@
 
 /* ---------------- assignment card ---------------- */
 .ms-assign {
+  border-top: 3px solid var(--nasa-blue-hi);
   position: absolute; z-index: 5; top: calc(var(--bar-h) + var(--s4)); left: var(--s4); width: 320px;
   padding: var(--s4); border-radius: var(--r-xl);
   display: flex; flex-direction: column; gap: var(--s3);
@@ -111,7 +114,7 @@
 }
 .ms-btn:active { transform: scale(0.98); }
 .ms-btn svg { width: 16px; height: 16px; }
-.ms-btn.primary { background: var(--blue); color: #fff; }
+.ms-btn.primary { background: var(--nasa-red); color: #fff; }
 .ms-btn.primary:hover { filter: brightness(1.1); }
 .ms-fine { margin: 0; font: var(--t-footnote); color: var(--label-3); }
 
@@ -122,13 +125,13 @@
 }
 .ms-tools button {
   display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 var(--s3) 0 10px;
-  border: 0; border-radius: 11px; background: none; cursor: pointer;
+  border: 0; border-radius: 3px; background: none; cursor: pointer;
   font: var(--t-subhead); font-weight: 500; letter-spacing: var(--t-subhead-ls);
 }
 .ms-tools button svg { width: 17px; height: 17px; color: var(--label-2); }
 .ms-tools button:hover { background: var(--fill-4); }
-.ms-tools button.on { background: var(--fill-2); }
-.ms-tools button.on svg { color: var(--blue); }
+.ms-tools button.on { background: var(--nasa-blue); }
+.ms-tools button.on svg { color: #fff; }
 
 .ms-explore {
   position: absolute; z-index: 6; top: calc(var(--bar-h) + var(--s4) + 50px); right: var(--s4); width: 320px;
@@ -158,16 +161,16 @@
 .ms-opt-t small.err { color: var(--red); }
 .ms-opt em { font-style: normal; font: var(--t-caption); font-family: var(--font-mono); color: var(--label-2); white-space: nowrap; }
 .ms-opt.on em { color: var(--label); }
-/* UISwitch */
+/* Terrain toggle */
 .ms-toggle i { position: relative; width: 42px; height: 26px; border-radius: var(--r-pill); background: var(--fill-2); flex: none; transition: background 0.25s var(--ease); }
 .ms-toggle i::after { content: ''; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15), 0 1px 1px rgba(0, 0, 0, 0.16); transition: transform 0.25s var(--spring); }
 .ms-toggle[aria-checked='true'] i { background: var(--green); }
 .ms-toggle[aria-checked='true'] i::after { transform: translateX(16px); }
 .ms-seg { display: flex; align-items: center; gap: var(--s3); margin: var(--s2) 10px 0; font: var(--t-subhead); color: var(--label-2); }
 .ms-seg > span:first-child { flex: 1; }
-.ms-seg-track { display: inline-flex; padding: 2px; border-radius: 9px; background: var(--fill-3); }
-.ms-seg button { min-width: 44px; height: 26px; border: 0; border-radius: 7px; background: none; cursor: pointer; font: var(--t-footnote); font-weight: 500; font-variant-numeric: tabular-nums; }
-.ms-seg button[aria-pressed='true'] { background: #636366; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12); font-weight: 600; }
+.ms-seg-track { display: inline-flex; padding: 2px; border-radius: 3px; background: var(--ops-bg); border: 1px solid #7fa2e0; }
+.ms-seg button { min-width: 44px; height: 26px; border: 0; border-radius: 2px; background: none; cursor: pointer; font: var(--t-footnote); font-weight: 500; font-variant-numeric: tabular-nums; }
+.ms-seg button[aria-pressed='true'] { background: var(--nasa-blue); box-shadow: none; font-weight: 600; }
 .ms-seg[data-disabled] { opacity: 0.4; }
 .ms-places { padding: var(--s1); }
 .ms-places h2 { padding: var(--s1) var(--s2) 0; }
@@ -192,7 +195,7 @@
 .ms-sources li span { display: block; color: var(--label-2); }
 .ms-sources li small { display: block; color: var(--label-3); font: var(--t-caption); }
 
-/* ---------------- camera controls (Apple Maps: compass, zoom, recenter) ---------------- */
+/* ---------------- camera controls ---------------- */
 .ms-nav {
   position: absolute; z-index: 5; right: var(--s4); bottom: 72px;
   display: flex; flex-direction: column; align-items: center; gap: var(--s2);
@@ -245,7 +248,7 @@
 .ms-ripples i { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25); animation: ms-ripple 0.8s var(--ease) forwards; }
 .ms-loading {
   position: absolute; inset: 0; z-index: 3; display: grid; place-content: center; justify-items: center; gap: var(--s3);
-  color: var(--label-2); font: var(--t-subhead); background: radial-gradient(circle at 50% 45%, #1b1210, #000 62%);
+  color: var(--label-2); font: var(--t-subhead); background: var(--ops-bg);
   transition: opacity 0.6s var(--ease);
 }
 .ms.globe-ready .ms-loading { opacity: 0; pointer-events: none; }
@@ -272,11 +275,8 @@
 @media (max-width: 900px) {
   .ms-bar { grid-template-columns: auto 1fr auto; gap: var(--s2); padding: 0 var(--s3); }
   .ms-lead { gap: 0; }
-  .ms-brand span:last-child { display: none; }
   .ms-switch { grid-column: 2; justify-self: center; }
   .ms-switch button { min-width: 0; }
-  .ms-switch button span { display: none; }
-  .ms .mm-turn span { display: none; }
   .ms-assign { top: calc(var(--bar-h) + var(--s2)); left: var(--s2); right: var(--s2); width: auto; padding: var(--s3); gap: var(--s2); }
   .ms-assign > p, .ms-fine, .ms-kicker { display: none; }
   .ms-assign h1 { font: var(--t-title3); margin: 0; }
@@ -289,4 +289,38 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .ms *, .ms *::before, .ms *::after { animation: none !important; transition: none !important; }
+}
+
+/* White header focus rings remain visible against NASA blue. */
+.ms-bar :focus-visible { outline-color: #fff; }
+.ms-bar .mm-turn span, .ms-crumbs { color: #d6e2f7; }
+
+.ms-return {
+  flex: none; display: inline-flex; align-items: center; gap: 5px; min-height: 30px;
+  padding: 4px 9px; border: 1px solid #7fa2e0; border-radius: 3px;
+  color: #fff; text-decoration: none; font: 600 11px var(--font); letter-spacing: .04em;
+}
+.ms-return:hover { background: #ffffff1f; }
+@media (max-width: 1180px) { .ms-lead { gap: var(--s3); } }
+@media (max-width: 900px) {
+  .ms { --bar-h: 100px; }
+  .ms-bar {
+    grid-template-columns: 1fr auto; grid-template-rows: 46px 42px;
+    gap: 0 8px; padding: 2px 10px 8px;
+  }
+  .ms-lead { grid-column: 1 / -1; grid-row: 1; justify-content: space-between; gap: 8px; }
+  .ms-brand { gap: 6px; }
+  .ms-logo { display: none; }
+  .ms-brand b { font-size: 11px; letter-spacing: .08em; }
+  .ms-brand small { font-size: 10px; }
+  .ms-switch { grid-column: 1; grid-row: 2; justify-self: start; }
+  .ms-switch button { min-width: 0; padding-inline: 7px; font-size: 11px; gap: 4px; }
+  .ms-switch button svg { width: 13px; height: 13px; }
+  .ms-clock { grid-column: 2; grid-row: 2; gap: 6px; }
+  .ms .mm-turn { gap: 4px; }
+  .ms .mm-turn span { font-size: 10px; }
+  .ms .mm-turn b { font-size: 15px; }
+  .ms .mm-wins { gap: 3px; }
+  .ms .mm-wins li { min-width: 20px; padding-inline: 4px; }
+  .ms-return { font-size: 10px; padding-inline: 6px; }
 }

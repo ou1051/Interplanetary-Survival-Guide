@@ -57,16 +57,35 @@ describe('Gale habitat-to-field handoff', () => {
     }
   });
 
+  it.each(['Gale', 'Delta'])('%s parks outside the habitat so the crew can get out and reboard before departure', site => {
+    const { terrain, route } = buildDeltaTraverse();
+    const mission = site === 'Gale' ? makeMission() : new Mission(route, terrain, { x: 0, y: 2, z: 0 });
+    mission.start();
+    const { x, z } = mission.rover;
+    expect(Math.hypot(x, z)).toBeGreaterThanOrEqual(11.9);
+    if (site === 'Delta') expect([x, z]).toEqual([0, -14]);
+    mission.update(dt, {}, 0);
+    expect(mission.exitRover()).toBe(true);
+    mission.update(dt, {}, 0);
+    expect(mission.boardRover()).toBe(true);
+    expect(mission.rover).toMatchObject({ x, z });
+    expect(mission.leftHome).toBe(false);
+    expect(fieldGuidance(mission).canReturn).toBe(false);
+    expect(mission.returnToHabitat()).toBe(false);
+    expect(mission.endEva()).toBe(false);
+  });
+
   it('drives to the outcrop, collects its artifacts on foot and ends the EVA at the habitat', () => {
     const mission = makeMission();
     mission.start();
     const station = mission.stations[0];
-    expect(station.tasks.length).toBe(3);
+    const finds = station.tasks.filter(task => task.artifact);
+    expect(finds).toHaveLength(3);
     drive(mission, () => mission.currentStation === station);
     expect(station.visited).toBe(true);
-    expect(mission.collect(station.tasks[0].artifact)).toBe(false); // only on foot
+    expect(mission.collect(finds[0].artifact)).toBe(false); // only on foot
     expect(mission.exitRover()).toBe(true);
-    for (const task of station.tasks) {
+    for (const task of finds) {
       expect(walkTo(mission, task.artifact.x, task.artifact.z, WALK.reach * 0.8)).toBe(true);
       expect(mission.collect(task.artifact)).toBe(true);
     }
@@ -166,9 +185,13 @@ it('restores the original delta loop with four science stations and five hazard 
   expect(route.stops.filter(stop => stop.kind === 'gate')).toHaveLength(5);
   const mission = new Mission(route, terrain, { x: 0, y: 0, z: 0 });
   mission.start();
-  mission.s = route.length / 4;
   expect(fieldGuidance(mission).canReturn).toBe(false);
   expect(mission.returnToHabitat()).toBe(false);
+  drive(mission, () => mission.leftHome);
+  expect(fieldGuidance(mission).canReturn).toBe(true);
+  expect(mission.returnToHabitat()).toBe(true);
+  expect(mission.retracing).toBe(false);
+  expect(mission.nextStation?.final).toBe(true);
 });
 
 it('offers three ordered approaches and preserves the original path after S1', () => {
@@ -222,8 +245,9 @@ it('hides one obstacle in unsurveyed ground that stops the rover and costs time'
   const hit = mission.nextKnownStop.ref;
   expect(hit.type).toBe('SOFT SAND · WHEEL SINKING');
   expect(Math.hypot(hit.at.x - patch.cx, hit.at.z - patch.cz)).toBeLessThan(patch.radius);
-  // while driving, the displays never named it before the rover got there
-  expect(seen).not.toContain(hit.type);
+  // A close camera sighting reveals the actual obstacle before the rover stops.
+  expect(seen).toContain(hit.type);
+  expect(mission.detectedObstacles.map(stop => stop.ref)).toEqual([hit]);
   // the rover stays put until the crew deals with it, which costs time
   const at = { ...mission.rover };
   mission.update(1, mission.autopilot(), 0);
@@ -273,7 +297,7 @@ describe('leg check at stations', () => {
     drive(mission, () => mission.currentStation?.id === 'S1');
     expect(mission.exitRover()).toBe(true);
     const s1 = mission.route.stations[0];
-    for (const task of s1.tasks) {
+    for (const task of s1.tasks.filter(task => task.artifact)) {
       const find = task.artifact;
       expect(walkTo(mission, find.x, find.z, WALK.reach - 0.4)).toBe(true);
       expect(mission.collect(find)).toBe(true);
@@ -329,10 +353,12 @@ describe('leg check at stations', () => {
     const quick = legOptions(mission).options.find(o => o.id === 'quick');
     expect(mission.chooseLeg(quick)).toBe(true);
     const s2 = mission.route.stations.find(st => st.id === 'S2');
-    expect(s2.tasks.map(t => !!t.skipped)).toEqual([false, true, true]);
+    const planned = s2.tasks.filter(task => !task.skipped);
+    expect(planned).toHaveLength(1);
+    expect(planned[0].artifact.stationId).toBe('S2');
     // collecting that one find completes S2
     mission.state = 'walk';
-    const find = s2.tasks[0].artifact;
+    const find = planned[0].artifact;
     Object.assign(mission.walker, { x: find.x + 1, z: find.z });
     expect(mission.collect(find)).toBe(true);
     expect(s2.done).toBe(true);

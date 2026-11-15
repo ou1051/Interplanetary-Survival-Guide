@@ -1,6 +1,8 @@
+import { CLEAR_WEATHER, PASSING_WEATHER, DUST_FRONT, SHORTCUT_FRONT } from './weather.js';
 import { ROVER, LIFE_SUPPORT, HAB, SITE, SLOPE_CLASSES, SURPRISES } from '../config/mission.js';
 import { clamp, DEG, wrapAngle } from '../core/math.js';
 import { consumptionEstimate } from '../physics/traverse.js';
+import { forecastReturn, temperatureAt, COLD_WORK_LIMIT_C } from './legCheck.js';
 
 // ---------------------------------------------------------------------------
 // EVA state machine + consumables.
@@ -11,8 +13,8 @@ import { consumptionEstimate } from '../physics/traverse.js';
 // The rover drives freely over the terrain: the planned route is guidance, not
 // a rail. Speed is governed by the ground under the rover (slope, mapped area
 // hazards) and the rover will not climb ground steeper than STEEP_BLOCK.
-// The crew can get out and walk anywhere; station work means collecting the
-// station's artifacts on foot. `s` is the rover's progress projected onto the
+// The crew can walk anywhere. Completing either the specimen collection or
+// the instrument program finishes a station. `s` is crew progress projected onto the
 // planned route, kept for the route displays.
 //
 // Unsurveyed ground hides one obstacle per patch (SURPRISES): the rover meets
@@ -31,12 +33,12 @@ const ROVER_RADIUS = 1.9;
 const REVERSE_SPEED = 1.2;
 const BOOST_STOP_NEAR = 25; // m: Shift does nothing this close to the next station
 
-// One hidden obstacle per unsurveyed patch the plan crosses, met after driving
-// part of the way into the patch.
+// Each unsurveyed patch can reveal one obstacle after the rover drives partway through it.
 function hiddenSurprises(route, random) {
   return (route.areaHazards ?? []).filter((hz) => hz.unsurveyed).map((hz) => {
     const kind = SURPRISES[Math.floor(random() * SURPRISES.length) % SURPRISES.length];
     return {
+      kind: 'gate',
       hazard: hz,
       after: hz.radius * (0.5 + random() * 0.7), // metres driven inside the patch
       driven: 0,
@@ -55,7 +57,7 @@ function hiddenSurprises(route, random) {
 }
 
 export class Mission {
-  constructor(route, terrain, habAntenna, { random = Math.random, surprises = true, legCheck = true } = {}) {
+  constructor(route, terrain, habAntenna, { random = Math.random, surprises = true, legCheck = true, variableWeather = false, frontSeconds = 0 } = {}) {
     this.route = route;
     this.random = random;
     this.surprisesOn = surprises;
@@ -98,6 +100,54 @@ export class Mission {
     this.leftHome = false;
     this._zoneIds = new Set();
     this._searchTimer = 0;
+    this.detectedObstacles = [];
+    this._weather = CLEAR_WEATHER;
+    this.frontUntilMet = frontSeconds;
+    const forecastDelay = route.weatherExposure ? frontSeconds : 0;
+    this._weatherAt = variableWeather ? forecastDelay + 15 + random() * 20 : Infinity;
+  }
+
+  get weather() {
+    return this.dustWarning ? DUST_FRONT : this.weatherAt(this.s, this.met, this.route, this.onFoot ? this.walker : this.rover);
+  }
+
+  // Project only weather already observed or forecast on the route.
+  weatherAt(s, met, route = this.route, position) {
+    const zone = route.weatherExposure;
+    if (met < this.frontUntilMet) {
+      const patch = position && route.areaHazards?.find(hazard => hazard.unsurveyed);
+      if (patch ? Math.hypot(position.x - patch.cx, position.z - patch.cz) <= patch.radius
+        : zone && s >= zone.from && s <= zone.to) return SHORTCUT_FRONT;
+    }
+    return met < this._weatherAt ? this._weather : CLEAR_WEATHER;
+  }
+
+  get activeFront() {
+    return this.met < this.frontUntilMet ? this.route.weatherExposure : null;
+  }
+
+  get weatherRemainingSeconds() {
+    const weather = this.weather;
+    if (weather === SHORTCUT_FRONT) return this.frontUntilMet - this.met;
+    if (weather === CLEAR_WEATHER || weather === DUST_FRONT) return 0;
+    return Math.max(0, this._weatherAt - this.met);
+  }
+
+  get waitSeconds() {
+    if (this.activeFront && this.s <= this.activeFront.to) return this.frontUntilMet - this.met;
+    return this.weatherRemainingSeconds;
+  }
+
+  waitForWeather() {
+    const seconds = this.waitSeconds;
+    if ((!this.canExit && this.state !== 'gate') || !Number.isFinite(seconds) || seconds <= 0) return false;
+    const forecast = forecastReturn(this, { waitSeconds: seconds, homeOnly: true });
+    if (!forecast.reserveOK || forecast.batteryPct < 10 || forecast.daylightMinutes < -30) return false;
+    this.rover.speed = this.speed = 0;
+    this.cruise = false;
+    this._consume(seconds);
+    this.emit('log', { text: `Waited in rover · ${Math.ceil(seconds / 60)} min · ${this.weather.label}`, tone: 'info' });
+    return true;
   }
 
   on(fn) {
@@ -122,7 +172,10 @@ export class Mission {
   }
   // What the displays may show next: the obstacle while stopped at one, else the next station.
   get nextKnownStop() {
-    if (this.state === 'gate' && this.surprise) return { kind: 'gate', s: this.s, ref: this.surprise.ref };
+    if (this.surprise) return this.surprise;
+    const spotted = this.detectedObstacles.find(sp => !sp.found &&
+      Math.hypot(this.rover.x - sp.hazard.cx, this.rover.z - sp.hazard.cz) <= sp.hazard.radius);
+    if (spotted) return spotted;
     return this.nextStop;
   }
   // The station whose area the crew is in, if any.
@@ -148,8 +201,85 @@ export class Mission {
     return SITE.lmstStart + this.met / 60;
   }
 
+  get scienceResults() {
+    return this.route.stations.filter(st => !st.final).flatMap(st => st.tasks
+      .filter(task => task.done || task.skipped || st.skipped || this.aborted || this.state === 'complete').map(task => ({
+        station: st.id, task: task.label,
+        result: task.done || task.deferred ? task.result : this.aborted ? 'Not performed · crew chose to head home' : 'Not performed · omitted from selected station plan',
+        quality: task.quality ?? 'nominal', status: task.done ? 'complete' : task.deferred ? 'deferred' : 'skipped',
+      })));
+  }
+
+  get outsideMinutes() {
+    return this._outsideWeather === this.weather && this._outsideWeatherUntil === this._weatherAt ? this._outsideMinutes ?? 0 : 0;
+  }
+
+  // Both instrument work and collecting a find spend the same outside and return budgets.
+  _workBudget(task) {
+    const forecast = forecastReturn(this, { workMinutes: task.minutes, homeOnly: true });
+    const left = (this.weather.exposureMinutes ?? Infinity) - this.outsideMinutes;
+    const outside = task.outside !== false;
+    const reason = outside && task.minutes > left ? `Needs ${task.minutes} min outside; ${Math.max(0, Math.floor(left))} min left in cold window`
+      : outside && temperatureAt(this.lmst + task.minutes) < COLD_WORK_LIMIT_C ? `Work ends below ${COLD_WORK_LIMIT_C} °C; head home`
+      : this.dustWarning ? 'Dust front: head home'
+      : !forecast.reserveOK ? 'Return would breach the oxygen reserve'
+      : forecast.batteryPct < 10 ? 'Return would breach the 10% battery margin'
+      : forecast.daylightMinutes < -30 ? 'Return would be after twilight' : '';
+    return { reason, forecast };
+  }
+
+  get stationOptions() {
+    const st = this.currentStation;
+    if ((!this.canExit && !this.onFoot) || !st || st.skipped || this.aborted) return [];
+    const options = st.tasks.flatMap((task, index) => {
+      if (task.done || task.skipped || task.artifact) return [];
+      const { reason, forecast } = this._workBudget(task);
+      const outside = task.outside !== false;
+      const dust = task.panorama && this.weather.visibilityM < 1000;
+      return [{ id: `task:${index}`, label: `${/^collect/i.test(task.label) && st.id === 'S2' ? 'Sample first · ' : 'Do '}${task.label}`,
+        detail: dust ? 'Dust will obscure fine detail; this panorama will be marked degraded' : `${task.minutes} min ${outside ? 'outside' : 'work'}`,
+        workMinutes: task.minutes, waitSeconds: 0, forecast, allowed: !reason, reason }];
+    });
+    if (st.tasks.some(task => task.panorama && !task.done && !task.skipped)) options.push({
+      id: 'defer-panorama', label: 'Defer panorama', detail: 'Record the missed observation and continue with other tasks',
+      workMinutes: 0, waitSeconds: 0, forecast: forecastReturn(this, { homeOnly: true }), allowed: true, reason: '',
+    });
+    if (this.canExit && this.waitSeconds > 0 && !this.dustWarning) {
+      const forecast = forecastReturn(this, { waitSeconds: this.waitSeconds, homeOnly: true });
+      const allowed = forecast.reserveOK && forecast.batteryPct >= 10 && forecast.daylightMinutes >= -30;
+      options.push({ id: 'wait', label: 'Wait in rover for clear weather', detail: 'Suit oxygen and rover hotel power keep running',
+        workMinutes: 0, waitSeconds: this.waitSeconds, forecast, allowed,
+        reason: allowed ? '' : 'Waiting would breach oxygen, battery or daylight limits' });
+    }
+    options.push({ id: 'home', label: 'Head home now', detail: 'End science work and navigate back to HAB',
+      workMinutes: 0, waitSeconds: 0, forecast: forecastReturn(this, { homeOnly: true }), allowed: true, reason: '' });
+    return options;
+  }
+
+  chooseStationAction(id) {
+    const option = this.stationOptions.find(option => option.id === id);
+    if (!option?.allowed) return false;
+    const st = this.currentStation;
+    if (id.startsWith('task:')) return this._finishStationTask(st.tasks[Number(id.slice(5))]);
+    if (id === 'wait') return this.waitForWeather();
+    if (id === 'home') return this.returnToHabitat();
+    const task = st.tasks.find(task => task.panorama && !task.done && !task.skipped);
+    task.skipped = true;
+    task.deferred = true;
+    task.result = `Panorama deferred by crew · ${this.weather.label}; no panorama acquired`;
+    this.emit('log', { text: `${st.id} · ${task.result}`, tone: 'warn' });
+    this.emit('task', { station: st, task });
+    this._stationComplete(st, task);
+    return true;
+  }
+
   start() {
-    const p = this.route.sample(0);
+    // Routes can start at the habitat centre; park at their first clear departure point.
+    let p = this.route.sample(0);
+    while (Math.hypot(p.x - HAB.x, p.z - HAB.z) < HAB_RADIUS + ROVER_RADIUS && this.s + this.route.step <= this.route.length) {
+      this.s += this.route.step;
+      p = this.route.sample(this.s);
+    }
     Object.assign(this.rover, { x: p.x, z: p.z, heading: Math.atan2(-p.tx, -p.tz), speed: 0, steer: 0 });
     this.pos = { x: p.x, y: this.terrain.heightAt?.(p.x, p.z) ?? 0, z: p.z };
     this.state = 'drive';
@@ -158,14 +288,13 @@ export class Mission {
     this.emit('state', { state: this.state });
   }
 
-  // Station artifacts become the station's work list.
+  // Collections and instrument observations are two ways to complete a station.
   setArtifacts(artifacts) {
     this.artifacts = artifacts;
     for (const st of this.stations) {
       const mine = artifacts.filter((a) => a.stationId === st.id);
       if (!mine.length) continue;
-      st.tasks = mine.map((a) => ({ label: `Collect ${a.name}`, minutes: a.minutes, artifact: a, result: a.note, progress: 0, done: false }));
-      st.done = false;
+      st.tasks = st.tasks.filter(task => !task.artifact).concat(mine.map((a) => ({ label: `Collect ${a.name}`, minutes: a.minutes, artifact: a, result: a.note, progress: 0, done: false })));
     }
   }
 
@@ -182,6 +311,7 @@ export class Mission {
     r.speed = 0;
     this.cruise = false;
     this.state = 'walk';
+    this.pos = { x: this.walker.x, y: this.terrain.heightAt(this.walker.x, this.walker.z), z: this.walker.z };
     this.emit('log', { text: 'Crew out of the rover · on foot', tone: 'info' });
     this.emit('state', { state: this.state });
     return true;
@@ -191,6 +321,7 @@ export class Mission {
     if (!this.canBoard) return false;
     this.state = 'drive';
     this.rover.speed = 0;
+    this.pos = { x: this.rover.x, y: this.terrain.heightAt(this.rover.x, this.rover.z), z: this.rover.z };
     this.emit('log', { text: 'Crew aboard · rover ready', tone: 'info' });
     this.emit('state', { state: this.state });
     return true;
@@ -200,7 +331,15 @@ export class Mission {
     if (!['drive', 'walk'].includes(this.state) || !this.atHome) return false;
     this.legPending = null;
     const home = this.home;
-    if (home) home.done = true;
+    if (home) {
+      for (const task of home.tasks.filter(t => !t.done && !t.skipped)) {
+        this._consume(task.minutes * 60, { work: true });
+        task.done = true;
+        task.progress = 1;
+      }
+      home.done = true;
+    }
+    if (this.stations.some(st => !st.done && !st.skipped)) this.aborted = true;
     this.rover.speed = this.speed = 0;
     this.state = 'complete';
     this.emit('log', { text: 'EVA complete. Welcome home.', tone: 'ok' });
@@ -208,16 +347,17 @@ export class Mission {
     return true;
   }
 
-  // Dust or a reserve problem: turn around and head home along the outbound track.
+  // Keep the crew where they are; redirect the navigator toward the habitat.
   returnToHabitat() {
-    if (this.route.retracesOutbound === false || !['drive', 'walk'].includes(this.state) || this.aborted ||
-        this.s <= 1 || this.s >= this.route.length / 2) return false;
+    if (!['drive', 'walk'].includes(this.state) || this.aborted || this.atHome || !this.leftHome) return false;
     this.aborted = true;
     this.dustWarning = false;
     this.cruise = false;
-    this.rover.speed = 0;
-    if (this.state === 'drive') this.rover.heading += Math.PI;
-    this.emit('log', { text: 'Returning along the outbound track', tone: 'warn' });
+    this.rover.speed = this.speed = 0;
+    this.legPending = null;
+    this.retracing = this.route.retracesOutbound !== false && this.s < this.route.length / 2;
+    if (this.state === 'drive' && this.retracing) this.rover.heading += Math.PI;
+    this.emit('log', { text: this.retracing ? 'Returning along the outbound track' : 'Returning to habitat', tone: 'warn' });
     this.emit('state', { state: this.state });
     return true;
   }
@@ -226,6 +366,7 @@ export class Mission {
   acknowledge() {
     if (this.state !== 'gate' || !this.surprise) return false;
     const z = this.surprise.ref;
+    z.acknowledged = true;
     this._consume(z.delayMinutes * 60, { work: true });
     this.emit('log', { text: `${z.type} cleared · +${z.delayMinutes} min`, tone: 'warn' });
     this.surprise = null;
@@ -240,9 +381,16 @@ export class Mission {
   chooseLeg(option) {
     if (!this.legPending || !option?.allowed) return false;
     const ahead = this.stations.filter((st) => !st.done && !st.skipped && st !== this.legPending);
-    if (option.id === 'quick' && ahead[0]) ahead[0].tasks.slice(1).forEach((task) => { if (!task.done) task.skipped = true; });
+    if (option.id === 'quick' && ahead[0]) {
+      const pending = ahead[0].tasks.filter(task => !task.done && !task.skipped);
+      const keep = pending.find(task => task.artifact) ?? pending[0];
+      for (const task of pending) if (task !== keep) task.skipped = true;
+    }
     if (option.id === 'skip' && ahead[0]) ahead[0].skipped = true;
-    if (option.id === 'home') ahead.forEach((st) => { st.skipped = true; });
+    if (option.id === 'home') {
+      ahead.forEach((st) => { st.skipped = true; });
+      this.returnToHabitat();
+    }
     for (const st of ahead) if (!st.skipped && st.tasks.every((t) => t.done || t.skipped)) st.done = true;
     this.lastLeg = option.id;
     this.legPending = null;
@@ -262,8 +410,9 @@ export class Mission {
       st.done = before.done;
       st.skipped = before.skipped;
       st.visited = before.visited;
+      if (this.legPending === before) this.legPending = st;
     }
-    const found = this.surprises.filter((sp) => sp.found);
+    const found = this.surprises.filter((sp) => sp.ref.detected || sp.driven > 0);
     const fresh = this.surprisesOn ? hiddenSurprises(route, this.random).filter((sp) => !found.some((f) => f.hazard.id === sp.hazard.id)) : [];
     this.route = route;
     this.surprises = [...found, ...fresh];
@@ -276,43 +425,81 @@ export class Mission {
     }
   }
 
+  collectionBlockReason(artifact) {
+    if (!artifact) return 'No find selected';
+    if (artifact.collected) return 'Already collected';
+    if (this.aborted) return 'Science ended · returning to habitat';
+    if (!this.onFoot) return 'Leave the rover to collect this find';
+    if (Math.hypot(this.walker.x - artifact.x, this.walker.z - artifact.z) > WALK.reach) return 'Move closer to the find';
+    return this._workBudget(artifact).reason;
+  }
+
   collect(artifact) {
-    if (!artifact || artifact.collected || this.state !== 'walk') return false;
+    const reason = this.collectionBlockReason(artifact);
+    if (reason) {
+      this.emit('log', { text: reason, tone: 'warn' });
+      return false;
+    }
     artifact.collected = true;
     this.collected.push(artifact);
     this.samples++;
-    this._consume(artifact.minutes * 60, { work: true });
+    this._consume(artifact.minutes * 60, { work: true, outside: true });
     const st = artifact.stationId ? this.stations.find((x) => x.id === artifact.stationId) : null;
     const task = st?.tasks.find((t) => t.artifact === artifact);
     if (task) { task.done = true; task.skipped = false; task.progress = 1; }
     this.emit('log', { text: `${st ? `${st.id} ✓ ` : ''}Collected ${artifact.name}`, tone: 'ok' });
     this.emit('artifact', { artifact, station: st });
-    if (st && !st.done && st.tasks.every((t) => t.done || t.skipped)) {
-      st.done = true;
-      st.skipped = false;
-      const ahead = this.stations.some((x) => !x.done && !x.skipped);
-      if (this.legCheck && ahead) {
-        // More science ahead: the crew picks the next leg on the wrist navigator.
-        this.legPending = st;
-        this.emit('log', { text: `${st.id} complete · choose the next leg on your wrist navigator [P]`, tone: 'info' });
-        this.emit('station', { station: st, done: true });
-        this.emit('legcheck', { station: st });
-      } else {
-        const next = this.nextStation;
-        this.emit('log', { text: `${st.id} complete · next: ${next?.final ? 'habitat' : `${next.id} · ${next.name}`}`, tone: 'ok' });
-        this.emit('station', { station: st, done: true });
-      }
-    }
+    if (task) this._stationComplete(st, task);
     return true;
+  }
+
+  _stationComplete(st, task) {
+    const group = st.tasks.filter(t => Boolean(t.artifact) === Boolean(task.artifact));
+    if (st.done || !group.every(t => t.done || t.skipped)) return;
+    st.done = true;
+    st.skipped = false;
+    const ahead = this.stations.some(x => !x.done && !x.skipped);
+    if (this.legCheck && ahead) {
+      this.legPending = st;
+      this.emit('log', { text: `${st.id} complete · choose the next leg on your wrist navigator [P]`, tone: 'info' });
+      this.emit('station', { station: st, done: true });
+      this.emit('legcheck', { station: st });
+    } else {
+      this.emit('log', { text: `${st.id} complete · next: ${this.nextStation?.name ?? 'habitat'}`, tone: 'ok' });
+      this.emit('station', { station: st, done: true });
+    }
   }
 
   // ---------------------------------------------------------------- per frame
   _consume(seconds, options = {}) {
     const consumed = consumptionEstimate(seconds, options);
+    let outsideFrom = this.met;
     this.met += seconds;
     this.o2Used += consumed.oxygenMinutes;
     this.dose += LIFE_SUPPORT.doseRateUsvH * (seconds / 3600);
     this.batteryWh = Math.max(0, this.batteryWh - consumed.batteryWh);
+    if (!this.dustWarning && this.met >= this._weatherAt) {
+      // A long science task crosses the same weather events as driving minute by minute.
+      do {
+        outsideFrom = this._weatherAt;
+        this._weather = this._weather === CLEAR_WEATHER
+          ? PASSING_WEATHER[Math.floor(this.random() * PASSING_WEATHER.length)] : CLEAR_WEATHER;
+        this._weatherAt += this._weather === CLEAR_WEATHER ? 45 + this.random() * 45
+          : this._weather === PASSING_WEATHER[0] ? 25 + this.random() * 15 : 12 * 60 + this.random() * 8 * 60;
+      } while (this.met >= this._weatherAt);
+      const clearing = this._weather === CLEAR_WEATHER;
+      this.emit('log', {
+        text: clearing ? 'Weather cleared · normal operations resumed'
+          : Number.isFinite(this._weather.exposureMinutes) ? `Cold spell · outside work limited to ${this._weather.exposureMinutes} min`
+            : `${this._weather.label} · speed limited to ${this._weather.speedLimit} m/s`,
+        tone: clearing ? 'ok' : 'warn',
+      });
+    }
+    if (options.outside && Number.isFinite(this.weather.exposureMinutes)) {
+      this._outsideMinutes = this.outsideMinutes + (this.met - outsideFrom) / 60;
+      this._outsideWeather = this.weather;
+      this._outsideWeatherUntil = this._weatherAt;
+    }
   }
 
   // input: { throttle, brake, steer, boost } when driving;
@@ -369,6 +556,7 @@ export class Mission {
     let limit = ROVER.maxSpeed;
     let reason = '';
     for (const z of ground.zones) if (z.limit < limit) { limit = z.limit; reason = z.type; }
+    if (this.weather.speedLimit < limit) { limit = this.weather.speedLimit; reason = this.weather.label; }
     this.limit = limit;
 
     let v = r.speed;
@@ -385,7 +573,7 @@ export class Mission {
       if (brake && !this.dustWarning) v = Math.max(-REVERSE_SPEED, v - ROVER.accel * 0.6 * sdt);
       else v = Math.min(0, v + (throttle ? ROVER.brake : ROVER.coast * 3) * sdt);
     }
-    v = clamp(v, -REVERSE_SPEED, ROVER.maxSpeed);
+    v = clamp(v, -Math.min(REVERSE_SPEED, limit), ROVER.maxSpeed);
     this.governed = throttle && limit < ROVER.maxSpeed - 0.01 && v >= limit - 0.15;
     this.limitReason = reason;
 
@@ -428,10 +616,20 @@ export class Mission {
     for (const sp of this.surprises) {
       if (sp.found || Math.hypot(r.x - sp.hazard.cx, r.z - sp.hazard.cz) > sp.hazard.radius) continue;
       sp.driven += moved;
-      if (sp.driven < sp.after) continue;
+      const remaining = Math.max(0, sp.after - sp.driven);
+      const range = Math.min(35, this.weather.visibilityM * 0.035);
+      if (!sp.ref.detected && remaining <= range) {
+        sp.ref.detected = true;
+        sp.ref.at = { x: r.x - Math.sin(r.heading) * remaining * Math.sign(r.speed || 1), z: r.z - Math.cos(r.heading) * remaining * Math.sign(r.speed || 1) };
+        sp.s = this.route.nearestS(sp.ref.at.x, sp.ref.at.z);
+        this.detectedObstacles.push(sp);
+        this.emit('log', { text: `Mast camera spotted ${sp.ref.type.toLowerCase()} · ${Math.round(remaining)} m ahead`, tone: 'warn' });
+      }
+      if (remaining > 0) continue;
       sp.found = true;
       sp.ref.maxTilt = this._ground(r.x, r.z, r.heading).tilt;
       sp.ref.at = { x: r.x, z: r.z };
+      sp.s = this.route.nearestS(r.x, r.z);
       this.surprise = sp;
       r.speed = this.speed = 0;
       this.cruise = false;
@@ -484,7 +682,7 @@ export class Mission {
     this.governed = false;
     this.limit = top;
     this.limitReason = '';
-    this._consume(dt, { work: true });
+    this._consume(dt, { work: true, outside: true });
     this.pos = { x: w.x, y: this.terrain.heightAt(w.x, w.z), z: w.z };
     this._zones(ground.zones.filter((z) => z.id !== 'SLOPE' || z.severity === 'danger'));
   }
@@ -542,7 +740,7 @@ export class Mission {
     // Search mostly ahead, so out-and-back routes whose legs overlap keep their direction.
     const at = Math.round(this.s / R.step);
     const ahead = Math.ceil(80 / R.step), behind = Math.ceil(12 / R.step);
-    let [i, d] = this.aborted && R.retracesOutbound !== false ? best(at - ahead, at + behind) : best(at - behind, at + ahead);
+    let [i, d] = this.retracing ? best(at - ahead, at + behind) : best(at - behind, at + ahead);
     this._searchTimer -= dt;
     if (full || (d > 40 && this._searchTimer <= 0)) {
       // Far from the last known stretch: search the whole route once in a while.
@@ -569,7 +767,7 @@ export class Mission {
     for (const st of this.stations) {
       if (st.visited || Math.hypot(st.x - this.pos.x, st.z - this.pos.z) > STATION_RADIUS) continue;
       st.visited = true;
-      const open = st.tasks.filter((t) => !t.done).length;
+      const open = st.tasks.filter(t => t.artifact && !t.done && !t.skipped).length;
       this.emit('log', { text: `Arrived ${st.id} · ${st.name}${open ? ` · get out and collect ${open} artifact${open > 1 ? 's' : ''}` : ''}`, tone: 'ok' });
       this.emit('station', { station: st, done: false });
     }
@@ -579,11 +777,28 @@ export class Mission {
   autopilot(input = {}) {
     const R = this.route;
     const r = this.rover;
-    const back = this.aborted && R.retracesOutbound !== false;
-    const p = R.sample(clamp(this.s + (back ? -9 : 9), 0, R.length));
+    const p = this.aborted && R.retracesOutbound === false ? HAB
+      : R.sample(clamp(this.s + (this.retracing ? -9 : 9), 0, R.length));
     const want = Math.atan2(-(p.x - r.x), -(p.z - r.z));
     const err = wrapAngle(want - r.heading);
     return { throttle: true, brake: false, boost: false, ...input, steer: clamp(-err * 2.2, -1, 1) };
+  }
+
+  _finishStationTask(task) {
+    const st = this.currentStation;
+    const weather = this.weather;
+    if (task.panorama && weather.visibilityM < 1000) {
+      task.quality = 'dust-degraded';
+      task.result = 'Dust-degraded panorama stored · fine beds obscured; repeat observation needed (SIMULATION)';
+    } else task.quality = 'nominal';
+    task.done = true;
+    task.progress = 1;
+    this._consume(task.minutes * 60, { work: true, outside: task.outside !== false });
+    if (/^collect/i.test(task.label)) this.samples += task.sampleCount ?? 1;
+    this.emit('log', { text: `${st.id} ✓ ${task.label} — ${task.result}`, tone: task.quality === 'nominal' ? 'ok' : 'warn' });
+    this.emit('task', { station: st, task });
+    this._stationComplete(st, task);
+    return true;
   }
 
   // Line-of-sight from the rover's antenna to the habitat mast over the DEM.

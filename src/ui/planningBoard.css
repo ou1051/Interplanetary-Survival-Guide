@@ -315,20 +315,6 @@
   border-radius: 7px;
   background: repeating-linear-gradient(90deg, #24251a 0 3px, transparent 4px 8px);
 }
-.wd-keys {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 5px 18px;
-  margin: 14px auto 0;
-  padding: 3px 8px;
-  width: fit-content;
-  background: #091208df;
-  color: var(--phosphor);
-  font-size: 11px;
-}
-.wd-keys kbd { color: inherit; border-color: var(--trace); background: transparent; }
-
 @media (max-width: 650px) {
   .wd-case { grid-template-columns: minmax(0, 1fr) 36px; gap: 8px 6px; }
   .wd-screen { height: clamp(300px, 65dvh, 570px); }
@@ -340,9 +326,6 @@
   .wd-power { font-size: 8px !important; }
   .wd-lamp { width: 27px; }
   .wd-console { max-width: 80%; margin-left: 7%; }
-}
-@media (pointer: coarse) {
-  .wd-keys { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .pb[open] .wd { animation: none; }
@@ -414,8 +397,9 @@
 .wd-screen .wd-return { border: 1px solid var(--signal); padding: 5px 8px; }
 .wd-screen .wd-return:hover { background: var(--signal); color: var(--tube); text-shadow: none; }
 .wd-foot { grid-template-columns: auto minmax(15px, 1fr); }
-.field-wrist { position: absolute; z-index: 16; bottom: 14px; right: 18px; pointer-events: auto; }
+.field-controls { position: absolute; z-index: 16; bottom: 14px; right: 18px; display: flex; align-items: stretch; gap: 8px; pointer-events: auto; }
 .field-alert { position: absolute; z-index: 16; left: 50%; bottom: 85px; transform: translateX(-50%); color: #ffcf9a; background: #1e140d; padding: 8px 12px; width: max-content; max-width: 90vw; }
+.field-alert:empty { padding: 0; }
 .station-observation { display:block; color:var(--hud); font-size:11px; margin-top:8px; }
 .station-observation img { display:block; width:100%; max-height:70px; object-fit:cover; }
 

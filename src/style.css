@@ -430,6 +430,7 @@ kbd {
   position: relative;
   display: grid;
   grid-template-columns: 22px 1fr auto;
+  width: 100%; background: transparent; color: inherit; font-family: inherit; text-align: left;
   align-items: center;
   gap: 8px;
   padding: 9px 10px;
@@ -448,8 +449,24 @@ kbd {
 .task.done { border-color: rgba(92, 255, 154, 0.4); cursor: default; }
 .task.done .chk { border-color: var(--ok); background: var(--ok); }
 .task.active { border-color: var(--hud); }
+.task:focus-visible { outline: 2px solid var(--hud); outline-offset: 2px; }
 .task.locked { opacity: 0.45; cursor: default; }
 .task.skipped { opacity: 0.35; cursor: default; text-decoration: line-through; } /* dropped by a quick-stop leg choice */
+.station-conditions, .station-outcomes { font-size: 12px; line-height: 1.5; }
+.station-actions { display: grid; gap: 8px; }
+.station-action {
+  width: 100%; min-height: 44px; padding: 10px 12px; text-align: left;
+  border: 1px solid rgba(154, 244, 255, 0.4); background: #102b35; color: #d6fbff;
+  cursor: pointer; touch-action: manipulation; font: inherit;
+}
+.station-action strong, .station-action span { display: block; }
+.station-action strong { font-size: 13px; }
+.station-action span { margin-top: 4px; font-size: 11px; line-height: 1.5; }
+.station-action:disabled { opacity: 0.55; cursor: default; }
+.station-action:focus-visible { outline: 2px solid #9af4ff; outline-offset: 2px; }
+.station-action .decision-reason { color: #ffc179; }
+.debrief-science { grid-column: 1 / -1; max-height: 240px; overflow: auto; }
+.debrief-science p { font: 12px/1.6 var(--sans); }
 .card .cta {
   margin-top: 16px;
   width: 100%;
@@ -582,7 +599,7 @@ button.primary:disabled { opacity: 0.5; cursor: progress; box-shadow: none; }
   .layers .panel-title, .legend { display: none; }
   .alert { top: 136px; font-size: 10px; }
   .touch { right: 10px; bottom: 96px; }
-  .eva-actions { right: 10px; left: 10px; top: 162px; bottom: auto; flex-direction: row; flex-wrap: wrap; justify-content: flex-start; }
+  .eva-actions { flex-direction: row; flex-wrap: wrap; }
   .eva-crew, .eva-collect, .eva-end { font-size: 12px; padding: 9px 12px; }
   .card.compact { width: auto; }
   #card { bottom: 214px; max-height: 38vh; }
@@ -593,14 +610,30 @@ button.primary:disabled { opacity: 0.5; cursor: progress; box-shadow: none; }
 
 .pb-launch-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 
-.sources-dialog { color: #dce5df; border: 1px solid #52635c; background: #101b1d; padding: 46px; width: min(900px, 92vw); max-height: 86vh; font-family: var(--sans); border-radius: 6px; box-shadow: 0 30px 120px #000a; user-select: text; }
-.sources-dialog::backdrop { background: #020b10c9; backdrop-filter: blur(8px); }
-.sources-dialog h2 { font-size: clamp(26px, 3vw, 40px); letter-spacing: -.04em; line-height: 1.15; font-weight: 400; margin: 24px 0; }
-.sources-dialog p, .sources-dialog li { font-size: 12px; line-height: 1.8; color: #afc1bb; }.sources-dialog h3 { font-size: 14px; font-weight: 500; }
-.sources-dialog a { color: #d0e4bc; text-underline-offset: 4px; }.sources-dialog .source-close { position: absolute; top: 12px; right: 18px; border: 0; background: none; color: #dce5df; font-size: 26px; cursor: pointer; }
-.source-note { border-top: 1px solid #ffffff20; padding-top: 14px; }
+.sources-dialog { color: var(--ops-text); border: 1px solid var(--ops-line); background: var(--ops-bg); padding: 0; width: min(820px, calc(100vw - 32px)); max-height: min(86vh, 900px); max-height: min(86dvh, 900px); overflow-y: auto; font-family: var(--ops-font); border-radius: 3px; box-shadow: 0 30px 120px #000a; user-select: text; }
+.sources-dialog:modal { overscroll-behavior: contain; }
+.sources-dialog::backdrop { background: #020811ce; backdrop-filter: blur(8px); overflow: hidden; overscroll-behavior: contain; }
+.source-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px; border-left: 6px solid var(--nasa-red); background: var(--nasa-blue); }
+.sources-dialog h2 { margin: 0; color: #fff; font-size: clamp(20px, 3vw, 26px); font-weight: 700; line-height: 1.2; letter-spacing: -.01em; }
+.source-header form { margin: 0; }
+.sources-dialog .source-close { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid #7fa2e0; border-radius: 3px; background: transparent; color: #fff; font: 400 28px/1 var(--ops-font); cursor: pointer; }
+.sources-dialog .source-close:hover { background: #ffffff1f; }
+.source-body { padding: 20px; }
+.source-panel { padding: 18px 20px; margin-bottom: 12px; border: 1px solid var(--ops-line); background: var(--ops-panel); }
+.sources-dialog h3 { margin: 0 0 10px; color: var(--ops-text); font-size: 11px; font-weight: 700; line-height: 1.4; letter-spacing: .12em; text-transform: uppercase; }
+.sources-dialog p, .sources-dialog li { font-size: 13px; line-height: 1.7; color: #c7d4ea; }
+.source-panel p { margin: 0 0 10px; }
+.source-panel p:last-child { margin-bottom: 0; }
+.source-panel ul { margin: 0; padding-left: 18px; }
+.source-panel li + li { margin-top: 8px; }
+.sources-dialog a { color: #a9cbff; text-underline-offset: 4px; overflow-wrap: anywhere; }
+.sources-dialog a:hover { color: #fff; }
+.sources-dialog :is(button, a):focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.sources-dialog .source-note { margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--ops-line); color: var(--ops-dim); font-size: 11px; }
 @media (max-width: 760px) {
-  .sources-dialog { padding: 30px 23px; }
+  .source-header { padding: 14px; }
+  .source-body { padding: 12px; }
+  .source-panel { padding: 16px; }
 }
 button:focus-visible, a:focus-visible { outline: 2px solid #d3edb9; outline-offset: 5px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }

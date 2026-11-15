@@ -1,0 +1,104 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it } from 'vitest';
+import { Input } from '../src/sim/input.js';
+import { Mission } from '../src/sim/mission.js';
+import { buildDeltaTraverse } from '../src/data/deltaTraverse.js';
+import { renderStationChoices } from '../src/ui/stationChoices.js';
+import { Hud } from '../src/ui/hud.js';
+import { placeArtifacts } from '../src/sim/artifacts.js';
+
+function setup(id = 'S2') {
+  const { route, terrain } = buildDeltaTraverse();
+  const mission = new Mission(route, terrain, {}, { surprises: false });
+  mission.start();
+  const station = mission.stations.find(station => station.id === id)!;
+  Object.assign(mission.rover, { x: station.x, z: station.z, speed: 0 });
+  mission.pos = { x: station.x, y: station.h, z: station.z };
+  mission.s = station.s;
+  mission.leftHome = true;
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  return { mission, container };
+}
+afterEach(() => document.body.replaceChildren());
+
+describe('shared station decisions UI', () => {
+  it('shows instruments beside physical finds without adding remote collect buttons', () => {
+    const { mission, container } = setup();
+    const artifacts = placeArtifacts({ route: mission.route, terrain: mission.terrain, seed: 42 });
+    mission.setArtifacts(artifacts);
+    renderStationChoices(container, mission);
+    expect(container.querySelector('[data-action="task:0"]')).not.toBeNull();
+    mission.currentStation!.tasks.forEach((task, index) => {
+      if (task.artifact) expect(container.querySelector(`[data-action="task:${index}"]`)).toBeNull();
+    });
+    mission.exitRover();
+    renderStationChoices(container, mission);
+    expect(container.textContent).toContain('Collect physical finds on foot');
+    mission.rover.speed = 2;
+    mission.boardRover();
+    mission.rover.speed = 2;
+    renderStationChoices(container, mission);
+    expect(container.children).toHaveLength(0);
+  });
+
+  it('runs the sample-first decision through a native button while the rover is parked', () => {
+    const { mission, container } = setup();
+    renderStationChoices(container, mission);
+    const button = container.querySelector<HTMLButtonElement>('[data-action="task:2"]')!;
+    expect(button.textContent).toContain('Sample first');
+    expect(button.textContent).toContain('HAB O₂');
+    expect(button.textContent).toContain('battery');
+    expect(button.textContent).toContain('daylight');
+    button.click();
+    expect(mission.samples).toBe(1);
+    expect(container.querySelector('[data-action="task:2"]')).toBeNull();
+    expect(container.querySelector('.station-outcomes')!.textContent).toContain('tube A2');
+  });
+
+  it('leaves Enter and Space on a focused station button to its native click handler', () => {
+    const { mission, container } = setup();
+    const input = new Input(container);
+    renderStationChoices(container, mission);
+    const button = container.querySelector('button')!;
+    for (const key of ['Enter', ' ']) {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      button.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(input.hit(key.toLowerCase())).toBe(false);
+    }
+    container.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(input.hit('enter')).toBe(true);
+  });
+
+  it('preserves focus while forecasts refresh and exposes blocked cold work', () => {
+    const { mission, container } = setup('S4');
+    mission._weather = { label: 'Cold spell', speedLimit: 4.5, temperatureOffsetC: -25, exposureMinutes: 10 };
+    renderStationChoices(container, mission);
+    const short = container.querySelector<HTMLButtonElement>('[data-action="task:1"]')!;
+    short.focus();
+    mission.met += 1;
+    renderStationChoices(container, mission);
+    expect(document.activeElement).toBe(short);
+    const long = container.querySelector<HTMLButtonElement>('[data-action="task:2"]')!;
+    expect(long.disabled).toBe(true);
+    expect(long.textContent).toContain('10 min left in cold window');
+    long.click();
+    expect(mission.scienceResults).toHaveLength(0);
+  });
+
+  it('retains skipped and degraded science outcomes in the debrief after early return', () => {
+    const { mission } = setup();
+    mission._weather = { label: 'Blowing dust', speedLimit: 1.5, visibilityM: 190, temperatureOffsetC: 0, exposureMinutes: Infinity };
+    mission.chooseStationAction('task:0');
+    mission.chooseStationAction('home');
+    document.body.innerHTML = '<div id="hud"></div><div id="card"></div><div id="debriefGrid"></div><div id="debriefSub"></div><div id="debrief" class="hidden"></div><p id="debriefNote"></p><button id="debriefExtra"></button><button id="restartBtn"></button>';
+    const hud = Object.create(Hud.prototype);
+    hud.mission = mission;
+    hud.route = mission.route;
+    hud.showDebrief(() => {});
+    expect(document.querySelector('.debrief-science')!.textContent).toContain('Dust-degraded');
+    expect(document.querySelector('.debrief-science')!.textContent).toContain('head home');
+    expect(document.querySelector('#debriefSub')!.textContent).toContain('Returned early');
+  });
+});

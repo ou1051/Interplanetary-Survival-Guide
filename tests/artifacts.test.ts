@@ -59,17 +59,28 @@ describe('artifact catalog and placement', () => {
     mission.setArtifacts(finds);
     mission.start();
     const s1 = mission.stations[0];
-    expect(s1.tasks.map((t: { artifact: { stationId: string } }) => t.artifact.stationId)).toEqual(['S1', 'S1', 'S1']);
-    mission.state = 'walk';
+    const tasks = s1.tasks.filter(t => t.artifact);
+    expect(tasks.map(t => t.artifact.stationId)).toEqual(['S1', 'S1', 'S1']);
+    Object.assign(mission.rover, { x: s1.x, z: s1.z });
+    mission.update(0, {}, 0);
+    mission.exitRover();
+    expect(mission.collect(tasks[0].artifact)).toBe(false); // beyond suit reach
+    expect(mission.stationOptions.some(option => option.id === 'task:0')).toBe(true);
     const events: string[] = [];
     mission.on((type: string) => events.push(type));
-    for (const t of s1.tasks) mission.collect(t.artifact);
+    for (const t of tasks) {
+      Object.assign(mission.walker, { x: t.artifact.x, z: t.artifact.z });
+      mission.update(0, {}, 0);
+      expect(mission.collect(t.artifact)).toBe(true);
+    }
     expect(s1.done).toBe(true);
     expect(mission.nextStation.id).toBe('S2');
-    expect(mission.collect(s1.tasks[0].artifact)).toBe(false); // already collected
+    expect(mission.collect(tasks[0].artifact)).toBe(false); // already collected
     expect(events.filter((e) => e === 'artifact')).toHaveLength(3);
     expect(events).toContain('station');
     const wild = finds.find((a) => !a.stationId)!;
+    Object.assign(mission.walker, { x: wild.x, z: wild.z });
+    mission.update(0, {}, 0);
     expect(mission.collect(wild)).toBe(true);
     expect(mission.samples).toBe(4);
   });

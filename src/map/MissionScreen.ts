@@ -26,7 +26,6 @@ export interface MissionScreenOptions {
   initialView?: View;
 }
 
-const BAR_H = 52;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const EXAGGERATION = [1, 1.5, 3];
 
@@ -51,13 +50,13 @@ export class MissionScreen {
     this.view = opts.initialView ?? 'globe';
     this.root = document.createElement('div');
     this.root.className = 'ms';
-    this.root.style.setProperty('--bar-h', `${BAR_H}px`);
     this.root.innerHTML = `
       <header class="ms-bar">
         <div class="ms-lead">
+        <a class="ms-return" href="./index.html#briefing">← <span>Route Briefing</span></a>
         <div class="ms-brand">
           <span class="ms-logo" aria-hidden="true"><svg viewBox="0 0 32 32"><defs><radialGradient id="msl" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#f0a070"/><stop offset=".6" stop-color="#c1673d"/><stop offset="1" stop-color="#6e2f17"/></radialGradient></defs><circle cx="16" cy="16" r="13" fill="url(#msl)"/><path d="M6 19.5c5.6-3 14.4-3 20 0" stroke="#fff3ea" stroke-width="1.6" fill="none" opacity=".7"/></svg></span>
-          <span><b>Field Office</b><small>Freelance Astronaut</small></span>
+          <span><b>Explore Mars</b><small>Mission Operations</small></span>
         </div>
         <nav class="ms-crumbs" aria-label="Location"></nav>
         </div>
@@ -104,7 +103,6 @@ export class MissionScreen {
     this.map = new MissionMap(this.q('.ms-site'), {
       site: this.site,
       onAction: opts.onAction,
-      topInset: BAR_H,
       showClock: false,
       initialTab: 'scout',
       draw: opts.drawMap ?? true,

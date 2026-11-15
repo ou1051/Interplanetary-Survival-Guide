@@ -78,15 +78,24 @@
           <div class="legend" id="legend"></div>
         </div>
 
-        <div class="eva-actions" id="evaActions">
-          <button type="button" id="collectBtn" class="eva-collect" hidden></button>
-          <button type="button" id="endBtn" class="eva-end" hidden>End EVA at airlock [Enter]</button>
-          <button type="button" id="crewBtn" class="eva-crew">Get out [F]</button>
-          <button type="button" id="viewBtn" class="ghost eva-view">View · First person [T]</button>
-          <button type="button" id="collectionHudBtn" class="ghost eva-view">Collection [I]</button>
+        <div class="field-tools">
+          <div class="field-controls">
+            <button type="button" class="weather-control field-weather" data-open-weather aria-controls="planningBoard" aria-haspopup="dialog" title="Read current conditions on the wrist map">
+              <span class="weather-symbol" aria-hidden="true"></span>
+              <span class="weather-reading"><small>Weather now</small><strong id="fieldWeather">Clear</strong></span>
+              <span class="weather-chevron" aria-hidden="true">›</span>
+            </button>
+            <button type="button" id="boardBtn" class="ghost">Wrist navigator [P]</button>
+          </div>
+          <div class="eva-actions" id="evaActions">
+            <button type="button" id="collectBtn" class="eva-collect" hidden></button>
+            <button type="button" id="endBtn" class="eva-end" hidden>End EVA at airlock [Enter]</button>
+            <button type="button" id="crewBtn" class="eva-crew">Get out [F]</button>
+            <button type="button" id="viewBtn" class="ghost eva-view">View · First person [T]</button>
+            <button type="button" id="collectionHudBtn" class="ghost eva-view">Collection [I]</button>
+          </div>
         </div>
-        <button type="button" id="boardBtn" class="ghost field-wrist">Wrist navigator [P]</button>
-        <p id="fieldAlert" class="field-alert hidden" role="status">Dust front ahead. Open your wrist navigator to return.</p>
+        <p id="fieldAlert" class="field-alert" role="status"></p>
 
         <div id="touch" class="touch">
           <button data-v="left" aria-label="steer left">◀</button>
@@ -105,6 +114,10 @@
             <div>
               <div class="overlay-title">SURVIVAL ROUTE · <span id="mapSite"></span></div>
               <div class="overlay-sub" id="mapSub"></div>
+              <button type="button" class="weather-control map-weather" data-open-weather aria-controls="planningBoard" aria-haspopup="dialog" title="Read current conditions on the wrist map">
+                <span class="weather-symbol" aria-hidden="true"></span>
+                <span id="mapWeather"></span><span class="weather-chevron" aria-hidden="true">›</span>
+              </button>
             </div>
             <button id="mapClose" class="ghost">CLOSE [M]</button>
           </div>
@@ -128,13 +141,31 @@
       <section id="habitat" aria-label="Habitat mission control"></section>
 
       <dialog id="sourcesDialog" class="sources-dialog" aria-labelledby="sourcesTitle">
-        <form method="dialog"><button class="source-close" aria-label="Close mission information">×</button></form>
-        <h2 id="sourcesTitle">Mission &amp; sources</h2>
-        <p>Plan a route from the habitat, drive to science stations and monitor your oxygen for the return. The Delta traverse uses fictional terrain. Gale Crater uses archived HiRISE elevation and imagery with a Curiosity field reference. Hazards, weather and life support are simulated.</p>
-        <p>The <a href="./map.html">Mars globe</a> streams NASA and USGS imagery and elevation. Coverage and resolution depend on the source.</p>
-        <h3>Science sources</h3><ul><li><a href="https://science.nasa.gov/mars/facts/" target="_blank" rel="noopener">NASA · Mars facts ↗</a> — planetary context</li><li><a href="https://science.nasa.gov/mission/mars-2020-perseverance/" target="_blank" rel="noopener">NASA · Perseverance ↗</a> — ancient delta and exploration context</li><li><a href="https://trek.nasa.gov/mars/" target="_blank" rel="noopener">NASA · Mars Trek ↗</a> — orbital map sources</li></ul>
-        <h3>Open-source inspiration</h3><p>We studied <a href="https://github.com/sohaib1083/gale-marswalk-planner" target="_blank" rel="noopener">Gale Marswalk Planner</a> for terrain-aware route planning, <a href="https://github.com/PhewwcCoder/nasa-space-app-challenge" target="_blank" rel="noopener">Sol-3</a> for first-person exploration and source-linked learning, and <a href="https://github.com/NASA-AMMOS/3DTilesRendererJS" target="_blank" rel="noopener">NASA AMMOS 3D Tiles Renderer</a> for multiscale 3D terrain architecture.</p>
-        <p class="source-note">Built with Three.js and CesiumJS. Independent Space Apps project; no NASA endorsement. Concept demonstrator, not operational astronaut navigation.</p>
+        <header class="source-header">
+          <h2 id="sourcesTitle">Mission &amp; sources</h2>
+          <form method="dialog"><button class="source-close" aria-label="Close mission information" autofocus>×</button></form>
+        </header>
+        <div class="source-body">
+          <section class="source-panel" aria-labelledby="sourceMissionTitle">
+            <h3 id="sourceMissionTitle">Mission overview</h3>
+            <p>Plan a route from the habitat, drive to science stations and monitor your oxygen for the return. The Delta traverse uses fictional terrain. Gale Crater uses archived HiRISE elevation and imagery with a Curiosity field reference. Hazards, weather and life support are simulated.</p>
+            <p>The <a href="./map.html">Mars globe</a> streams NASA and USGS imagery and elevation. Coverage and resolution depend on the source.</p>
+          </section>
+          <section class="source-panel" aria-labelledby="sourceScienceTitle">
+            <h3 id="sourceScienceTitle">Science sources</h3>
+            <ul>
+              <li><a href="https://science.nasa.gov/mars/facts/" target="_blank" rel="noopener">NASA · Mars facts ↗</a> — planetary context</li>
+              <li><a href="https://science.nasa.gov/mission/mars-2020-perseverance/" target="_blank" rel="noopener">NASA · Perseverance ↗</a> — ancient delta and exploration context</li>
+              <li><a href="https://trek.nasa.gov/mars/" target="_blank" rel="noopener">NASA · Mars Trek ↗</a> — orbital map sources</li>
+              <li><a href="https://science.nasa.gov/resource/mars-report-dust-storms-on-mars/" target="_blank" rel="noopener">NASA · Dust storms on Mars ↗</a> — observed loss of visibility. Event timing, visibility ranges and rover limits in this mission are simulated.</li>
+            </ul>
+          </section>
+          <section class="source-panel" aria-labelledby="sourceInspirationTitle">
+            <h3 id="sourceInspirationTitle">Open-source inspiration</h3>
+            <p>We studied <a href="https://github.com/sohaib1083/gale-marswalk-planner" target="_blank" rel="noopener">Gale Marswalk Planner</a> for terrain-aware route planning, <a href="https://github.com/PhewwcCoder/nasa-space-app-challenge" target="_blank" rel="noopener">Sol-3</a> for first-person exploration and source-linked learning, and <a href="https://github.com/NASA-AMMOS/3DTilesRendererJS" target="_blank" rel="noopener">NASA AMMOS 3D Tiles Renderer</a> for multiscale 3D terrain architecture.</p>
+          </section>
+          <p class="source-note">Built with Three.js and CesiumJS. Independent Space Apps project; no NASA endorsement. Concept demonstrator, not operational astronaut navigation.</p>
+        </div>
       </dialog>
 
       <section id="debrief" class="screen hidden">
