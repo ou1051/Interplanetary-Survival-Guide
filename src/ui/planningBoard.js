@@ -162,6 +162,11 @@ export class PlanningBoard {
           <span class="wd-grille"></span>
         </div>
       </div>
+      <p class="wd-keys">
+        <span><kbd>←</kbd> <kbd>→</kbd> Switch site / screen</span>
+        <span><kbd>Enter</kbd> Select / Zoom</span>
+        <span><kbd>P</kbd> Close</span>
+      </p>
     </div>`;
   }
 
