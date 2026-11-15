@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { consumptionEstimate } from '../physics/traverse.js';
 import { SITE, ROVER, LIFE_SUPPORT, SLOPE_CLASSES } from '../config/mission.js';
+import { RARITY } from '../sim/artifacts.js';
 import { formatHMS, formatHM, formatDist, clamp } from '../core/math.js';
 import { ZONE_COLORS, bearingTo } from './mapRenderer.js';
 
@@ -20,7 +21,10 @@ function fitCanvas(canvas, w, h) {
 const kmh = (ms) => ms * 3.6;
 
 export class Hud {
-  constructor({ route, mission, mapRenderer, layers, input }) {
+  constructor({ route, mission, mapRenderer, layers, input, artifacts = [] }) {
+    this.artifacts = artifacts;
+    this.context = {};
+    this.keysMode = '';
     this.route = route;
     this.mission = mission;
     this.map = mapRenderer;
@@ -60,6 +64,14 @@ export class Hud {
       el.innerHTML = `<span class="label">⚠ ${z.type}</span><span class="dist"></span><span class="icon"></span>`;
       root.appendChild(el);
       this.markers.push({ el, kind: 'gate', ref: z, x: p.x, y: this.route.terrain.heightAt(p.x, p.z) + 2.6, z: p.z });
+    }
+    for (const a of this.artifacts) {
+      const el = document.createElement('div');
+      el.className = 'marker artifact';
+      el.style.setProperty('--rarity', RARITY[a.rarity].color);
+      el.innerHTML = `<span class="label">${a.stationId ? a.name : 'Unknown signal'}</span><span class="dist"></span><span class="icon"></span>`;
+      root.appendChild(el);
+      this.markers.push({ el, kind: 'artifact', ref: a, x: a.x, y: a.y + 1.9, z: a.z });
     }
   }
 
@@ -131,27 +143,26 @@ export class Hud {
     const wb = M.walkback();
     this._vital('v-walk', `${(wb.distance / 1000).toFixed(2)}/${(wb.limit / 1000).toFixed(1)} km`, clamp(wb.distance / Math.max(1, wb.limit), 0, 1), wb.distance > wb.limit ? 'danger' : wb.distance > wb.limit * 0.7 ? 'warn' : '');
 
-    // navigation
-    const next = M.nextKnownStop;
+    // navigation: the next open station (or home), straight-line from where the crew is
     const station = M.nextStation;
-    if (next) {
-      const name = next.kind === 'gate' ? `⚠ ${next.ref.type}` : next.ref.final ? 'HABITAT' : `${next.ref.id} · ${next.ref.name}`;
-      $('nextName').textContent = name;
-      const d = Math.max(0, next.s - M.s);
+    if (station) {
+      $('nextName').textContent = station.final ? 'HABITAT' : `${station.id} · ${station.name}`;
+      const d = Math.hypot(station.x - view.x, station.z - view.z);
       $('nextDist').textContent = formatDist(d);
-      const v = Math.max(M.speed, 0.6);
-      $('nextEta').textContent = M.state === 'drive' ? `ETA ${formatHM(d / v / 60)}` : M.state.toUpperCase();
+      const v = Math.max(M.speed, M.onFoot ? 0.8 : 1.2);
+      $('nextEta').textContent = M.onFoot ? `ON FOOT · ${formatHM(d / v / 60)}` : `ETA ${formatHM(d / v / 60)}`;
     }
     $('speedVal').textContent = kmh(M.speed).toFixed(1);
     const lim = $('speedLimit');
-    const limit = this.route.speedLimitAt(M.s + 3);
-    lim.textContent = M.governed ? `LIMITED · ${M.limitReason}` : `LIMIT ${Math.round(kmh(limit))} km/h`;
-    lim.classList.toggle('gov', M.governed || limit < ROVER.maxSpeed);
+    if (M.onFoot) lim.textContent = this.input.down('shift') ? 'RUNNING' : 'WALKING';
+    else lim.textContent = M.governed ? `LIMITED · ${M.limitReason}` : M.rover.speed < -0.05 ? 'REVERSE' : `LIMIT ${Math.round(kmh(M.limit))} km/h`;
+    lim.classList.toggle('gov', !M.onFoot && (M.governed || M.limit < ROVER.maxSpeed));
 
     const zi = $('zoneInfo');
     zi.innerHTML = M.activeZones.length
       ? M.activeZones.map((z) => `<span class="tag ${z.severity}">${z.type}</span>`).join('')
       : '';
+    this._keys();
 
     this._attitude(view.pitch, view.roll);
     this._compass(view, station);
@@ -339,11 +350,14 @@ export class Hud {
         const st = mk.ref;
         cls = st.done ? 'done' : st.id === nextId ? 'next' : 'other';
         if (st.final && nextId !== 'HAB' && M.s < 60) cls = 'other';
+      } else if (mk.kind === 'gate') {
+        // Hazard posts on the planned route: shown ahead while following it.
+        const ahead = mk.ref.s0 - M.s;
+        visible = !M.offRoute && ahead > -5 && ahead < 220;
       } else {
-        const z = mk.ref;
-        const ahead = z.s0 - M.s;
-        visible = ahead > -5 && ahead < 220 && !(z.acknowledged && ahead < 0);
-        cls = z.acknowledged ? 'ack' : '';
+        const a = mk.ref;
+        visible = !a.collected && Math.hypot(a.x - view.x, a.z - view.z) < 90;
+        cls = a === this.context.reach ? 'next' : '';
       }
       const d = Math.hypot(mk.x - view.x, mk.z - view.z);
       if (mk.kind === 'station' && d < 9) visible = false;
@@ -364,7 +378,7 @@ export class Hud {
       const m = 46;
       if (sx < m || sx > W - m || sy < 90 || sy > H - 80) edge = true;
       // only the next target is shown when off-screen
-      const important = mk.kind === 'gate' || cls === 'next';
+      const important = mk.kind === 'gate' || (mk.kind === 'station' && cls === 'next');
       if (edge && !important) {
         el.style.opacity = 0;
         continue;
@@ -372,7 +386,7 @@ export class Hud {
       sx = clamp(sx, m, W - m);
       sy = clamp(sy, 90, H - 80);
       el.style.opacity = 1;
-      el.className = `marker ${mk.kind === 'gate' ? 'gate' : ''} ${mk.ref.final ? 'hab' : ''} ${cls} ${edge ? 'edge' : ''}`;
+      el.className = `marker ${mk.kind === 'station' ? '' : mk.kind} ${mk.ref.final ? 'hab' : ''} ${cls} ${edge ? 'edge' : ''}`;
       el.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -100%)`;
       el.querySelector('.dist').textContent = formatDist(d);
     }
@@ -383,132 +397,167 @@ export class Hud {
     const el = $('alert');
     let msg = '';
     let tone = '';
+    const fromRover = Math.hypot(M.walker.x - M.rover.x, M.walker.z - M.rover.z);
     if (wb.distance > wb.limit) { msg = 'WALKBACK LIMIT EXCEEDED — RETURN TOWARD HAB'; tone = 'danger'; }
     else if (M.o2Remaining < 45) { msg = 'O₂ LOW — RETURN TO HAB'; tone = 'danger'; }
     else if (M.batteryPct < 15) { msg = 'ROVER POWER LOW'; tone = 'danger'; }
-    else if (M.state === 'drive' && M.offRoute) { msg = 'CORRIDOR EDGE — STEER BACK TO ROUTE'; tone = 'warn'; }
-    else if (M.state === 'drive' && M.activeZones.some((z) => z.severity === 'danger')) { msg = `HAZARD ZONE · ${M.activeZones.find((z) => z.severity === 'danger').type}`; tone = 'danger'; }
+    else if (M.blocked) { msg = M.onFoot ? 'TOO STEEP TO CLIMB ON FOOT' : 'TOO STEEP FOR THE ROVER — FIND ANOTHER WAY'; tone = 'warn'; }
+    else if (M.bumped > 0) { msg = 'HABITAT — KEEP CLEAR'; tone = 'warn'; }
+    else if (M.activeZones.some((z) => z.severity === 'danger')) { msg = `HAZARD ZONE · ${M.activeZones.find((z) => z.severity === 'danger').type}`; tone = 'danger'; }
+    else if (M.onFoot && fromRover > 150) { msg = `ROVER ${Math.round(fromRover)} m AWAY`; tone = 'warn'; }
     else if (!M.comms.los) { msg = 'NO DIRECT LINE-OF-SIGHT TO HAB · ORBITER RELAY'; tone = 'warn'; }
     else if (M.governed) { msg = `SPEED LIMITED · ${M.limitReason}`; tone = 'info'; }
+    else if (M.offRoute && !M.onFoot) { msg = `OFF THE PLANNED ROUTE · ${Math.round(M.routeDistance)} m`; tone = 'info'; }
     el.textContent = msg;
     el.className = `alert ${msg ? 'show' : ''} ${tone}`;
   }
 
   _prompt() {
     const M = this.mission;
+    const C = this.context;
     const el = $('prompt');
     let html = '';
     if (M.state === 'drive') {
+      const st = M.currentStation;
+      const open = st && !st.skipped ? st.tasks.filter((t) => !t.done && !t.skipped).length : 0;
       const charge = `${Math.round(M.boostCharge * 100)}%`;
       const boost = M.boosting ? `TIME ×${ROVER.timeBoost} · BOOST ${charge}`
         : M.boostBlocked ? `<span class="boost-off">⇧ BOOST OFF · ${M.boostBlocked}${M.boostBlocked === 'RECHARGING' ? ` ${charge}` : ''}</span>` : '';
-      if (M.cruise) html = `CRUISE ON · <kbd>S</kbd> to cancel${boost ? ` · ${boost}` : ''}`;
-      else if (M.speed < 0.15 && !this.input.throttle) html = `<span class="pulse">HOLD <kbd>W</kbd> TO DRIVE THE SURVIVAL ROUTE</span>`;
+      if (M.atHome) html = `<span class="pulse">AT THE HABITAT · <kbd>↵</kbd> END EVA · <kbd>F</kbd> GET OUT</span>`;
+      else if (M.legPending) html = `<span class="pulse">${M.legPending.id} DONE · CHOOSE THE NEXT LEG ON YOUR WRIST NAVIGATOR <kbd>P</kbd></span>`;
+      else if (st && open && M.speed < 0.3) html = `<span class="pulse">${st.id} · <kbd>F</kbd> GET OUT AND COLLECT ${open} ARTIFACT${open > 1 ? 'S' : ''}</span>`;
+      else if (st && open) html = `${st.id} · STOP HERE TO COLLECT ARTIFACTS`;
+      else if (M.cruise) html = `CRUISE ON · <kbd>S</kbd> to cancel${boost ? ` · ${boost}` : ''}`;
+      else if (M.speed < 0.15 && !this.input.throttle) html = `<span class="pulse">HOLD <kbd>W</kbd> TO DRIVE · THE ROUTE IS A GUIDE, GO ANYWHERE</span>`;
       else if (boost) html = boost;
-    } else if (M.state === 'gate') html = `<span class="pulse">HAZARD BRIEFING — PRESS <kbd>ENTER</kbd> TO ACKNOWLEDGE</span>`;
-    else if (M.state === 'station') {
-      const t = M.nextStop.ref.tasks.find((x) => !x.done && !x.skipped);
-      html = t ? `HOLD <kbd>E</kbd> — ${t.label.toUpperCase()}` : '';
-    } else if (M.state === 'stationDone') html = `<span class="pulse">PRESS <kbd>ENTER</kbd> TO ${M.nextStop.ref.final ? 'END THE EVA' : M.legCheck && M.nextStation && !M.nextStation.final ? 'PLAN THE NEXT LEG' : 'RESUME THE TRAVERSE'}</span>`;
-    else if (M.state === 'legcheck') html = `<span class="pulse">ROVER PARKED · CHOOSE THE NEXT LEG ON YOUR WRIST NAVIGATOR <kbd>P</kbd></span>`;
+    } else if (M.state === 'gate') {
+      html = `<span class="pulse">NOT ON THE MAP · ROVER STOPPED — PRESS <kbd>ENTER</kbd> TO DEAL WITH IT</span>`;
+    } else if (M.state === 'walk') {
+      if (C.reach) {
+        const p = Math.round((C.collecting || 0) * 100);
+        html = `<span class="pulse">HOLD <kbd>E</kbd> — COLLECT ${C.reach.name.toUpperCase()}${p ? ` · ${p} %` : ''}</span>`;
+      } else if (M.canBoard) html = `<span class="pulse">PRESS <kbd>F</kbd> TO BOARD THE ROVER</span>`;
+      else if (M.atHome) html = `AT THE HABITAT · <kbd>↵</kbd> END EVA`;
+      else if (M.legPending) html = `<span class="pulse">${M.legPending.id} DONE · CHOOSE THE NEXT LEG ON YOUR WRIST NAVIGATOR <kbd>P</kbd></span>`;
+      else html = `<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> WALK · <kbd>⇧</kbd> RUN · FOLLOW THE BEAMS TO ARTIFACTS`;
+    }
     if (el.innerHTML !== html) el.innerHTML = html;
+  }
+
+  // Key hints follow what the crew is doing.
+  _keys() {
+    const mode = this.mission.state;
+    if (mode === this.keysMode) return;
+    this.keysMode = mode;
+    const k = (keys, text) => `<span>${keys.map((x) => `<kbd>${x}</kbd>`).join('')} ${text}</span>`;
+    $('keys').innerHTML = mode === 'walk'
+      ? [k(['W', 'A', 'S', 'D'], 'walk'), k(['⇧'], 'run'), k(['E'], 'collect (hold)'), k(['F'], 'board rover'), k(['T'], 'view'), k(['I'], 'collection'), k(['M'], 'map'), k(['V'], 'recentre')].join('')
+      : [k(['W'], 'drive'), k(['S'], 'brake · hold to reverse'), k(['A', 'D'], 'steer'), k(['C'], 'cruise'), k(['⇧'], 'time ×3'), k(['F'], 'get out'), k(['T'], 'view'), k(['I'], 'collection'),
+        k(['Z', 'X'], 'look'), k(['B'], 'look back'), k(['M'], 'map'), k(['L'], 'lights'), k(['H'], 'HUD')].join('');
   }
 
   // ------------------------------------------------------------ cards
   _updateCard() {
     const M = this.mission;
     const card = $('card');
-    const stop = M.nextStop;
-    const showing = ['gate', 'station', 'stationDone'].includes(M.state);
-    const key = showing ? `${M.state === 'gate' ? 'g' : 's'}:${stop.ref.id}` : '';
+    const gate = M.state === 'gate' && M.surprise ? M.surprise.ref : null;
+    const st = ['drive', 'walk'].includes(M.state) ? M.currentStation : null;
+    const home = !st && M.atHome && ['drive', 'walk'].includes(M.state);
+    // Inside a mapped area hazard: its briefing, without stopping the rover.
+    const hazard = !st && !home && M.state === 'drive' ? M.activeZones.find((z) => z.area && z.procedure?.length) : null;
+    const key = gate ? `g:${gate.id}` : st ? `s:${st.id}:${M.state}:${st.skipped ? 1 : 0}` : home ? 'home' : hazard ? `h:${hazard.id}` : '';
     if (key !== this.cardKey) {
       this.cardKey = key;
-      if (!showing) {
+      if (!key) {
         card.classList.add('hidden');
         card.innerHTML = '';
-      } else if (M.state === 'gate') this._gateCard(card, stop.ref);
-      else this._stationCard(card, stop.ref);
+      } else if (gate) this._gateCard(card, gate);
+      else if (home) this._homeCard(card);
+      else if (hazard) this._hazardCard(card, hazard);
+      else this._stationCard(card, st);
     }
-    if (showing && M.state !== 'gate') {
-      const st = stop.ref;
-      const active = st.tasks.find((t) => !t.done && !t.skipped);
+    if (st) {
       card.querySelectorAll('.task').forEach((el, i) => {
         const t = st.tasks[i];
         el.classList.toggle('done', t.done);
-        el.classList.toggle('skipped', !!t.skipped);
-        el.classList.toggle('active', t === active);
-        el.classList.toggle('locked', !t.done && t !== active);
-        el.querySelector('.fill').style.width = `${(t.done ? 1 : t.progress) * 100}%`;
+        el.classList.toggle('skipped', !!t.skipped && !t.done);
+        el.classList.toggle('active', !t.done && t.artifact === this.context.reach);
         const res = el.querySelector('.res');
-        if (t.done && res.textContent === '') res.textContent = `→ ${t.result}`;
+        if (t.done && res.textContent === '') res.textContent = '→ collected';
       });
-      const cta = card.querySelector('.cta');
-      const done = st.tasks.every((t) => t.done || t.skipped);
-      const legAhead = M.legCheck && M.route.stations.some((x) => !x.final && !x.done && !x.skipped && x !== st);
-      cta.disabled = !done;
-      cta.textContent = done ? (st.final ? 'END EVA [ENTER]' : legAhead ? 'PLAN NEXT LEG [ENTER]' : 'RESUME TRAVERSE [ENTER]') : 'HOLD [E] ON EACH TASK';
+      const left = st.tasks.filter((t) => !t.done && !t.skipped).length;
+      const hint = card.querySelector('.hint');
+      const text = st.skipped ? `${st.id} is skipped on this EVA.`
+        : !left ? `${st.id} complete.${M.legPending === st ? ' Choose the next leg on your wrist navigator [P].' : ' Board the rover and head for the next station.'}`
+        : M.onFoot ? 'Follow the light beams. Stand next to a find and hold E to collect it.'
+          : 'Stop the rover and press F to get out. Artifacts can only be collected on foot.';
+      if (hint.textContent !== text) hint.textContent = text;
     }
   }
 
-  _gateCard(card, z) {
-    card.className = `card gate${z.surprise ? ' surprise' : ''}`;
-    const len = Math.round(z.s1 - z.s0);
+  _hazardCard(card, z) {
+    card.className = 'card gate compact';
     card.innerHTML = `
-      <div class="kicker">${z.surprise ? 'NOT ON THE MAP · ROVER STOPPED' : 'HAZARD GATE · ROVER STOPPED'}</div>
+      <div class="kicker">HAZARD AREA · LIMIT ${Math.round(kmh(z.limit))} km/h</div>
+      <h2>${z.type}</h2>
+      ${z.obstacles?.length ? `<h3>POSSIBLE HIDDEN OBSTACLES</h3><ul>${z.obstacles.map((o) => `<li>${o}</li>`).join('')}</ul>` : ''}
+      <h3>PROCEDURE</h3>
+      <ul>${z.procedure.map((p) => `<li>${p}</li>`).join('')}</ul>
+      ${z.basis ? `<div class="basis">DATA BASIS · ${z.basis}</div>` : ''}`;
+  }
+
+  _homeCard(card) {
+    card.className = 'card compact';
+    const M = this.mission;
+    const done = M.stations.filter((s) => s.done).length;
+    card.innerHTML = `
+      <div class="kicker">HABITAT AIRLOCK</div>
+      <h2>Back at the habitat</h2>
+      <div class="obj">${done} of ${M.stations.length} stations complete · ${M.collected.length} artifacts aboard. End the EVA here, or head out again.</div>
+      <button class="cta">END EVA [ENTER]</button>`;
+    card.querySelector('.cta').addEventListener('click', () => M.endEva());
+  }
+
+  // An obstacle the orbital map could not show: the rover is stopped until the crew deals with it.
+  _gateCard(card, z) {
+    card.className = 'card gate surprise';
+    card.innerHTML = `
+      <div class="kicker">NOT ON THE MAP · ROVER STOPPED</div>
       <h2>${z.type}</h2>
       <div class="facts">
-        ${z.surprise ? `<div class="fact"><span>DELAY</span><b>+${z.delayMinutes} min</b></div>
-        <div class="fact"><span>O₂ COST</span><b>+${consumptionEstimate(z.delayMinutes * 60, { work: true }).oxygenMinutes.toFixed(1)} min</b></div>`
-          : `<div class="fact"><span>LENGTH</span><b>${len} m</b></div>`}
-        <div class="fact"><span>MAX TILT</span><b>${z.maxTilt.toFixed(1)}°</b></div>
-        <div class="fact"><span>LIMIT</span><b>${Math.round(kmh(z.limit))} km/h</b></div>
+        <div class="fact"><span>DELAY</span><b>+${z.delayMinutes} min</b></div>
+        <div class="fact"><span>O₂ COST</span><b>+${consumptionEstimate(z.delayMinutes * 60, { work: true }).oxygenMinutes.toFixed(1)} min</b></div>
+        <div class="fact"><span>TILT HERE</span><b>${z.maxTilt.toFixed(1)}°</b></div>
       </div>
       <h3>PROCEDURE</h3>
       <ul>${z.procedure.map((p) => `<li>${p}</li>`).join('')}</ul>
       <div class="basis">DATA BASIS · ${z.basis}</div>
-      <button class="cta">${z.surprise ? 'DEAL WITH IT &amp; PROCEED [ENTER]' : 'ACKNOWLEDGE &amp; PROCEED [ENTER]'}</button>`;
+      <button class="cta">DEAL WITH IT &amp; PROCEED [ENTER]</button>`;
     card.querySelector('.cta').addEventListener('click', () => this.mission.acknowledge());
   }
 
   _stationCard(card, st) {
-    card.className = 'card';
+    const onFoot = this.mission.onFoot;
+    card.className = `card ${onFoot ? 'compact' : ''}`;
     const T = this.route.terrain;
-    const slope = T.slopeAt(st.x, st.z, 3);
-    const total = st.tasks.reduce((s, t) => s + t.minutes, 0);
+    const slope = T.slopeAt ? T.slopeAt(st.x, st.z, 3) : 0;
     card.innerHTML = `
-      <div class="kicker">${st.final ? 'END OF TRAVERSE' : `SCIENCE STATION ${st.id}`} · ${st.tasks.length} TASK${st.tasks.length > 1 ? 'S' : ''}</div>
+      <div class="kicker">SCIENCE STATION ${st.id} · ${st.tasks.length} ARTIFACT${st.tasks.length === 1 ? '' : 'S'}</div>
       <h2>${st.name}</h2>
-      <div class="obj">${st.objective}</div>
+      ${onFoot ? '' : `<div class="obj">${st.objective}</div>
       <div class="facts">
         <div class="fact"><span>ELEV</span><b>${st.h.toFixed(0)} m</b></div>
         <div class="fact"><span>SLOPE</span><b>${slope.toFixed(1)}°</b></div>
-        <div class="fact"><span>TIME</span><b>${total} min</b></div>
+        <div class="fact"><span>FINDS</span><b>${st.tasks.length}</b></div>
       </div>
       <h3>WHY HERE</h3>
       <ul>${st.why.map((w) => `<li>${w}</li>`).join('')}</ul>
       ${st.observation ? `<a class="station-observation" href="${st.observation.source}" target="_blank" rel="noopener">
         <img src="${st.observation.image}" alt="Horizontal rock beds photographed by Curiosity">
-        Curiosity Mastcam · Sol 1790 ↗</a>` : ''}
-      <h3>TASKS</h3>
-      <div class="tasks">${st.tasks
-        .map(
-          (t) => `<div class="task"><i class="fill"></i><i class="chk"></i><span class="lbl">${t.label}</span><span class="min">${t.minutes} min</span><span class="res"></span></div>`,
-        )
-        .join('')}</div>
-      <button class="cta" disabled>HOLD [E] ON EACH TASK</button>`;
-    card.querySelectorAll('.task').forEach((el) => {
-      const on = (e) => {
-        if (!el.classList.contains('active')) return;
-        e.preventDefault();
-        this.input.virtual.action = true;
-      };
-      const off = () => (this.input.virtual.action = false);
-      el.addEventListener('pointerdown', on);
-      el.addEventListener('pointerup', off);
-      el.addEventListener('pointerleave', off);
-      el.addEventListener('pointercancel', off);
-    });
-    card.querySelector('.cta').addEventListener('click', () => this.mission.acknowledge());
+        Curiosity Mastcam · Sol 1790 ↗</a>` : ''}`}
+      <h3>ARTIFACTS HERE</h3>
+      <div class="tasks">${st.tasks.map((t) => `<div class="task"><i class="fill"></i><i class="chk" style="border-color:${RARITY[t.artifact?.rarity ?? 'common'].color}"></i><span class="lbl">${t.artifact?.name ?? t.label}</span><span class="min">${RARITY[t.artifact?.rarity ?? 'common'].label}</span><span class="res"></span></div>`).join('')}</div>
+      <p class="hint"></p>`;
   }
 
   // ------------------------------------------------------------ map overlay
@@ -552,23 +601,28 @@ export class Hud {
   }
 
   // ------------------------------------------------------------ debrief
-  showDebrief(onRestart) {
+  showDebrief(onRestart, { items: extraItems = [], note = '', extra = null } = {}) {
     const M = this.mission;
     $('hud').classList.add('hidden');
     $('card').classList.add('hidden');
-    const gates = this.route.zones.filter((z) => z.severity === 'danger').length;
     const items = [
-      ['DISTANCE', formatDist(M.distance)],
+      ['DRIVEN', formatDist(M.distance)],
       ['MET', formatHMS(M.met)],
       ['O₂ REMAINING', formatHM(M.o2Remaining)],
       ['ROVER PWR', `${M.batteryPct.toFixed(0)} %`],
       ['DOSE', `${M.dose.toFixed(1)} µSv`],
-      ['SAMPLES', M.samples],
-      ['GATES CLEARED', gates],
-      ['STATIONS', this.route.stations.length - 1],
+      ...extraItems,
     ];
     $('debriefGrid').innerHTML = items.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
     $('debriefSub').textContent = `${this.mission.aborted ? 'Returned early' : 'Science traverse'} · ${(this.route.site ?? SITE).name}`;
+    $('debriefNote').textContent = note;
+    $('debriefNote').hidden = !note;
+    const more = $('debriefExtra');
+    more.hidden = !extra;
+    if (extra) {
+      more.textContent = extra.label;
+      more.onclick = extra.onClick;
+    }
     $('debrief').classList.remove('hidden');
     $('restartBtn').onclick = onRestart;
   }

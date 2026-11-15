@@ -69,7 +69,7 @@ export class PlanningBoard {
     }
     if (show) {
       this.el.showModal();
-      const targetTab = initialTab || (this.mission?.state === 'legcheck' ? 'leg' : (this.mission ? 'guide' : 'topology'));
+      const targetTab = initialTab || (this.mission?.legPending ? 'leg' : (this.mission ? 'guide' : 'topology'));
       this.showTab(targetTab);
     } else {
       this.el.close();
@@ -250,9 +250,9 @@ export class PlanningBoard {
     });
   }
 
-  // The "Next leg" screen only exists while the rover is parked at a station waiting for a decision.
+  // The "Next leg" screen only exists after a station's work is done, until the next leg is chosen.
   get tabs() {
-    return this.mission?.state === 'legcheck'
+    return this.mission?.legPending
       ? ['leg', 'guide', 'map', 'topology', 'suit']
       : ['guide', 'map', 'topology', 'suit'];
   }
@@ -287,7 +287,7 @@ export class PlanningBoard {
   // The leg ahead: which station we stand at, where the leg goes, and its three paths (Delta loop only).
   _legContext() {
     const route = this.mission.route;
-    const here = this.mission.currentStation;
+    const here = this.mission.legPending ?? this.mission.currentStation;
     const stops = route.stations.filter((station) => !station.final);
     const index = stops.indexOf(here) + 1;
     const next = route.stations[stops.indexOf(here) + 1];

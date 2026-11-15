@@ -43,6 +43,30 @@ try {
   try { await page.waitForFunction(start => window.__isg.mission.s > start, before, { timeout: 20000 }); }
   finally { await page.keyboard.up('w'); }
   assert.ok(await page.evaluate(() => window.__isg.mission.s) > before, 'Surface rover responds to driving input');
+  // Free roaming EVA: drive to S1, get out, collect a find on foot, board again.
+  await page.evaluate(() => {
+    const { mission, simulate } = window.__isg;
+    for (let i = 0; i < 900 && mission.currentStation?.id !== 'S1'; i++) simulate(0.5, { boost: true });
+    for (let i = 0; i < 300 && Math.abs(mission.rover.speed) > 0.01; i++) mission.update(1 / 30, { brake: true }, 0);
+  });
+  assert.equal(await page.evaluate(() => window.__isg.mission.currentStation?.id), 'S1');
+  await page.keyboard.press('f');
+  await page.waitForFunction(() => window.__isg.mission.state === 'walk');
+  await page.evaluate(() => {
+    const { mission, artifacts } = window.__isg;
+    const find = artifacts.find(a => a.stationId === 'S1');
+    mission.walker.x = find.x + 1.2;
+    mission.walker.z = find.z;
+  });
+  await page.waitForFunction(() => !document.getElementById('collectBtn').hidden);
+  await page.screenshot({ path: 'test-results/02b-on-foot.png' });
+  await page.evaluate(() => { const { mission, artifacts } = window.__isg; mission.collect(artifacts.find(a => a.stationId === 'S1')); });
+  assert.equal(await page.evaluate(() => window.__isg.mission.collected.length), 1);
+  assert.equal(await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('isg.collection.v1')).items).length), 1);
+  await page.evaluate(() => { const { mission } = window.__isg; const r = mission.rover; mission.walker.x = r.x - Math.cos(r.heading) * 2.4; mission.walker.z = r.z + Math.sin(r.heading) * 2.4; });
+  await page.waitForFunction(() => window.__isg.mission.canBoard);
+  await page.keyboard.press('f');
+  await page.waitForFunction(() => window.__isg.mission.state === 'drive');
   await page.close();
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
   mobile.on('pageerror', e => errors.push(e.message));
@@ -71,5 +95,5 @@ try {
   await mobile.getByRole('button', { name: /Turn around and return/ }).click();
   assert.equal(await mobile.evaluate(() => window.__isg.mission.aborted), true);
   assert.deepEqual(errors, [], 'No runtime errors');
-  console.log('Browser checks passed: Mars Surface Operations welcome and habitat entry on desktop and mobile, sources, Delta driving and wrist navigator, Gale dust return.');
+  console.log('Browser checks passed: Mars Surface Operations welcome and habitat entry on desktop and mobile, sources, Delta driving and wrist navigator, getting out to collect a find and boarding again, Gale dust return.');
 } finally { await browser.close(); }
