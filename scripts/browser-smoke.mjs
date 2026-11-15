@@ -50,13 +50,18 @@ try {
     return mission.weather.label;
   });
   assert.notEqual(weather, 'Clear', 'Default Delta launch gets variable weather');
-  await page.keyboard.press('p');
-  await page.getByRole('button', { name: 'Route', exact: true }).click();
+  await page.waitForFunction(label => document.querySelector('#fieldWeather').textContent === label, weather);
+  await page.getByRole('button', { name: 'Weather ' + weather, exact: true }).click();
+  await page.locator('[data-route-view]').waitFor();
   const wristWeather = await page.locator('[data-route-weather]').textContent();
   assert.ok(wristWeather.includes(weather));
   await page.keyboard.press('Escape');
   await page.keyboard.press('m');
   await page.waitForFunction(label => document.querySelector('#mapWeather').textContent === label, wristWeather);
+  await page.locator('.map-weather').press('Enter');
+  await page.locator('[data-route-view]').waitFor();
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('.map-weather').evaluate(el => el === document.activeElement), true);
   await page.close();
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
   mobile.on('pageerror', e => errors.push(e.message));
@@ -85,5 +90,5 @@ try {
   await mobile.getByRole('button', { name: /Turn around and return/ }).click();
   assert.equal(await mobile.evaluate(() => window.__isg.mission.aborted), true);
   assert.deepEqual(errors, [], 'No runtime errors');
-  console.log('Browser checks passed: Mars Surface Operations welcome and habitat entry on desktop and mobile, sources, Delta driving and wrist navigator, Gale dust return.');
+  console.log('Browser checks passed: habitat entry on desktop and mobile, sources, Delta driving, weather controls and wrist navigator, Gale dust return.');
 } finally { await browser.close(); }
