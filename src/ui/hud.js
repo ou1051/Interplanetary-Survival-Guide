@@ -464,7 +464,7 @@ export class Hud {
       const st = M.currentStation;
       const open = st && !st.skipped ? st.tasks.filter((t) => !t.done && !t.skipped).length : 0;
       const charge = `${Math.round(M.boostCharge * 100)}%`;
-      const boost = M.boosting ? `TIME ×${ROVER.timeBoost} · BOOST ${charge}`
+      const boost = M.boosting ? 'USING BOOST'
         : M.boostBlocked ? `<span class="boost-off">⇧ BOOST OFF · ${M.boostBlocked}${M.boostBlocked === 'RECHARGING' ? ` ${charge}` : ''}</span>` : '';
       if (M.atHome) html = `<span class="pulse">AT THE HABITAT · <kbd>↵</kbd> END EVA · <kbd>F</kbd> GET OUT</span>`;
       else if (M.legPending) html = `<span class="pulse">${M.legPending.id} DONE · CHOOSE THE NEXT LEG ON YOUR WRIST NAVIGATOR <kbd>P</kbd></span>`;
@@ -495,7 +495,7 @@ export class Hud {
     const k = (keys, text) => `<span>${keys.map((x) => `<kbd>${x}</kbd>`).join('')} ${text}</span>`;
     $('keys').innerHTML = mode === 'walk'
       ? [k(['W', 'A', 'S', 'D'], 'walk'), k(['⇧'], 'run'), k(['E'], 'collect · station work (hold)'), k(['F'], 'board rover'), k(['T'], 'view'), k(['I'], 'collection'), k(['M'], 'map'), k(['V'], 'recentre')].join('')
-      : [k(['W'], 'drive'), k(['S'], 'brake · hold to reverse'), k(['A', 'D'], 'steer'), k(['C'], 'cruise'), k(['E'], 'station work (hold)'), k(['⇧'], 'time ×3'), k(['F'], 'get out'), k(['T'], 'view'), k(['I'], 'collection'),
+      : [k(['W'], 'drive'), k(['S'], 'brake · hold to reverse'), k(['A', 'D'], 'steer'), k(['C'], 'cruise'), k(['E'], 'station work (hold)'), k(['⇧'], 'boost'), k(['F'], 'get out'), k(['T'], 'view'), k(['I'], 'collection'),
         k(['Z', 'X'], 'look'), k(['B'], 'look back'), k(['M'], 'map'), k(['L'], 'lights'), k(['H'], 'HUD')].join('');
   }
 
