@@ -5,11 +5,12 @@ import { Terrain, featureMasks, sampleContext } from './world/terrain.js';
 import { Route, RouteVisuals } from './world/route.js';
 import { ROVER } from './config/mission.js';
 import { createRocks, createHabitat } from './world/scenery.js';
-import { createSky, createEnvironment, DustMotes, WheelDust, SUN_DIR, HORIZON } from './world/atmosphere.js';
+import { createSky, createEnvironment, DustMotes, WheelDust, SUN_DIR, HORIZON, ZENITH } from './world/atmosphere.js';
 import { Rover, EYE } from './rover/rover.js';
 import { drawNav, drawTraverse, drawScience, drawLife } from './rover/screens.js';
 import { LAYERS, layerById } from './data/layers.js';
 import { Mission, WALK } from './sim/mission.js';
+import { CLEAR_WEATHER, WIND_DIRECTION, windSpeedAt } from './sim/weather.js';
 import { placeArtifacts, loadCollection, recordFind, saveCollection } from './sim/artifacts.js';
 import { Astronaut, EYE_HEIGHT } from './world/astronaut.js';
 import { ArtifactField } from './world/artifactField.js';
@@ -58,7 +59,9 @@ async function initSurface(plan, scenario, status) {
 
   const input = new Input(viewport);
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(HORIZON.clone(), 0.00042);
+  scene.fog = new THREE.FogExp2(HORIZON.clone(), CLEAR_WEATHER.fogDensity);
+  const dustHorizon = new THREE.Color('#c49368');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const env = createEnvironment(renderer);
   scene.environment = env;
   scene.environmentIntensity = 0.55;
@@ -66,6 +69,9 @@ async function initSurface(plan, scenario, status) {
   const hemi = new THREE.HemisphereLight(0xe0b48c, 0x5a3020, 0.75);
   scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff0dc, 2.6);
+  const warmSun = sun.color.clone();
+  const coldSun = new THREE.Color('#d5e5f6');
+  const coldZenith = new THREE.Color('#777985');
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   const sc = sun.shadow.camera;
@@ -345,6 +351,9 @@ async function initSurface(plan, scenario, status) {
   input.keys.clear();
   input.pressed.clear();
   const fieldAlert = document.getElementById('fieldAlert');
+  const fieldWeatherEffect = document.getElementById('fieldWeatherEffect');
+  const windBearing = Math.atan2(WIND_DIRECTION.x, -WIND_DIRECTION.z);
+  const windCues = ['Tailwind ↑', 'Wind ↗', 'Crosswind →', 'Wind ↘', 'Headwind ↓', 'Wind ↙', 'Crosswind ←', 'Wind ↖'];
   const dustAt = route.length * 0.29;
   let lastWeather;
 
@@ -416,22 +425,32 @@ async function initSurface(plan, scenario, status) {
       mission.dustWarning = true;
       mission.rover.speed = mission.speed = 0;
       mission.cruise = false;
-      hud.log('Simulated dust front ahead. Open wrist navigation [P].', 'danger');
-      planningBoard.toggle(true);
+      hud.log('Dust front · rover stopped. Open the wrist navigator [P] to return.', 'danger');
     }
     const weather = mission.weather;
-    scene.fog.density = weather.fogDensity;
+    const windSpeed = windSpeedAt(weather, mission.met);
+    const cold = Number.isFinite(weather.exposureMinutes);
+    scene.fog.density += (weather.fogDensity - scene.fog.density) * damp(3, elapsed);
+    // Use the contrast lost across 45 m of terrain to soften the sunlight and fill the sky with dust.
+    const dust = 1 - Math.exp(-((45 * (scene.fog.density - CLEAR_WEATHER.fogDensity)) ** 2));
+    scene.fog.color.copy(HORIZON).lerp(dustHorizon, dust);
+    sky.material.uniforms.uHorizon.value.copy(scene.fog.color);
+    sky.material.uniforms.uDust.value = dust;
+    sun.intensity = 2.6 * (1 - 0.8 * dust);
+    hemi.intensity = 0.75 + 0.5 * dust;
     if (planningBoard.open) planningBoard.updateField();
     if (weather !== lastWeather || mission.state === 'complete') {
       if (weather !== lastWeather) {
-        const tone = weather.limitsVisibility ? 'dust' : Number.isFinite(weather.exposureMinutes) ? 'cold' : 'clear';
+        sun.color.copy(cold ? coldSun : warmSun);
+        sky.material.uniforms.uZenith.value.copy(cold ? coldZenith : ZENITH);
+        const tone = weather.limitsVisibility ? 'dust' : cold ? 'cold' : 'clear';
         for (const button of weatherButtons) button.dataset.tone = tone;
         document.getElementById('fieldWeather').textContent = weather.label;
       }
       let message = '';
       if (mission.state !== 'complete' && weather.label !== 'Clear') {
-        message = mission.dustWarning ? 'Dust front ahead. Open your wrist navigator to return.'
-          : Number.isFinite(weather.exposureMinutes) ? `Cold spell · Outside work limited to ${weather.exposureMinutes} min. Review tasks on your wrist navigator.`
+        message = mission.dustWarning ? `Dust front · Visibility ≈ ${formatDist(weather.visibilityM)} · Rover stopped. Open Wrist navigator [P] to return.`
+          : cold ? `Cold spell · Outside work limited to ${weather.exposureMinutes} min. Review tasks on your wrist navigator.`
           : `${weather.label} · Visibility ≈ ${formatDist(weather.visibilityM)} · Rover limit ${Math.round(weather.speedLimit * 3.6)} km/h`;
       }
       if (fieldAlert.textContent !== message) fieldAlert.textContent = message;
@@ -487,6 +506,22 @@ async function initSurface(plan, scenario, status) {
     // Who is shown: the cockpit legs in first person, the whole figure outside.
     const outside = viewMode !== 'pov';
     const inRover = !onFoot; // driving, or the EVA has ended with the crew aboard
+    const frost = cold && !outside && mission.state !== 'complete' ? (onFoot ? 'visor' : 'windshield') : '';
+    if (viewport.dataset.frost !== frost) viewport.dataset.frost = frost;
+    let effect = '';
+    if (cold) {
+      const secondsLeft = Math.max(0, Math.ceil((weather.exposureMinutes - mission.outsideMinutes) * 60));
+      effect = `EVA left ${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`;
+    } else if (windSpeed > 0) {
+      // Wind direction is relative to the vehicle's nose, or the astronaut's heading on foot.
+      const relative = wrapAngle(windBearing + (onFoot ? mission.walker.yaw : R.heading));
+      const arrow = windCues[(8 + Math.round(relative / (Math.PI / 4))) % 8];
+      effect = `${arrow} · ${Math.round(windSpeed)} m/s`;
+    }
+    if (fieldWeatherEffect.textContent !== effect) {
+      fieldWeatherEffect.textContent = effect;
+      fieldWeatherEffect.hidden = !effect;
+    }
     rover.driverLegs.visible = inRover && !outside;
     rover.driver.visible = inRover && outside;
     walker.root.visible = onFoot && outside;
@@ -533,7 +568,7 @@ async function initSurface(plan, scenario, status) {
     sky.position.copy(camWorld);
     sun.target.position.set(focus.x, focus.y, focus.z);
     sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, 150);
-    motes.update(dt, camWorld);
+    motes.update(reducedMotion.matches || paused ? 0 : dt, camWorld, dust, windSpeed);
 
     const simSpeed = Math.abs(roverSpeed);
     if (simSpeed > 0.25) {

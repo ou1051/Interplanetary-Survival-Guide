@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { consumptionEstimate } from '../physics/traverse.js';
 import { SITE, ROVER, LIFE_SUPPORT, SLOPE_CLASSES } from '../config/mission.js';
 import { RARITY } from '../sim/artifacts.js';
+import { temperatureAt } from '../sim/fieldGuidance.js';
 import { formatHMS, formatHM, formatDist, clamp } from '../core/math.js';
 import { ZONE_COLORS, bearingTo, mapWeatherLabel } from './mapRenderer.js';
 import { renderStationChoices } from './stationChoices.js';
@@ -178,6 +179,8 @@ export class Hud {
     const pw = M.batteryPct;
     this._vital('v-pwr', `${pw.toFixed(0)} %`, pw / 100, pw < 15 ? 'danger' : pw < 30 ? 'warn' : '');
     this._vital('v-dose', `${M.dose.toFixed(1)} µSv`, null, '');
+    const temp = Math.round(temperatureAt(M.lmst, M.weather.temperatureOffsetC));
+    this._vital('v-temp', `${temp} °C`, null, Number.isFinite(M.weather.exposureMinutes) ? 'warn' : '');
     this._vital('v-comms', M.comms.los ? `LOS +${M.comms.margin.toFixed(0)} dB` : 'RELAY', null, M.comms.los ? 'ok' : 'warn');
     const wb = M.walkback();
     this._vital('v-walk', `${(wb.distance / 1000).toFixed(2)}/${(wb.limit / 1000).toFixed(1)} km`, clamp(wb.distance / Math.max(1, wb.limit), 0, 1), wb.distance > wb.limit ? 'danger' : wb.distance > wb.limit * 0.7 ? 'warn' : '');

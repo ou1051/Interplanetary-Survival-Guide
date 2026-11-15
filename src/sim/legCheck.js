@@ -93,7 +93,7 @@ export function legOptions(mission, route = mission.route) {
   options.push(plan(mission, { id: 'home', label: 'Head home now', short: 'Go home', detail: 'No more stops', target: null, work: [], route }));
   return {
     now: clock(mission.lmst),
-    temperature: Math.round(temperatureAt(mission.lmst) + (mission.weather.temperatureOffsetC ?? 0)),
+    temperature: Math.round(temperatureAt(mission.lmst, mission.weather.temperatureOffsetC)),
     next,
     options,
     recommended: options.find((option) => option.allowed && option.id !== 'home') ?? options.at(-1),

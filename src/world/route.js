@@ -407,12 +407,14 @@ const beamVert = /* glsl */ `
   varying float vY;
   varying vec3 vN;
   varying vec3 vV;
+  #include <fog_pars_vertex>
   void main() {
     vY = uv.y;
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
     vN = normalize(normalMatrix * normal);
-    vV = normalize(-mv.xyz);
-    gl_Position = projectionMatrix * mv;
+    vV = normalize(-mvPosition.xyz);
+    gl_Position = projectionMatrix * mvPosition;
+    #include <fog_vertex>
   }
 `;
 const beamFrag = /* glsl */ `
@@ -422,12 +424,22 @@ const beamFrag = /* glsl */ `
   varying float vY;
   varying vec3 vN;
   varying vec3 vV;
+  #include <fog_pars_fragment>
   void main() {
     float rim = pow(1.0 - abs(dot(vN, vV)), 0.6);
     float fade = pow(1.0 - vY, 2.2);
     float pulse = 0.8 + 0.2 * sin(uTime * 2.5 - vY * 12.0);
     float a = (1.0 - rim) * fade * pulse * uIntensity;
     gl_FragColor = vec4(uColor * 1.4, a);
+    #ifdef USE_FOG
+      #ifdef FOG_EXP2
+        float fogFactor = 1.0 - exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);
+      #else
+        float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
+      #endif
+      // Additive light fades to black so distant beams do not brighten the fog.
+      gl_FragColor.rgb *= 1.0 - fogFactor;
+    #endif
   }
 `;
 
@@ -555,10 +567,14 @@ export class RouteVisuals {
     const mat = new THREE.ShaderMaterial({
       vertexShader: beamVert,
       fragmentShader: beamFrag,
-      uniforms: { uColor: { value: new THREE.Color(color) }, uTime: this.uniforms.uTime, uIntensity: { value: 0.9 } },
+      uniforms: {
+        ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
+        uColor: { value: new THREE.Color(color) }, uTime: this.uniforms.uTime, uIntensity: { value: 0.9 },
+      },
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
+      fog: true,
       side: THREE.DoubleSide,
     });
     const mesh = new THREE.Mesh(geo, mat);

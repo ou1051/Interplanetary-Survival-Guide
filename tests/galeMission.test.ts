@@ -111,7 +111,12 @@ describe('Gale habitat-to-field handoff', () => {
     expect(guidance.canReturn).toBe(true);
     expect(mission.returnToHabitat()).toBe(true);
     expect(mission.nextStation?.final).toBe(true);
+    expect(mission.weather.label).toBe('Blowing dust');
+    expect(mission.weatherRemainingSeconds).toBe(45);
     expect(Math.abs(mission.rover.heading - heading - Math.PI)).toBeLessThan(1e-9);
+    mission.update(45, {}, 0);
+    expect(mission.weather.label).toBe('Clear');
+    expect(mission.weatherAt(0, mission.met + 600).label).toBe('Clear');
     drive(mission, () => mission.atHome && mission.s < 30);
     expect(mission.endEva()).toBe(true);
     expect(mission.samples).toBe(0);

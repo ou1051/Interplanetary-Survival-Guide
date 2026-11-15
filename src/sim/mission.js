@@ -1,4 +1,4 @@
-import { CLEAR_WEATHER, PASSING_WEATHER, DUST_FRONT, SHORTCUT_FRONT } from './weather.js';
+import { CLEAR_WEATHER, PASSING_WEATHER, BLOWING_DUST, DUST_FRONT, SHORTCUT_FRONT, WIND_DIRECTION, windSpeedAt } from './weather.js';
 import { ROVER, LIFE_SUPPORT, HAB, SITE, SLOPE_CLASSES, SURPRISES } from '../config/mission.js';
 import { clamp, DEG, wrapAngle } from '../core/math.js';
 import { consumptionEstimate } from '../physics/traverse.js';
@@ -60,6 +60,7 @@ export class Mission {
   constructor(route, terrain, habAntenna, { random = Math.random, surprises = true, legCheck = true, variableWeather = false, frontSeconds = 0 } = {}) {
     this.route = route;
     this.random = random;
+    this.variableWeather = variableWeather;
     this.surprisesOn = surprises;
     this.legCheck = legCheck;
     this.surprises = surprises ? hiddenSurprises(route, random) : [];
@@ -351,6 +352,10 @@ export class Mission {
   returnToHabitat() {
     if (!['drive', 'walk'].includes(this.state) || this.aborted || this.atHome || !this.leftHome) return false;
     this.aborted = true;
+    if (this.dustWarning) {
+      this._weather = BLOWING_DUST;
+      this._weatherAt = this.met + 45;
+    }
     this.dustWarning = false;
     this.cruise = false;
     this.rover.speed = this.speed = 0;
@@ -484,7 +489,8 @@ export class Mission {
         outsideFrom = this._weatherAt;
         this._weather = this._weather === CLEAR_WEATHER
           ? PASSING_WEATHER[Math.floor(this.random() * PASSING_WEATHER.length)] : CLEAR_WEATHER;
-        this._weatherAt += this._weather === CLEAR_WEATHER ? 45 + this.random() * 45
+        if (!this.variableWeather) this._weatherAt = Infinity; // the scripted return has only one storm
+        else this._weatherAt += this._weather === CLEAR_WEATHER ? 45 + this.random() * 45
           : this._weather === PASSING_WEATHER[0] ? 25 + this.random() * 15 : 12 * 60 + this.random() * 8 * 60;
       } while (this.met >= this._weatherAt);
       const clearing = this._weather === CLEAR_WEATHER;
@@ -537,6 +543,7 @@ export class Mission {
 
   _drive(dt, input, pitchDeg) {
     const r = this.rover;
+    const weather = this.weather;
     const ground = this._ground(r.x, r.z, r.heading);
     // Shift speeds up time, but only on easy ground, away from the next station, and only for a short while.
     const st = this.nextStation;
@@ -556,7 +563,7 @@ export class Mission {
     let limit = ROVER.maxSpeed;
     let reason = '';
     for (const z of ground.zones) if (z.limit < limit) { limit = z.limit; reason = z.type; }
-    if (this.weather.speedLimit < limit) { limit = this.weather.speedLimit; reason = this.weather.label; }
+    if (weather.speedLimit < limit) { limit = weather.speedLimit; reason = weather.label; }
     this.limit = limit;
 
     let v = r.speed;
@@ -579,7 +586,10 @@ export class Mission {
 
     // Steering: bicycle model, the wheels turn in over ~0.3 s.
     r.steer += (clamp(input.steer || 0, -1, 1) * 0.5 - r.steer) * Math.min(1, dt * 6);
-    r.heading -= (v * Math.tan(r.steer) / ROVER.wheelbase) * sdt;
+    const heading = r.heading;
+    const crosswind = windSpeedAt(weather, this.met) * (Math.cos(heading) * WIND_DIRECTION.x - Math.sin(heading) * WIND_DIRECTION.z);
+    // A small steering bias keeps correction familiar and reverses yaw correctly when backing up.
+    r.heading -= (v * (Math.tan(r.steer) + crosswind * 0.003) / ROVER.wheelbase) * sdt;
 
     // Ground the rover cannot climb: stop before driving onto it.
     const dir = Math.sign(v);
@@ -595,6 +605,7 @@ export class Mission {
       const front = this._ground(r.x - Math.sin(r.heading) * 2.6, r.z - Math.cos(r.heading) * 2.6, r.heading);
       if (front.tilt > STEEP_BLOCK && front.tilt > ground.tilt) this.blocked = true;
     }
+    if (!v) r.heading = heading;
     r.speed = v;
     this.speed = Math.abs(v);
 

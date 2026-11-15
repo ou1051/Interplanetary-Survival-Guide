@@ -60,7 +60,7 @@ export function drawNav(scr, map, mission, view) {
   if (next) {
     g.textAlign = 'right';
     const label = next.kind === 'gate' ? 'GATE' : next.ref.final ? 'HAB' : next.ref.id;
-    const at = next.ref.at ?? next.ref;
+    const at = next.kind === 'gate' ? next.ref.at : next.ref;
     const r = mission.rover;
     g.fillText(`${label} ${formatDist(Math.hypot(at.x - r.x, at.z - r.z))}`, W - 12, 23);
   }

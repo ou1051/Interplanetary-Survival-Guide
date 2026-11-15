@@ -11,9 +11,9 @@ export const clock = (minutes) => {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 };
 
-export function temperatureAt(lmstMinutes) {
+export function temperatureAt(lmstMinutes, offsetC = 0) {
   const hours = (((lmstMinutes / 60) % 24) + 24) % 24;
-  return -50 + 38 * Math.cos((2 * Math.PI * (hours - 13.5)) / 24);
+  return -50 + 38 * Math.cos((2 * Math.PI * (hours - 13.5)) / 24) + offsetC;
 }
 
 export function forecastWeather(mission, s, elapsedSeconds, route = mission.route, position = route.sample?.(s)) {

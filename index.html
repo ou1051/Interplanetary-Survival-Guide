@@ -38,7 +38,7 @@
           <div class="vital" id="v-dose"><span class="k">DOSE</span><b class="v">--</b></div>
           <div class="vital" id="v-comms"><span class="k">COMMS</span><b class="v">--</b></div>
           <div class="vital" id="v-walk"><span class="k">WALKBACK</span><b class="v">--</b><i class="bar"><i></i></i></div>
-          <div class="vital" id="v-temp"><span class="k">EXT TEMP</span><b class="v">-23 °C</b></div>
+          <div class="vital" id="v-temp"><span class="k">EXT TEMP</span><b class="v">– °C</b></div>
         </aside>
 
         <aside class="hud-right" id="navPanel">
@@ -80,9 +80,9 @@
 
         <div class="field-tools">
           <div class="field-controls">
-            <button type="button" class="weather-control field-weather" data-open-weather aria-controls="planningBoard" aria-haspopup="dialog" title="Read current conditions on the wrist map">
+            <button type="button" class="weather-control field-weather" data-open-weather aria-controls="planningBoard" aria-haspopup="dialog" aria-labelledby="fieldWeatherLabel fieldWeather" aria-describedby="fieldWeatherEffect" title="Read current conditions on the wrist map">
               <span class="weather-symbol" aria-hidden="true"></span>
-              <span class="weather-reading"><small>Weather now</small><strong id="fieldWeather">Clear</strong></span>
+              <span class="weather-reading"><small id="fieldWeatherLabel">Weather now</small><strong id="fieldWeather">Clear</strong><span id="fieldWeatherEffect" hidden></span></span>
               <span class="weather-chevron" aria-hidden="true">›</span>
             </button>
             <button type="button" id="boardBtn" class="ghost">Wrist navigator [P]</button>

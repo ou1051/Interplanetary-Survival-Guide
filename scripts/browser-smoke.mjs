@@ -1,6 +1,8 @@
 import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { CLEAR_WEATHER, PASSING_WEATHER } from '../src/sim/weather.js';
+import { temperatureAt } from '../src/sim/fieldGuidance.js';
 
 async function checkMobileActions(page, label) {
   const issues = await page.evaluate(() => {
@@ -117,11 +119,25 @@ try {
   await page.keyboard.press('f');
   await page.waitForFunction(() => window.__isg.mission.state === 'drive');
   // Reproduce the cold S1 card, then run the previously blocked scan through the keyboard.
-  await page.evaluate(() => {
+  await page.evaluate(cold => {
     const { mission } = window.__isg;
-    mission._weather = { ...mission.weather, label: 'Cold spell', exposureMinutes: 10 };
+    mission._weather = cold;
     mission._weatherAt = mission.met + 360;
-  });
+  }, PASSING_WEATHER.find(weather => weather.label === 'Cold spell'));
+  await page.waitForFunction(() => document.getElementById('viewport').dataset.frost === 'windshield');
+  assert.match(await page.locator('#fieldWeatherEffect').textContent(), /EVA left/);
+  const coldTemperature = await page.evaluate(() => ({ lmst: window.__isg.mission.lmst, offset: window.__isg.mission.weather.temperatureOffsetC }));
+  assert.equal(await page.locator('#v-temp .v').textContent(), `${Math.round(temperatureAt(coldTemperature.lmst, coldTemperature.offset))} °C`);
+  await page.keyboard.press('f');
+  await page.waitForFunction(() => document.getElementById('viewport').dataset.frost === 'visor');
+  await page.keyboard.press('t');
+  await page.waitForFunction(() => document.getElementById('viewport').dataset.frost === '');
+  await page.keyboard.press('t');
+  await page.waitForFunction(() => window.__isg.viewMode === 'overhead');
+  await page.keyboard.press('t');
+  await page.waitForFunction(() => document.getElementById('viewport').dataset.frost === 'visor');
+  await page.keyboard.press('f');
+  await page.waitForFunction(() => document.getElementById('viewport').dataset.frost === 'windshield');
   const scan = page.locator('#card .tasks .task').filter({ hasText: 'VNIR spectrometer scan' });
   await page.locator('#viewport').focus();
   await page.keyboard.down('e');
@@ -134,6 +150,11 @@ try {
   try { await scan.getByText(/olivine-rich/).waitFor(); }
   finally { await page.keyboard.up('e'); }
   assert.equal(await page.evaluate(() => window.__isg.mission.currentStation.tasks.filter(task => !task.artifact && task.done).length), 1);
+  await page.evaluate(clear => {
+    window.__isg.mission._weather = clear;
+    window.__isg.mission._weatherAt = Infinity;
+  }, CLEAR_WEATHER);
+  await page.waitForFunction(() => document.getElementById('viewport').dataset.frost === '');
   await page.close();
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
   mobile.on('pageerror', e => errors.push(e.message));
@@ -198,6 +219,12 @@ try {
     }
     if (mission.s < route.length * 0.29) throw new Error('Rover did not reach the dust front');
   });
+  await mobile.waitForFunction(() => window.__isg.mission.dustWarning);
+  assert.equal(await mobile.evaluate(() => window.__isg.planningBoard.open), false, 'Dust front remains visible on the surface');
+  assert.equal(await mobile.evaluate(() => window.__isg.mission.rover.speed), 0, 'Dust front stops the rover');
+  assert.match(await mobile.locator('#fieldWeatherEffect').textContent(), /wind.*m\/s/i);
+  await mobile.screenshot({ path: 'test-results/05-mobile-dust-front.png' });
+  await mobile.getByRole('button', { name: 'Wrist navigator [P]', exact: true }).click();
   await mobile.getByRole('button', { name: /Turn around and return/ }).click();
   assert.equal(await mobile.evaluate(() => window.__isg.mission.aborted), true);
   await mobile.evaluate(() => {

@@ -465,7 +465,7 @@ export class PlanningBoard {
       'home-o2': hm(guidance.returnOxygen),
       'home-time': guidance.returnForecast.backAt,
       'home-power': `${Math.floor(guidance.returnForecast.batteryPct)}%`,
-      temp: `${Math.round(temperatureAt(mission.lmst) + mission.weather.temperatureOffsetC)} °C`.replace('-', '−'),
+      temp: `${Math.round(temperatureAt(mission.lmst, mission.weather.temperatureOffsetC))} °C`.replace('-', '−'),
       lmst: `${String(Math.floor(mission.lmst / 60) % 24).padStart(2, '0')}:${String(Math.floor(mission.lmst % 60)).padStart(2, '0')}`,
     };
     for (const [key, value] of Object.entries(values)) {

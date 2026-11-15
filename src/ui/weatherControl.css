@@ -45,3 +45,25 @@ button.weather-control:focus-visible { outline: 2px solid var(--weather-accent);
 @media (pointer: coarse) {
   #hud .field-alert { bottom: 220px; margin: 0; pointer-events: none; }
 }
+
+/* Frost stays on the glass, behind the instrument and navigation overlays. */
+#viewport::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    url('./frost-rim.svg') center / 100% 100% no-repeat,
+    radial-gradient(ellipse at 50% 46% in oklab, transparent 64%, #b5deff14 83%, #e1f3ff75 100%);
+  box-shadow: inset 0 0 38px #c3e7ff66;
+  transition: opacity 1.4s ease;
+}
+#viewport[data-frost="windshield"]::after { opacity: .85; }
+#viewport[data-frost="visor"]::after {
+  opacity: 1;
+  border-radius: 12% / 8%;
+}
+@media (prefers-reduced-motion: reduce) {
+  #viewport::after { transition: none; }
+}

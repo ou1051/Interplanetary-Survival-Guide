@@ -1,8 +1,21 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { drawFieldHazards } from '../src/ui/mapRenderer.js';
 import { TraverseRelief } from '../src/ui/traverseRelief.js';
+import { drawNav } from '../src/rover/screens.js';
+import { BLOWING_DUST } from '../src/sim/weather.js';
 
 afterEach(() => vi.unstubAllGlobals());
+
+it('keeps the station distance readable on the cockpit map in blowing dust', () => {
+  const fillText = vi.fn();
+  const screen = { ctx: { fillRect() {}, fillText }, canvas: { width: 400, height: 240 }, tex: {} };
+  const mission = { rover: { x: 0, z: 0 }, s: 0, weather: BLOWING_DUST,
+    nextKnownStop: { kind: 'station', ref: { id: 'S1', at: [60, 80], x: 60, z: 80 } } };
+  drawNav(screen, { drawNav() {} }, mission, { x: 0, z: 0, headingDeg: 0 });
+  const labels = fillText.mock.calls.map(([text]) => text);
+  expect(labels).toContain('S1 100 m');
+  expect(labels).toContain('VIS ≈ 50 m');
+});
 
 it('places observed obstacles at their actual world coordinates away from the planned route', () => {
   const fillRect = vi.fn();
