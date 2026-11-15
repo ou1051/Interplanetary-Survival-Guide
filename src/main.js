@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { ICON } from './map/icons.ts';
+import './ui/weatherControl.css';
 import { Terrain, featureMasks, sampleContext } from './world/terrain.js';
 import { Route, RouteVisuals } from './world/route.js';
 import { ROVER } from './config/mission.js';
@@ -21,6 +23,11 @@ const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
 const planningBoard = new PlanningBoard();
 document.getElementById('boardBtn').addEventListener('click', () => planningBoard.toggle(true));
+const weatherButtons = document.querySelectorAll('[data-open-weather]');
+for (const button of weatherButtons) {
+  button.querySelector('.weather-symbol').innerHTML = ICON.wind;
+  button.addEventListener('click', () => planningBoard.toggle(true, 'map'));
+}
 
 mountHabitat(document.getElementById('habitat'), initSurface);
 
@@ -112,7 +119,7 @@ async function initSurface(plan, scenario, status) {
   // keep keyboard shortcuts from re-triggering whatever button was clicked last
   document.addEventListener('click', (e) => {
     const button = e.target.closest?.('button');
-    if (button && button.id !== 'boardBtn' && !planningBoard.el.contains(button)) button.blur();
+    if (button && button.id !== 'boardBtn' && !button.hasAttribute('data-open-weather') && !planningBoard.el.contains(button)) button.blur();
   });
 
   // ---------------------------------------------------------------- layers
@@ -222,7 +229,7 @@ async function initSurface(plan, scenario, status) {
   input.pressed.clear();
   const fieldAlert = document.getElementById('fieldAlert');
   const dustAt = route.length * 0.29;
-  let lastWeather;
+  let lastWeather, lastFront;
 
   // debug / automated testing hook: advance the simulation with a fixed step
   const simulate = (seconds, o = {}) => {
@@ -273,7 +280,15 @@ async function initSurface(plan, scenario, status) {
     const weather = mission.weather;
     scene.fog.density = weather.fogDensity;
     if (planningBoard.open) planningBoard.updateField();
-    if (weather !== lastWeather || mission.state === 'complete') {
+    const frontAhead = mission.activeFront && mission.s < mission.activeFront.to;
+    if (weather !== lastWeather || frontAhead !== lastFront || mission.state === 'complete') {
+      if (weather !== lastWeather || frontAhead !== lastFront) {
+        const dustAhead = frontAhead && weather.label === 'Clear';
+        const tone = weather.limitsVisibility || dustAhead ? 'dust' : Number.isFinite(weather.exposureMinutes) ? 'cold' : 'clear';
+        for (const button of weatherButtons) button.dataset.tone = tone;
+        document.getElementById('fieldWeather').textContent = dustAhead ? 'Dust ahead' : weather.label;
+        lastFront = frontAhead;
+      }
       let message = '';
       if (mission.state !== 'complete' && weather.label !== 'Clear') {
         message = mission.dustWarning ? 'Dust front ahead. Open your wrist navigator to return.'

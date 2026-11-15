@@ -77,7 +77,14 @@
           <div class="legend" id="legend"></div>
         </div>
 
-        <button type="button" id="boardBtn" class="ghost field-wrist">Wrist navigator [P]</button>
+        <div class="field-controls">
+          <button type="button" class="weather-control field-weather" data-open-weather aria-controls="planningBoard" aria-haspopup="dialog" title="Open weather on the wrist map">
+            <span class="weather-symbol" aria-hidden="true"></span>
+            <span class="weather-reading"><small>Weather</small><strong id="fieldWeather">Clear</strong></span>
+            <span class="weather-chevron" aria-hidden="true">›</span>
+          </button>
+          <button type="button" id="boardBtn" class="ghost">Wrist navigator [P]</button>
+        </div>
         <p id="fieldAlert" class="field-alert" role="status"></p>
 
         <div id="touch" class="touch">
@@ -97,7 +104,10 @@
             <div>
               <div class="overlay-title">SURVIVAL ROUTE · <span id="mapSite"></span></div>
               <div class="overlay-sub" id="mapSub"></div>
-              <div class="overlay-sub" id="mapWeather"></div>
+              <button type="button" class="weather-control map-weather" data-open-weather aria-controls="planningBoard" aria-haspopup="dialog" title="Open weather on the wrist map">
+                <span class="weather-symbol" aria-hidden="true"></span>
+                <span id="mapWeather"></span><span class="weather-chevron" aria-hidden="true">›</span>
+              </button>
             </div>
             <button id="mapClose" class="ghost">CLOSE [M]</button>
           </div>

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
+import { Input } from '../src/sim/input.js';
 import { Mission } from '../src/sim/mission.js';
 import { buildDeltaTraverse } from '../src/data/deltaTraverse.js';
 import { renderStationChoices } from '../src/ui/stationChoices.js';
@@ -30,6 +31,21 @@ describe('shared station decisions UI', () => {
     expect(mission.samples).toBe(1);
     expect(container.querySelector('[data-action="task:2"]')).toBeNull();
     expect(container.querySelector('.station-outcomes')!.textContent).toContain('tube A2');
+  });
+
+  it('leaves Enter and Space on a focused station button to its native click handler', () => {
+    const { mission, container } = setup();
+    const input = new Input(container);
+    renderStationChoices(container, mission);
+    const button = container.querySelector('button')!;
+    for (const key of ['Enter', ' ']) {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      button.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(input.hit(key.toLowerCase())).toBe(false);
+    }
+    container.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(input.hit('enter')).toBe(true);
   });
 
   it('preserves focus while forecasts refresh and exposes blocked cold work', () => {

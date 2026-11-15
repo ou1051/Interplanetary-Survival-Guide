@@ -3,6 +3,7 @@ const svg = (d: string) =>
   `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 
 export const ICON = {
+  wind: svg('<path d="M3 8h10a3 3 0 1 0-3-3M2 12h16a3 3 0 1 0-2.7-4.4M4 16h8a3 3 0 1 1-2.8 4"/>'),
   imagery: svg('<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.6"/>'),
   slope: svg('<path d="M3 19L10 8l4 6 3-4 4 9z"/>'),
   evidence: svg('<path d="M12 21s-6-5.6-6-11a6 6 0 1112 0c0 5.4-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/>'),

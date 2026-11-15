@@ -414,7 +414,7 @@
 .wd-screen .wd-return { border: 1px solid var(--signal); padding: 5px 8px; }
 .wd-screen .wd-return:hover { background: var(--signal); color: var(--tube); text-shadow: none; }
 .wd-foot { grid-template-columns: auto minmax(15px, 1fr); }
-.field-wrist { position: absolute; z-index: 16; bottom: 14px; right: 18px; pointer-events: auto; }
+.field-controls { position: absolute; z-index: 16; bottom: 14px; right: 18px; display: flex; align-items: stretch; gap: 8px; pointer-events: auto; }
 .field-alert { position: absolute; z-index: 16; left: 50%; bottom: 85px; transform: translateX(-50%); color: #ffcf9a; background: #1e140d; padding: 8px 12px; width: max-content; max-width: 90vw; }
 .field-alert:empty { padding: 0; }
 .station-observation { display:block; color:var(--hud); font-size:11px; margin-top:8px; }

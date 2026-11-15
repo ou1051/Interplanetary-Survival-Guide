@@ -462,6 +462,21 @@
   background: var(--ops-panel); border: 1px solid var(--ops-line); border-radius: 3px; color: #fff;
   font: 500 13px var(--ops-font); letter-spacing: 0; text-transform: none; padding: 7px 8px;
 }
+#habitat .hab-scenario .weather-control { position: relative; }
+#habitat .hab-scenario .weather-control select {
+  flex: 1; min-width: 0; width: 100%; min-height: 34px; appearance: none; cursor: pointer;
+  background: transparent; border: 0; border-radius: 0; padding: 8px 34px 8px 0;
+  color: #edf3ff; font-weight: 600; line-height: 18px;
+}
+#habitat .weather-control::after {
+  content: ''; position: absolute; right: 15px; top: calc(50% - 4px); width: 6px; height: 6px;
+  border-right: 1.5px solid var(--weather-accent, #91cce9); border-bottom: 1.5px solid var(--weather-accent, #91cce9);
+  transform: rotate(45deg); pointer-events: none;
+}
+#habitat .weather-control:hover { border-color: var(--weather-accent, #91cce9); }
+#habitat .weather-control:has(select:focus-visible) { outline: 2px solid var(--weather-accent, #91cce9); outline-offset: 2px; }
+#habitat .weather-control select:focus-visible { outline: 0; }
+#habitat .weather-control select option { background: var(--ops-panel); color: #edf3ff; }
 #habitat .hab-brief .hab-objective, #habitat .hab-brief h3 { font-family: var(--ops-font); color: #fff; letter-spacing: 0; }
 #habitat .hab-brief .hab-objective { font-size: 21px; margin-top: 16px; }
 #habitat .hab-brief p:not(.hab-eyebrow) { color: #c7d4ea; font-family: var(--ops-font); }

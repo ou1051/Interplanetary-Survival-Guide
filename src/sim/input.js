@@ -11,6 +11,7 @@ export class Input {
     window.addEventListener('keydown', (e) => {
       if (e.target.closest?.('#habitat, #sourcesDialog, input, textarea, select')) return;
       const k = e.key.toLowerCase();
+      if ((k === 'enter' || k === ' ') && e.target.closest?.('button')) return;
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
       if (!this.keys.has(k)) this.pressed.add(k);
       this.keys.add(k);

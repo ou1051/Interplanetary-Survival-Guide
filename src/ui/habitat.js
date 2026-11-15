@@ -3,6 +3,7 @@ import { makeDeltaOverview } from './deltaOverview.js';
 import { AREA_HAZARDS } from '../config/mission.js';
 import { Mission } from '../sim/mission.js';
 import { forecastReturn } from '../sim/legCheck.js';
+import { ICON } from '../map/icons.ts';
 import { mountHabitatRoom } from './habitatRoom.js';
 import { mountHabitatExterior } from './habitatExterior.js';
 import { mountConsoleMap3D } from './consoleMap3D.js';
@@ -132,11 +133,14 @@ export function mountHabitat(root, launch) {
             <p class="hab-reason" data-reason></p>
             </div>
             <label class="hab-scenario">Simulation conditions
-              <select data-scenario>
-                <option value="variable">Variable weather</option>
-                <option value="clear">Nominal conditions</option>
-                <option value="dust" data-gale-only>Dust front ahead</option>
-              </select>
+              <span class="weather-control" data-tone="variable">
+                <span class="weather-symbol" aria-hidden="true">${ICON.wind}</span>
+                <select data-scenario>
+                  <option value="variable">Variable weather</option>
+                  <option value="clear">Nominal conditions</option>
+                  <option value="dust" data-gale-only>Dust front ahead</option>
+                </select>
+              </span>
             </label>
             <button type="button" data-launch class="hab-launch">Go outside <span>→</span></button>
             <p class="hab-note" data-status role="status">Oxygen and weather are simulated.</p>
@@ -273,6 +277,7 @@ export function mountHabitat(root, launch) {
     }
     const conditions = query('[data-scenario]');
     if (delta && conditions.value === 'dust') conditions.value = 'variable';
+    conditions.closest('.weather-control').dataset.tone = conditions.value;
     const variable = conditions.value === 'variable';
     query('[data-departure-weather]').hidden = !delta || !s1Focused || !variable;
     query('[data-delta-brief]').hidden = !delta;
