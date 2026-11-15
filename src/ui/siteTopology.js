@@ -1,4 +1,5 @@
 import './siteTopology.css';
+import { createMarsGlobeRenderer, GLOBE_PAD } from './marsGlobeGL.js';
 
 // ---------------------------------------------------------------------------
 // Site Topology Module:
@@ -199,6 +200,34 @@ export class SiteTopologyWidget {
           this.gridData = data;
           this._scheduleDraw();
         }
+      })
+      .catch(() => {});
+
+    // Real Mars surface colour map (NASA Viking/MOLA mosaic, equirectangular, lon −180…180) — 2D fallback
+    this.marsTex = null;
+    const marsImg = new Image();
+    marsImg.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = marsImg.naturalWidth;
+        c.height = marsImg.naturalHeight;
+        const cctx = c.getContext('2d', { willReadFrequently: true });
+        cctx.drawImage(marsImg, 0, 0);
+        this.marsTex = { w: c.width, h: c.height, data: cctx.getImageData(0, 0, c.width, c.height).data };
+        this._globeCacheKey = '';
+        this._scheduleDraw();
+      } catch {
+        this.marsTex = null; // keep the painted fallback
+      }
+    };
+    marsImg.src = './mars/mars_color_2048.jpg';
+
+    // 3D relief-lit globe (WebGL). Until it is ready, or without WebGL, the 2D render is used.
+    this.marsGL = null;
+    createMarsGlobeRenderer({ color: './mars/mars_color_2048.jpg', height: './mars/mars_mola_height_2048.png' })
+      .then((r) => {
+        this.marsGL = r;
+        this._scheduleDraw();
       })
       .catch(() => {});
 
@@ -422,7 +451,45 @@ export class SiteTopologyWidget {
 
     // Clicking on a site pin or the Mars globe
     const globeCanvas = this.container.querySelector('[data-globe-canvas]');
+    // Drag to spin the globe (a drag never counts as a click)
+    let drag = null;
+    let suppressClick = false;
+    globeCanvas.style.cursor = 'grab';
+    globeCanvas.style.touchAction = 'none';
+    globeCanvas.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || this.zoomingIn) return;
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, lat: this.camLat, lon: this.camLon, moved: false };
+    });
+    globeCanvas.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x;
+      const dy = e.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+      if (!drag.moved) {
+        drag.moved = true;
+        globeCanvas.setPointerCapture?.(e.pointerId);
+        globeCanvas.style.cursor = 'grabbing';
+      }
+      const r = this._globeRadius || 150;
+      const degPerPx = 180 / Math.PI / r;
+      this.camLat = this.targetLat = Math.max(-80, Math.min(80, drag.lat + dy * degPerPx));
+      this.camLon = this.targetLon = (((drag.lon - dx * degPerPx) % 360) + 360) % 360;
+      this._scheduleDraw();
+    });
+    const endGlobeDrag = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      if (drag.moved) suppressClick = true;
+      drag = null;
+      globeCanvas.style.cursor = 'grab';
+    };
+    globeCanvas.addEventListener('pointerup', endGlobeDrag);
+    globeCanvas.addEventListener('pointercancel', endGlobeDrag);
+
     globeCanvas.addEventListener('click', (e) => {
+      if (suppressClick) {
+        suppressClick = false;
+        return;
+      }
       const rect = globeCanvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
@@ -870,22 +937,170 @@ export class SiteTopologyWidget {
 
     const radius = Math.min(w * 0.33, h * 0.35) * this.zoomFactor;
 
-    // Outer atmospheric halo
-    const halo = ctx.createRadialGradient(cx, cy, radius * 0.88, cx, cy, radius * 1.16);
-    halo.addColorStop(0, 'rgba(232, 118, 68, 0.32)');
-    halo.addColorStop(0.6, 'rgba(195, 82, 45, 0.12)');
-    halo.addColorStop(1, 'rgba(195, 82, 45, 0)');
-    ctx.fillStyle = halo;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius * 1.16, 0, Math.PI * 2);
-    ctx.fill();
+    const lat0 = (this.camLat * Math.PI) / 180;
+    const lon0 = (this.camLon * Math.PI) / 180;
 
-    // Mars sphere shaded body
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.clip();
+    this._globeRadius = radius;
 
+    if (this.marsGL) {
+      // 3D globe: relief-lit NASA colour + MOLA elevation, with its own atmosphere
+      const ext = radius * GLOBE_PAD;
+      const body = this.marsGL.render(ext * 2 * dpr, lat0, lon0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(body, cx - ext, cy - ext, ext * 2, ext * 2);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.strokeStyle = 'rgba(255, 236, 220, 0.07)';
+      ctx.lineWidth = 1;
+      this._drawGraticule(ctx, lat0, lon0, cx, cy, radius);
+      ctx.restore();
+    } else {
+      // Thin dusty atmosphere: a faint glow hugging the limb, brighter on the sunlit side
+      const halo = ctx.createRadialGradient(cx, cy, radius * 0.97, cx, cy, radius * 1.06);
+      halo.addColorStop(0, 'rgba(226, 170, 128, 0.30)');
+      halo.addColorStop(0.45, 'rgba(206, 140, 100, 0.10)');
+      halo.addColorStop(1, 'rgba(190, 120, 85, 0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius * 1.06, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.clip();
+
+      if (this.marsTex) {
+        // Realistic body: NASA colour mosaic, orthographic projection, sunlight + limb haze
+        const body = this._renderMarsBody(radius, dpr, lat0, lon0);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(body, cx - radius, cy - radius, radius * 2, radius * 2);
+      } else {
+        this._drawPaintedMars(ctx, cx, cy, radius, lat0, lon0);
+      }
+
+      // Faint latitude & longitude graticule (navigation aid)
+      ctx.strokeStyle = this.marsTex ? 'rgba(255, 236, 220, 0.09)' : 'rgba(255, 228, 205, 0.16)';
+      ctx.lineWidth = 1;
+      this._drawGraticule(ctx, lat0, lon0, cx, cy, radius);
+
+      ctx.restore();
+
+      // Globe rim: a hairline of lit atmosphere
+      ctx.strokeStyle = this.marsTex ? 'rgba(240, 196, 160, 0.22)' : 'rgba(255, 176, 124, 0.5)';
+      ctx.lineWidth = this.marsTex ? 1 : 1.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    this._drawSitePins(ctx, lat0, lon0, cx, cy, radius);
+
+    if (stillAnimating && !this.zoomingIn) {
+      this._scheduleDraw();
+    }
+  }
+
+  /**
+   * Render the lit Mars disc into a cached offscreen canvas (size 2r × 2r in device pixels,
+   * capped near the texture's own resolution). Re-rendered only when view or size changes.
+   */
+  _renderMarsBody(radius, dpr, lat0, lon0) {
+    const tex = this.marsTex;
+    // The 1440-px map gives ~460 texels across a hemisphere; beyond that is wasted work.
+    const size = Math.max(2, Math.min(Math.round(radius * 2 * dpr), 960));
+    const key = `${size}|${lat0.toFixed(4)}|${lon0.toFixed(4)}`;
+    if (this._globeCache && this._globeCacheKey === key) return this._globeCache;
+
+    let off = this._globeCache;
+    if (!off) off = this._globeCache = document.createElement('canvas');
+    if (off.width !== size || off.height !== size) {
+      off.width = size;
+      off.height = size;
+    }
+    const octx = off.getContext('2d');
+    const img = octx.createImageData(size, size);
+    const out = img.data;
+    const src = tex.data;
+    const tw = tex.w;
+    const th = tex.h;
+
+    const sinLat0 = Math.sin(lat0);
+    const cosLat0 = Math.cos(lat0);
+    // Sun from the upper left, slightly in front (view space: x right, y up, z toward viewer)
+    let lx = -0.55, ly = 0.42, lz = 0.72;
+    const ln = Math.hypot(lx, ly, lz);
+    lx /= ln; ly /= ln; lz /= ln;
+    const half = size / 2;
+    const inv = 1 / half;
+    const TWO_PI = Math.PI * 2;
+
+    for (let py = 0; py < size; py++) {
+      const ny = -((py + 0.5) - half) * inv;
+      for (let px = 0; px < size; px++) {
+        const nx = ((px + 0.5) - half) * inv;
+        const rho2 = nx * nx + ny * ny;
+        if (rho2 > 1) continue;
+        const nz = Math.sqrt(1 - rho2);
+
+        // Inverse orthographic projection → planetocentric lat / east lon
+        const sLat = nz * sinLat0 + ny * cosLat0;
+        const lat = Math.asin(sLat < -1 ? -1 : sLat > 1 ? 1 : sLat);
+        let lon = lon0 + Math.atan2(nx, nz * cosLat0 - ny * sinLat0);
+        lon = ((lon + Math.PI) % TWO_PI + TWO_PI) % TWO_PI; // 0…2π from −180°
+
+        // Bilinear texture sample
+        const u = (lon / TWO_PI) * tw - 0.5;
+        const v = (0.5 - lat / Math.PI) * th - 0.5;
+        let x0 = Math.floor(u);
+        let y0 = Math.floor(v);
+        const fx = u - x0;
+        const fy = v - y0;
+        const x1 = (x0 + 1 + tw) % tw;
+        x0 = (x0 + tw) % tw;
+        const y1 = Math.min(th - 1, Math.max(0, y0 + 1));
+        y0 = Math.min(th - 1, Math.max(0, y0));
+        const i00 = (y0 * tw + x0) * 4, i10 = (y0 * tw + x1) * 4;
+        const i01 = (y1 * tw + x0) * 4, i11 = (y1 * tw + x1) * 4;
+        const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
+        let r = src[i00] * w00 + src[i10] * w10 + src[i01] * w01 + src[i11] * w11;
+        let g = src[i00 + 1] * w00 + src[i10 + 1] * w10 + src[i01 + 1] * w01 + src[i11 + 1] * w11;
+        let b = src[i00 + 2] * w00 + src[i10 + 2] * w10 + src[i01 + 2] * w01 + src[i11 + 2] * w11;
+
+        // Lambert + soft terminator (Mars' dusty air scatters a little light past it)
+        const ndl = nx * lx + ny * ly + nz * lz;
+        const lit = ndl > 0 ? ndl : 0;
+        const twilight = Math.max(0, Math.min(1, (ndl + 0.12) / 0.24));
+        const shade = 0.05 + 1.08 * Math.pow(lit, 0.85) * (0.6 + 0.4 * twilight) + 0.04 * twilight;
+
+        // Limb: darker ground seen through more dust, plus a faint butterscotch haze
+        const limb = 1 - nz;
+        const haze = limb * limb * limb * 0.55 * (0.25 + 0.75 * twilight);
+        r = r * shade * (1 - haze) + 214 * haze;
+        g = g * shade * (1 - haze) + 156 * haze;
+        b = b * shade * (1 - haze) + 112 * haze;
+
+        // Anti-aliased edge
+        const edge = Math.min(1, (1 - Math.sqrt(rho2)) * half * 1.2);
+        const o = (py * size + px) * 4;
+        out[o] = r > 255 ? 255 : r;
+        out[o + 1] = g > 255 ? 255 : g;
+        out[o + 2] = b > 255 ? 255 : b;
+        out[o + 3] = 255 * edge;
+      }
+    }
+    octx.putImageData(img, 0, 0);
+    this._globeCacheKey = key;
+    return off;
+  }
+
+  /** Original stylised globe, kept as a fallback while (or if) the texture fails to load. */
+  _drawPaintedMars(ctx, cx, cy, radius, lat0, lon0) {
     const sphereGrad = ctx.createRadialGradient(
       cx - radius * 0.32,
       cy - radius * 0.28,
@@ -900,9 +1115,6 @@ export class SiteTopologyWidget {
     sphereGrad.addColorStop(1, '#2b1008');
     ctx.fillStyle = sphereGrad;
     ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
-
-    const lat0 = (this.camLat * Math.PI) / 180;
-    const lon0 = (this.camLon * Math.PI) / 180;
 
     // Draw Martian albedo patches (Syrtis Major, Tharsis, Valles Marineris, Hellas)
     const patches = [
@@ -929,10 +1141,9 @@ export class SiteTopologyWidget {
         ctx.fill();
       }
     }
+  }
 
-    // Draw latitude & longitude graticule lines
-    ctx.strokeStyle = 'rgba(255, 228, 205, 0.16)';
-    ctx.lineWidth = 1;
+  _drawGraticule(ctx, lat0, lon0, cx, cy, radius) {
     for (let lonDeg = 0; lonDeg < 360; lonDeg += 30) {
       ctx.beginPath();
       let started = false;
@@ -969,16 +1180,9 @@ export class SiteTopologyWidget {
       }
       ctx.stroke();
     }
+  }
 
-    ctx.restore();
-
-    // Globe rim stroke
-    ctx.strokeStyle = 'rgba(255, 176, 124, 0.5)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.stroke();
-
+  _drawSitePins(ctx, lat0, lon0, cx, cy, radius) {
     // Draw all 5 Site Pins on the Mars Globe
     this.pinScreenCoords = [];
     MARS_SITES.forEach((site, idx) => {
@@ -1026,10 +1230,6 @@ export class SiteTopologyWidget {
         ctx.fillText(label, lx, ly + 1);
       }
     });
-
-    if (stillAnimating && !this.zoomingIn) {
-      this._scheduleDraw();
-    }
   }
 
   _projectLatLon(latDeg, lonDeg, lat0, lon0, cx, cy, radius) {

@@ -10,6 +10,7 @@ For Gale Crater, the wall map and rover terrain share a crop of an archived Mars
 
 - **Orbital and elevation**: [HiRISE DTEEC_009149_1750_009294_1750_U01 and PSP_009149_1750_RED_A_01_ORTHO](https://www.uahirise.org/dtm/dtm.php?ID=PSP_009149_1750), NASA/JPL-Caltech/University of Arizona, [USGS Analysis Ready Data](https://stac.astrogeology.usgs.gov/docs/data/mars/hirise_dtms/). The local assets are made from a 640 m crop in Mars 2015 equirectangular coordinates, with elevation resampled to 4 m and slopes derived from that grid. The wall display frames a 320 m portion. Outside the crop the simulation extends the edge elevations.
 - **Science reference**: [Curiosity Mastcam Sol 1790, PIA21851](https://science.nasa.gov/photojournal/looking-up-at-layers-of-vera-rubin-ridge-on-sol-1790/), NASA/JPL-Caltech/MSSS. This is a regional reference for the visible bedding, not a photograph from the exact simulated station.
+- **Site Topology globe**: colour from the NASA Viking/MOLA Mars mosaic ([nasa/NASA-3D-Resources](https://github.com/nasa/NASA-3D-Resources), public domain); relief from the MGS MOLA global DEM 463 m mosaic (NASA/JPL/GSFC via USGS Astrogeology), resampled to 2048×1024 in `public/mars/`. Rendered in WebGL with per-pixel relief lighting; drag to spin.
 - **Globe**: [JPL Mars Trek](https://trek.nasa.gov/mars/) continues to provide imagery for the separate scouting map.
 
 ### References studied
