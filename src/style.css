@@ -413,6 +413,21 @@ kbd {
 .task.active { border-color: var(--hud); }
 .task.locked { opacity: 0.45; cursor: default; }
 .task.skipped { opacity: 0.35; cursor: default; text-decoration: line-through; } /* dropped by a quick-stop leg choice */
+.station-conditions, .station-outcomes { font-size: 12px; line-height: 1.5; }
+.station-actions { display: grid; gap: 8px; }
+.station-action {
+  width: 100%; min-height: 44px; padding: 10px 12px; text-align: left;
+  border: 1px solid rgba(154, 244, 255, 0.4); background: #102b35; color: #d6fbff;
+  cursor: pointer; touch-action: manipulation; font: inherit;
+}
+.station-action strong, .station-action span { display: block; }
+.station-action strong { font-size: 13px; }
+.station-action span { margin-top: 4px; font-size: 11px; line-height: 1.5; }
+.station-action:disabled { opacity: 0.55; cursor: default; }
+.station-action:focus-visible { outline: 2px solid #9af4ff; outline-offset: 2px; }
+.station-action .decision-reason { color: #ffc179; }
+.debrief-science { grid-column: 1 / -1; max-height: 240px; overflow: auto; }
+.debrief-science p { font: 12px/1.6 var(--sans); }
 .card .cta {
   margin-top: 16px;
   width: 100%;

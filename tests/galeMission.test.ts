@@ -142,8 +142,9 @@ it('hides one obstacle in unsurveyed ground that stops the rover and costs time'
   expect(hit.ref.type).toBe('SOFT SAND · WHEEL SINKING');
   expect(hit.s).toBeGreaterThan(zone.s0);
   expect(hit.s).toBeLessThan(zone.s1);
-  // while driving, the displays never named it before the rover got there
-  expect(seen).not.toContain(hit.ref.type);
+  // A local camera observation makes this previously unmapped obstacle known.
+  expect(seen).toContain(hit.ref.type);
+  expect(mission.detectedObstacles).toEqual([hit]);
   const before = mission.met;
   mission.acknowledge();
   expect(mission.met - before).toBeCloseTo(4 * 60, 5);

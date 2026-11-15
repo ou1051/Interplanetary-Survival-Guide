@@ -82,7 +82,7 @@ export const STATIONS = [
       'Base of the scarp is flat; the climb that follows is the main hazard',
     ],
     tasks: [
-      { label: 'Stratigraphic panorama (12 frames)', minutes: 20, result: '≥ 9 beds resolved, 0.2–0.8 m thick (MOCK)' },
+      { label: 'Stratigraphic panorama (12 frames)', minutes: 20, panorama: true, result: '≥ 9 beds resolved, 0.2–0.8 m thick (MOCK)' },
       { label: 'Laser range bed thickness', minutes: 15, result: 'Mean bed 0.46 m (MOCK)' },
       { label: 'Collect mudstone sample', minutes: 30, result: 'Fine-grained sample in tube A2 (MOCK)' },
     ],
@@ -116,7 +116,7 @@ export const STATIONS = [
     tasks: [
       { label: 'Comms relay check with HAB', minutes: 10, result: 'Link margin +7 dB (MOCK)' },
       { label: 'Dosimeter reading', minutes: 5, result: '0.29 mSv/sol, quiet space weather (MOCK)' },
-      { label: '360° planning panorama', minutes: 20, result: 'Panorama stored · 64 frames (MOCK)' },
+      { label: '360° planning panorama', minutes: 20, panorama: true, result: 'Panorama stored · 64 frames (MOCK)' },
     ],
   },
 ];

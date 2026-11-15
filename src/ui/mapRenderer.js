@@ -10,14 +10,19 @@ import { clamp, formatDist } from '../core/math.js';
 
 export const ZONE_COLORS = { caution: '#ffc23d', danger: '#ff5a45' };
 
-export function mapWeatherLabel(weather) {
-  const range = weather.label === 'Clear' ? 'visibility' : 'visibility ring';
-  return `Simulated weather · ${weather.label} · ${range} ≈ ${formatDist(weather.visibilityM)}`;
+export function mapWeatherLabel(weather, front, obstacles) {
+  const condition = Number.isFinite(weather.exposureMinutes) ? `${weather.exposureMinutes} min outdoor limit`
+    : `${weather.limitsVisibility ? 'visibility ring' : 'visibility'} ≈ ${formatDist(weather.visibilityM)}`;
+  const latest = obstacles?.at(-1);
+  return [`Simulated weather · ${weather.label} · ${condition}`,
+    front && `Dust front · amber route ${Math.round(front.from)}–${Math.round(front.to)} m`,
+    latest && `Mast camera · ${latest.ref.type.toLowerCase()} at ${Math.round(latest.s)} m`,
+  ].filter(Boolean).join(' · ');
 }
 
 // Project the same horizontal sight range onto each map's coordinate system.
 export function drawVisibilityRing(g, weather, x, z, project) {
-  if (weather.label === 'Clear') return;
+  if (!weather?.limitsVisibility) return;
   g.save();
   g.strokeStyle = '#ffbf69';
   g.lineWidth = 2;
@@ -31,6 +36,36 @@ export function drawVisibilityRing(g, weather, x, z, project) {
   }
   g.closePath();
   g.stroke();
+  g.restore();
+}
+
+// Show the forecast footprint and observations made by the crew on every field map.
+export function drawFieldHazards(g, route, project, front, obstacles) {
+  g.save();
+  if (front) {
+    g.strokeStyle = '#ffae59';
+    g.lineWidth = 6;
+    g.setLineDash([8, 4]);
+    g.beginPath();
+    for (let s = front.from; s < front.to + route.step; s += route.step) {
+      const { x, z } = route.sample(Math.min(s, front.to));
+      const [px, py] = project(x, z);
+      if (s === front.from) g.moveTo(px, py);
+      else g.lineTo(px, py);
+    }
+    g.stroke();
+    g.setLineDash([]);
+  }
+  for (const obstacle of obstacles ?? []) {
+    const { x, z } = route.sample(obstacle.s);
+    const [px, py] = project(x, z);
+    g.fillStyle = obstacle.ref.acknowledged ? '#a6abae' : '#ff7f63';
+    g.fillRect(px - 5, py - 5, 10, 10);
+    g.fillStyle = '#141719';
+    g.textAlign = 'center';
+    g.font = 'bold 10px monospace';
+    g.fillText('!', px, py + 3);
+  }
   g.restore();
 }
 
@@ -275,6 +310,7 @@ export class MapRenderer {
     }
     drawVisibilityRing(g, view.weather, view.x, view.z, toPx);
     this._drawRoute(g, toPx, view.s, scale, { lineWidth: 3.5, labels: true, icon: 7, labelSize: 12 });
+    drawFieldHazards(g, this.route, toPx, view.front, view.obstacles);
     const [rx, ry] = toPx(view.x, view.z);
     this._rover(g, rx, ry, view.heading, 10, 70);
     // north arrow + scale bar
@@ -325,6 +361,7 @@ export class MapRenderer {
     }
     drawVisibilityRing(g, view.weather, view.x, view.z, toPx);
     this._drawRoute(g, toPx, view.s, scale, { lineWidth: 5, labels: true, icon: 8, labelSize: 14 });
+    drawFieldHazards(g, this.route, toPx, view.front, view.obstacles);
     this._rover(g, cx, cy, 0, 11);
     return { toPx };
   }

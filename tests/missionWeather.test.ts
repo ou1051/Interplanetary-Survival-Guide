@@ -28,7 +28,7 @@ describe('variable mission weather', () => {
     expect(m.weather.label).toBe(label);
     expect(m.weather.speedLimit).toBeLessThan(4.5);
     expect(Math.exp(-Math.pow(m.weather.fogDensity * m.weather.visibilityM, 2))).toBeCloseTo(0.05);
-    m.update(40, parked, 0);
+    m.update(m.weatherRemainingSeconds, parked, 0);
     expect(m.weather.label).toBe('Clear');
     m.update(46, parked, 0);
     expect(m.weather.label).not.toBe('Clear');
@@ -48,10 +48,33 @@ describe('variable mission weather', () => {
     expect(m.speed).toBeGreaterThan(0);
     expect(m.speed).toBeLessThanOrEqual(m.weather.speedLimit);
     expect(m.limitReason).toBe(label);
-    m.update(40, parked, 0);
+    m.update(m.weatherRemainingSeconds, parked, 0);
     for (let i = 0; i < 100; i++) m.update(0.1, driving, 0);
     expect(m.weather.label).toBe('Clear');
     expect(m.speed).toBeGreaterThan(3);
+  });
+
+  it('distinguishes a brief gust from persistent dust and cold spells', () => {
+    const durations = [];
+    for (const roll of [0, 0.5, 0.9]) {
+      const m = mission(() => roll);
+      m.start();
+      m.update(35, parked, 0);
+      durations.push(m.weatherRemainingSeconds);
+      if (roll === 0.5) {
+        expect(m.weather).toMatchObject({ label: 'Cold spell', limitsVisibility: false, exposureMinutes: 10 });
+        expect(m.weather.temperatureOffsetC).toBeLessThan(0);
+      }
+      const before = m.met;
+      const cost = m.waitSeconds;
+      expect(m.waitForWeather()).toBe(true);
+      expect(m.met - before).toBeCloseTo(cost);
+      expect(m.weather.label).toBe('Clear');
+      expect(m.waitForWeather()).toBe(false);
+    }
+    expect(durations[0]).toBeLessThan(60);
+    expect(durations[1]).toBeGreaterThan(10 * 60);
+    expect(durations[2]).toBeGreaterThan(10 * 60);
   });
 
   it('advances at stations and coalesces long work intervals into one transition', () => {

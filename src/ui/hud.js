@@ -3,6 +3,7 @@ import { consumptionEstimate } from '../physics/traverse.js';
 import { SITE, ROVER, LIFE_SUPPORT, SLOPE_CLASSES } from '../config/mission.js';
 import { formatHMS, formatHM, formatDist, clamp } from '../core/math.js';
 import { ZONE_COLORS, bearingTo, mapWeatherLabel } from './mapRenderer.js';
+import { renderStationChoices } from './stationChoices.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -405,7 +406,7 @@ export class Hud {
     } else if (M.state === 'gate') html = `<span class="pulse">HAZARD BRIEFING — PRESS <kbd>ENTER</kbd> TO ACKNOWLEDGE</span>`;
     else if (M.state === 'station') {
       const t = M.nextStop.ref.tasks.find((x) => !x.done && !x.skipped);
-      html = t ? `HOLD <kbd>E</kbd> — ${t.label.toUpperCase()}` : '';
+      html = t ? `CHOOSE STATION WORK · OR HOLD <kbd>E</kbd> — ${t.label.toUpperCase()}` : '';
     } else if (M.state === 'stationDone') html = `<span class="pulse">PRESS <kbd>ENTER</kbd> TO ${M.nextStop.ref.final ? 'END THE EVA' : M.legCheck && M.nextStation && !M.nextStation.final ? 'PLAN THE NEXT LEG' : 'RESUME THE TRAVERSE'}</span>`;
     else if (M.state === 'legcheck') html = `<span class="pulse">ROVER PARKED · CHOOSE THE NEXT LEG ON YOUR WRIST NAVIGATOR <kbd>P</kbd></span>`;
     if (el.innerHTML !== html) el.innerHTML = html;
@@ -437,13 +438,18 @@ export class Hud {
         el.classList.toggle('locked', !t.done && t !== active);
         el.querySelector('.fill').style.width = `${(t.done ? 1 : t.progress) * 100}%`;
         const res = el.querySelector('.res');
-        if (t.done && res.textContent === '') res.textContent = `→ ${t.result}`;
+        if (t.done || t.skipped) res.textContent = `→ ${t.done || t.deferred ? t.result : 'Not performed · omitted from selected station plan'}`;
       });
       const cta = card.querySelector('.cta');
       const done = st.tasks.every((t) => t.done || t.skipped);
       const legAhead = M.legCheck && M.route.stations.some((x) => !x.final && !x.done && !x.skipped && x !== st);
       cta.disabled = !done;
       cta.textContent = done ? (st.final ? 'END EVA [ENTER]' : legAhead ? 'PLAN NEXT LEG [ENTER]' : 'RESUME TRAVERSE [ENTER]') : 'HOLD [E] ON EACH TASK';
+      const decisionKey = `${M.state}:${Math.floor(M.met)}:${st.tasks.map(t => `${!!t.done}${!!t.skipped}`).join('')}:${M.weather.label}`;
+      if (decisionKey !== this.stationDecisionKey) {
+        this.stationDecisionKey = decisionKey;
+        renderStationChoices(card.querySelector('.station-choices'), M);
+      }
     }
   }
 
@@ -451,7 +457,7 @@ export class Hud {
     card.className = `card gate${z.surprise ? ' surprise' : ''}`;
     const len = Math.round(z.s1 - z.s0);
     card.innerHTML = `
-      <div class="kicker">${z.surprise ? 'NOT ON THE MAP · ROVER STOPPED' : 'HAZARD GATE · ROVER STOPPED'}</div>
+      <div class="kicker">${z.surprise ? 'MAST CAMERA DISCOVERY · ROVER STOPPED' : 'HAZARD GATE · ROVER STOPPED'}</div>
       <h2>${z.type}</h2>
       <div class="facts">
         ${z.surprise ? `<div class="fact"><span>DELAY</span><b>+${z.delayMinutes} min</b></div>
@@ -492,6 +498,7 @@ export class Hud {
           (t) => `<div class="task"><i class="fill"></i><i class="chk"></i><span class="lbl">${t.label}</span><span class="min">${t.minutes} min</span><span class="res"></span></div>`,
         )
         .join('')}</div>
+      <div class="station-choices"></div>
       <button class="cta" disabled>HOLD [E] ON EACH TASK</button>`;
     card.querySelectorAll('.task').forEach((el) => {
       const on = (e) => {
@@ -539,12 +546,12 @@ export class Hud {
 
   _drawOverlay(view) {
     const weather = this.mission.weather;
-    const label = mapWeatherLabel(weather);
+    const label = mapWeatherLabel(weather, this.mission.activeFront, this.mission.detectedObstacles);
     if ($('mapWeather').textContent !== label) $('mapWeather').textContent = label;
     const mc = $('mapCanvas');
     const r = mc.getBoundingClientRect();
     const g = fitCanvas(mc, Math.max(200, r.width), Math.max(200, r.height));
-    this.map.drawOverview(g, Math.max(200, r.width), Math.max(200, r.height), { x: view.x, z: view.z, heading: (view.headingDeg * Math.PI) / 180, s: this.mission.s, weather });
+    this.map.drawOverview(g, Math.max(200, r.width), Math.max(200, r.height), { x: view.x, z: view.z, heading: (view.headingDeg * Math.PI) / 180, s: this.mission.s, weather, front: this.mission.activeFront, obstacles: this.mission.detectedObstacles });
     const pc = $('profileCanvas');
     const pr = pc.getBoundingClientRect();
     const pg = fitCanvas(pc, Math.max(200, pr.width), 170);
@@ -565,9 +572,22 @@ export class Hud {
       ['DOSE', `${M.dose.toFixed(1)} µSv`],
       ['SAMPLES', M.samples],
       ['GATES CLEARED', gates],
-      ['STATIONS', this.route.stations.length - 1],
+      ['STATIONS WORKED', `${this.route.stations.filter(st => !st.final && st.tasks.some(task => task.done)).length} / ${this.route.stations.length - 1}`],
+      ['SCIENCE COMPLETE', M.scienceResults.filter(result => result.status === 'complete').length],
+      ['DEGRADED / DEFERRED', M.scienceResults.filter(result => result.quality === 'dust-degraded' || result.status === 'deferred').length],
     ];
     $('debriefGrid').innerHTML = items.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
+    const results = document.createElement('div');
+    results.className = 'debrief-science';
+    const heading = document.createElement('h2');
+    heading.textContent = 'Science returned';
+    results.appendChild(heading);
+    for (const result of M.scienceResults) {
+      const p = document.createElement('p');
+      p.textContent = `${result.station} · ${result.task} — ${result.result} (${result.status})`;
+      results.appendChild(p);
+    }
+    $('debriefGrid').appendChild(results);
     $('debriefSub').textContent = `${this.mission.aborted ? 'Returned early' : 'Science traverse'} · ${(this.route.site ?? SITE).name}`;
     $('debrief').classList.remove('hidden');
     $('restartBtn').onclick = onRestart;

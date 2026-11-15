@@ -101,7 +101,10 @@ async function initSurface(plan, scenario, status) {
   scene.add(wheelDust.points);
 
   const map = new MapRenderer(terrain, route);
-  const mission = new Mission(route, terrain, hab.userData.antennaTop, { variableWeather: scenario === 'variable' });
+  const mission = new Mission(route, terrain, hab.userData.antennaTop, {
+    variableWeather: scenario === 'variable',
+    frontSeconds: scenario === 'variable' ? plan.frontSeconds : 0,
+  });
   const audio = new RoverAudio();
   const hud = new Hud({ route, mission, mapRenderer: map, layers: LAYERS, input });
   document.querySelectorAll('#touch button').forEach((b) => input.bindButton(b, b.dataset.v));
@@ -189,6 +192,7 @@ async function initSurface(plan, scenario, status) {
   hud.showHud();
   document.getElementById('boardBtn').focus({ preventScroll: true });
   mission.start();
+  if (plan.departureWaitSeconds > 0) mission.waitForWeather();
   input.resetLook();
   input.keys.clear();
   input.pressed.clear();
@@ -249,6 +253,7 @@ async function initSurface(plan, scenario, status) {
       let message = '';
       if (mission.state !== 'complete' && weather.label !== 'Clear') {
         message = mission.dustWarning ? 'Dust front ahead. Open your wrist navigator to return.'
+          : Number.isFinite(weather.exposureMinutes) ? `Cold spell · Outside work limited to ${weather.exposureMinutes} min. Review tasks on your wrist navigator.`
           : `${weather.label} · Visibility ≈ ${formatDist(weather.visibilityM)} · Rover limit ${Math.round(weather.speedLimit * 3.6)} km/h`;
       }
       if (fieldAlert.textContent !== message) fieldAlert.textContent = message;

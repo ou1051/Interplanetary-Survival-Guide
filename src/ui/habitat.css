@@ -526,6 +526,11 @@
 .hab-unknowns p { margin: 0 0 4px; }
 .hab-unknowns ul { margin: 0 0 6px; padding-left: 16px; }
 .hab-unknowns small { color: #d9c3a6; }
+.hab-weather h4 { margin: 0 0 5px; color: #ffc178; font-size: 12px; }
+.hab-weather .hab-routes { margin-top: 8px; }
+.hab-weather .hab-routes button { min-block-size: 44px; }
+.hab-weather .hab-routes button:focus-visible { outline: 2px solid #fff0d9; outline-offset: 2px; }
+.hab-weather .hab-routes button b { color: #ffc178; }
 
 /* ---------------- Integrated Site Topology Console Tabs & Viewport Lock ---------------- */
 #habitat .hab-stage .hab-wall {

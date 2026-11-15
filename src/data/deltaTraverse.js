@@ -52,6 +52,8 @@ export function buildDeltaApproaches(original) {
     });
     const lastIndex = Math.floor(distance / built.step);
     const unknowns = built.zones.filter(zone => zone.unsurveyed && zone.s0 < distance);
+    built.retracesOutbound = false;
+    if (variant.id === 'shortest') built.weatherExposure = { from: unknowns[0].s0, to: unknowns[0].s1 };
     const estimate = estimateLeg(built, terrain, distance);
     return { ...deltaPlan, ...variant, distance, s1: distance, unknowns, estimate, name: `Delta Front · ${variant.label} to S1`,
       maxTilt: Math.max(...built.tilt.subarray(0, lastIndex + 1)),
