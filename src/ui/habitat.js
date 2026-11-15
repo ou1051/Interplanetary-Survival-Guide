@@ -47,6 +47,7 @@ export function mountHabitat(root, launch) {
         <h1 id="hab-intro-title">Mars Surface<br>Operations</h1>
         <p>Plan a rover traverse from the habitat console. Visit the science stops and get back to the habitat with oxygen to spare.</p>
         <ol><li>Select a Mars landing site and run the live A* route planner.</li><li>Drive the route and use your wrist navigator.</li><li>Complete the science tasks and return to the airlock.</li></ol>
+        <p>For the best experience, play in full screen.</p>
         <button type="button" data-intro-enter>Enter habitat <span aria-hidden="true">→</span></button>
       </div>
     </section>
