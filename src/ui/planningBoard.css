@@ -444,3 +444,22 @@
 .wd-screen .wd-confirm { display: block; width: 100%; text-align: center; }
 .wd-screen .wd-confirm:disabled { opacity: .45; cursor: not-allowed; }
 .wd-screen .wd-confirm:disabled:hover { background: none; color: inherit; }
+
+/* Suit Data & Site Topology inside Tablet UI */
+.wd-suit-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.wd-screen .wd-preset-btn {
+  flex: 1;
+  min-width: 110px;
+  border: 1px solid var(--trace);
+  padding: 6px 8px;
+  background: rgba(16, 38, 22, 0.6);
+}
+.wd-screen .wd-preset-btn.on {
+  border-color: var(--signal);
+  background: rgba(35, 82, 42, 0.85);
+}
+.wd-preset-btn b, .wd-preset-btn small { display: block; }
+.wd-preset-btn small { font-size: 0.8em; color: var(--dim); }
+.wd-suit-sliders { display: grid; gap: 6px; margin-top: 8px; }
+.wd-suit-slider { display: grid; gap: 2px; font-size: 0.85em; }
+.wd-suit-slider input[type="range"] { width: 100%; accent-color: var(--signal); }

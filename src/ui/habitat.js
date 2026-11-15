@@ -4,6 +4,7 @@ import { AREA_HAZARDS } from '../config/mission.js';
 import { mountHabitatRoom } from './habitatRoom.js';
 import { mountHabitatExterior } from './habitatExterior.js';
 import { mountConsoleMap3D } from './consoleMap3D.js';
+import { SiteTopologyWidget } from './siteTopology.js';
 import { base, outcrop, gridPosition, imagery, observationSource, terrainSource, siteWidth, terrainSlope, planGaleRoutes } from '../data/galeSite.js';
 import './habitat.css';
 
@@ -28,6 +29,7 @@ export function mountHabitat(root, launch) {
   let view3d = true;
   let map3d = null;
   let map3dLoading = null;
+  let habTab = 'briefing';
   root.innerHTML = `
     <div class="hab-stage hab-before-entry" inert>
       <canvas class="hab-room" data-room aria-hidden="true"></canvas>
@@ -37,12 +39,16 @@ export function mountHabitat(root, launch) {
       </header>
       <div class="hab-wall">
         <div class="hab-screen">
-          <header class="hab-header"><h1>Mission briefing</h1><span class="hab-eva"><i></i> EVA-01</span><nav class="hab-nav" aria-label="Mission navigation">
+          <header class="hab-header"><h1>Mission briefing</h1><nav class="hab-console-tabs" aria-label="Console views">
+            <button type="button" data-hab-tab="briefing" aria-pressed="true">Route Briefing</button>
+            <button type="button" data-hab-tab="topology" aria-pressed="false">Site Topology</button>
+          </nav><span class="hab-eva"><i></i> EVA-01</span><nav class="hab-nav" aria-label="Mission navigation">
             <a href="./map.html">Explore Mars</a>
             <button type="button" id="sourcesBtn">Mission &amp; sources</button>
             <button type="button" data-review-close>← Habitat view</button>
           </nav></header>
-          <div class="hab-console-grid">
+          <div class="hab-topology-panel" data-hab-topology hidden></div>
+          <div class="hab-console-grid" data-hab-console-grid>
           <div class="hab-layout">
             <aside class="hab-metrics" aria-label="Selected route">
               <div><span>Objective</span><b data-objective-short>Visit four science stations</b></div>
@@ -452,15 +458,83 @@ export function mountHabitat(root, launch) {
         { transformOrigin: '0 0', transform: `translate(${before.left - after.left}px, ${before.top - after.top}px) scale(${before.width / after.width}, ${before.height / after.height})` },
         { transformOrigin: '0 0', transform: 'none' },
       ], { duration: 340, easing: 'cubic-bezier(.22,.75,.18,1)' });
+      zoomAnimation.finished.then(() => { if (habTab === 'topology') topoWidget?._scheduleDraw(); }).catch(() => {});
     }
+    if (habTab === 'topology') topoWidget?._scheduleDraw();
     (open ? reviewClose : lastZoomTrigger).focus({ preventScroll: true });
   }
   let lastZoomTrigger = reviewOpen;
   let scrollBeforeZoom = 0;
   const observation = query('[data-photo-dialog]');
+  const topoPanel = query('[data-hab-topology]');
+  const consoleGrid = query('[data-hab-console-grid]');
   let launching = false;
+
+  async function runLaunchSequence(planToLaunch, scenarioToLaunch = 'clear') {
+    if (launching || !planToLaunch) return;
+    launching = true;
+    const launchBtn = query('[data-launch]');
+    if (launchBtn) launchBtn.textContent = 'Opening airlock…';
+    stage.inert = true;
+    airlock.hidden = false;
+    root.scrollTop = 0;
+    query('.hab-airlock-status').focus({ preventScroll: true });
+    const progress = query('[data-airlock-progress]');
+    const cycle = motionReduced() ? Promise.resolve() : airlock.animate(
+      [{ opacity: .15 }, { opacity: 1 }], { duration: 570, easing: 'ease-out' }).finished;
+    for (const control of root.querySelectorAll('button, select')) control.disabled = true;
+    try {
+      await cycle;
+      await launch(planToLaunch, scenarioToLaunch, message => { progress.textContent = message; });
+      if (!motionReduced()) document.getElementById('viewport').animate(
+        [{ opacity: 0 }, { opacity: 1 }], { duration: 370, easing: 'ease-out' });
+      room?.dispose();
+    } catch (error) {
+      console.error(error);
+      launching = false;
+      airlock.hidden = true;
+      stage.inert = false;
+      reviewClose.disabled = false;
+      const st = query('[data-status]');
+      if (st) st.textContent = 'The 3D simulation could not start. Reload to retry.';
+    }
+  }
+
+  const topoWidget = new SiteTopologyWidget(topoPanel, {
+    onDeploy: ({ site, pathId }) => {
+      if (!approaches) {
+        original.traverse = buildDeltaTraverse();
+        approaches = buildDeltaApproaches(original.traverse);
+      }
+      const chosenApproach = approaches.find(a => a.id === pathId) || approaches[1] || approaches[0];
+      const customPlan = {
+        ...chosenApproach,
+        name: `${site.name.split('·')[0].trim()} · ${chosenApproach.label} to S1`,
+        site: { name: site.name, eva: 'EVA-01', sol: 214 },
+      };
+      runLaunchSequence(customPlan, 'clear');
+    },
+  });
+
+  function setHabTab(nextTab) {
+    habTab = nextTab;
+    const isTopo = habTab === 'topology';
+    topoPanel.hidden = !isTopo;
+    consoleGrid.hidden = isTopo;
+    brief.hidden = isTopo;
+    root.classList.toggle('hab-topology-mode', isTopo);
+    for (const tabBtn of root.querySelectorAll('[data-hab-tab]')) {
+      tabBtn.setAttribute('aria-pressed', String(tabBtn.dataset.habTab === habTab));
+    }
+    if (isTopo) {
+      if (!zoomed) setZoom(true, screenOpen);
+      topoWidget._scheduleDraw();
+    }
+  }
+
   window.addEventListener('keydown', (event) => {
-    if (document.querySelector('dialog[open]')) return;
+    if (document.querySelector('dialog[open]') || launching) return;
+    if (habTab === 'topology' && zoomed && !root.classList.contains('hidden') && intro.hidden && topoWidget.handleKeyDown(event)) return;
     if (event.key.toLowerCase() === 'e' && !event.repeat && !event.altKey && !event.ctrlKey &&
         !event.metaKey && intro.hidden && !root.classList.contains('hidden') && !zoomed) {
       event.preventDefault();
@@ -479,6 +553,10 @@ export function mountHabitat(root, launch) {
     if (button === enter) enterHabitat();
     if (button === reviewOpen || button === screenOpen) setZoom(true, button);
     if (button === reviewClose) setZoom(false);
+    if (button.dataset.habTab) {
+      setHabTab(button.dataset.habTab);
+      return;
+    }
     if (button.hasAttribute('data-s1') || button.hasAttribute('data-s1-back')) {
       const focus = button.hasAttribute('data-s1');
       if (!zoomed) setZoom(true, screenOpen);
@@ -506,30 +584,10 @@ export function mountHabitat(root, launch) {
     if (button.hasAttribute('data-observation')) observation.showModal();
     if (button.hasAttribute('data-photo-close')) observation.close();
     if (button.hasAttribute('data-launch') && selected && !button.disabled) {
-      launching = true;
-      button.textContent = 'Opening airlock…';
-      stage.inert = true;
-      airlock.hidden = false;
-      root.scrollTop = 0;
-      query('.hab-airlock-status').focus({ preventScroll: true });
-      const progress = query('[data-airlock-progress]');
-      const cycle = motionReduced() ? Promise.resolve() : airlock.animate(
-        [{ opacity: .15 }, { opacity: 1 }], { duration: 570, easing: 'ease-out' }).finished;
-      for (const control of root.querySelectorAll('button, select')) control.disabled = true;
-      try {
-        await cycle;
-        await launch(selected === original ? approachChoice : selected, selected === original ? 'clear' : query('[data-scenario]').value, message => { progress.textContent = message; });
-        if (!motionReduced()) document.getElementById('viewport').animate(
-          [{ opacity: 0 }, { opacity: 1 }], { duration: 370, easing: 'ease-out' });
-        room?.dispose();
-      } catch (error) {
-        console.error(error);
-        launching = false;
-        airlock.hidden = true;
-        stage.inert = false;
-        reviewClose.disabled = false;
-        query('[data-status]').textContent = 'The 3D simulation could not start. Reload to retry.';
-      }
+      await runLaunchSequence(
+        selected === original ? approachChoice : selected,
+        selected === original ? 'clear' : query('[data-scenario]').value
+      );
       return;
     }
     update();
