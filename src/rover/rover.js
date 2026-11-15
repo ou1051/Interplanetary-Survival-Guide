@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ROVER } from '../config/mission.js';
 import { damp, clamp } from '../core/math.js';
+import { createSuitMaterials, createSeatedAstronaut } from './astronaut.js';
 
 // ---------------------------------------------------------------------------
 // Pressurised-suit, open-frame rover seen from the driver's seat (left side).
@@ -99,8 +100,6 @@ export class Rover {
       console: new THREE.MeshStandardMaterial({ map: panelTexture('#2b2f36', '#1b1d21', false), metalness: 0.3, roughness: 0.55, envMap, envMapIntensity: 0.5 }),
       gold: new THREE.MeshStandardMaterial({ color: 0xd6a648, metalness: 1.0, roughness: 0.26, envMap, envMapIntensity: 1.2 }),
       suit: new THREE.MeshStandardMaterial({ color: 0xece9e2, roughness: 0.82, metalness: 0.0, envMap, envMapIntensity: 0.35 }),
-      suitDark: new THREE.MeshStandardMaterial({ color: 0x9fa3a8, roughness: 0.6, metalness: 0.3, envMap }),
-      visor: new THREE.MeshStandardMaterial({ color: 0xa8823a, metalness: 1.0, roughness: 0.1, envMap, envMapIntensity: 1.1 }),
       seat: new THREE.MeshStandardMaterial({ color: 0x40444b, roughness: 0.9, metalness: 0.1 }),
       wheel: new THREE.MeshStandardMaterial({ map: meshTexture(), metalness: 0.75, roughness: 0.45, envMap }),
       tread: new THREE.MeshStandardMaterial({ color: 0x8d9197, metalness: 0.9, roughness: 0.35, envMap }),
@@ -112,6 +111,7 @@ export class Rover {
       ledBlue: new THREE.MeshBasicMaterial({ color: 0x55dfff, toneMapped: false }),
     };
     this.M = M;
+    this.suitM = createSuitMaterials(envMap);
 
     this._buildChassis();
     this._buildWheels();
@@ -401,67 +401,13 @@ export class Rover {
       body.add(foot);
     }
 
-    const leg = (parent, x) => {
-      const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.36, 6, 12), M.suit);
-      thigh.rotation.x = Math.PI / 2 - 0.12;
-      thigh.position.set(x, 0.98, -0.02);
-      const shin = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.22, 6, 12), M.suit);
-      shin.rotation.x = 0.72;
-      shin.position.set(x, 0.87, -0.34);
-      const boot = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.28), M.suitDark);
-      boot.position.set(x, 0.77, -0.5);
-      const knee = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 8), M.suitDark);
-      knee.position.set(x, 1.0, -0.22);
-      parent.add(thigh, shin, boot, knee);
-    };
-    // Driver's own legs (seen when looking down).
-    leg(body, -0.52);
-    leg(body, -0.3);
+    // Driver's own suited legs (seen when looking down).
+    body.add(createSeatedAstronaut(this.suitM, { seatX: -0.42, upperBody: false }).group);
 
-    // Co-pilot astronaut in the right seat.
-    const crew = new THREE.Group();
-    crew.position.set(0.42, 0, 0);
-    leg(crew, -0.1);
-    leg(crew, 0.12);
-    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.21, 0.34, 8, 16), M.suit);
-    torso.position.set(0.01, 1.25, 0.24);
-    torso.rotation.x = 0.1;
-    const plss = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.56, 0.2), M.suit);
-    plss.position.set(0.01, 1.35, 0.47);
-    const rcu = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, 0.08), M.suitDark);
-    rcu.position.set(0.01, 1.3, 0.02);
-    const rcuLed = new THREE.Mesh(new THREE.SphereGeometry(0.01, 6, 4), M.ledGreen);
-    rcuLed.position.set(0.06, 1.33, -0.02);
-    crew.add(torso, plss, rcu, rcuLed);
-    for (const ax of [-1, 1]) {
-      const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.24, 6, 10), M.suit);
-      upper.position.set(0.01 + ax * 0.26, 1.28, 0.16);
-      upper.rotation.x = 0.35;
-      const fore = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.22, 6, 10), M.suit);
-      fore.position.set(0.01 + ax * 0.24, 1.08, -0.02);
-      fore.rotation.x = 1.25;
-      const glove = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 8), M.suitDark);
-      glove.position.set(0.01 + ax * 0.22, 1.02, -0.17);
-      crew.add(upper, fore, glove);
-    }
-    // helmet (turns to look at things)
-    this.copilotHead = new THREE.Group();
-    this.copilotHead.position.set(0.01, 1.68, 0.2);
-    const neck = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.03, 10, 24), M.suitDark);
-    neck.rotation.x = Math.PI / 2;
-    neck.position.y = -0.12;
-    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.19, 28, 20), M.suit);
-    shell.scale.set(1, 1.05, 1.02);
-    const visor = new THREE.Mesh(new THREE.SphereGeometry(0.195, 28, 20, Math.PI * 1.2, Math.PI * 0.6, Math.PI * 0.24, Math.PI * 0.36), M.visor);
-    visor.scale.set(1, 1.05, 1.02);
-    const lampL = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.05, 10), M.suitDark);
-    lampL.position.set(-0.17, 0.08, -0.04);
-    lampL.rotation.z = Math.PI / 2;
-    const lampR = lampL.clone();
-    lampR.position.x = 0.17;
-    this.copilotHead.add(neck, shell, visor, lampL, lampR);
-    crew.add(this.copilotHead);
-    body.add(crew);
+    // Co-pilot astronaut in the right seat; the helmet turns to look at things.
+    const copilot = createSeatedAstronaut(this.suitM, { seatX: 0.42 });
+    this.copilotHead = copilot.head;
+    body.add(copilot.group);
   }
 
   _buildEquipment() {
