@@ -78,7 +78,7 @@ export class MapRenderer {
       x0 = Math.min(x0, route.x[i]); x1 = Math.max(x1, route.x[i]);
       z0 = Math.min(z0, route.z[i]); z1 = Math.max(z1, route.z[i]);
     }
-    const pad = 130;
+    const pad = 200; // room for detours picked between stations
     this.bounds = { x0: x0 - pad, x1: x1 + pad, z0: z0 - pad, z1: z1 + pad };
     this.mpp = 2; // metres per pixel of the base raster
     this.w = Math.ceil((this.bounds.x1 - this.bounds.x0) / this.mpp);

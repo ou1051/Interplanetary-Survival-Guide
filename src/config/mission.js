@@ -199,8 +199,13 @@ export const SURPRISES = [
 
 export const ROVER = {
   maxSpeed: 4.5, // m/s (~16 km/h)
-  cautionSpeed: 2.8,
-  dangerSlopeSpeed: 1.6,
+  cautionSpeed: 2.8, // yellow: moderate slope (10 km/h)
+  dangerSlopeSpeed: 1.6, // red: steep slope (6 km/h)
+  // Hold Shift to speed up time. It is limited: a short charge that drains while held and refills
+  // slowly, and it does not work on yellow/red stretches or close to a stop.
+  timeBoost: 3,
+  boostSeconds: 12, // full charge lasts this long (real seconds)
+  boostRechargeSeconds: 20, // empty to full while not boosting
   accel: 1.1,
   brake: 2.6,
   coast: 0.35,

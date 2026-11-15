@@ -8,12 +8,45 @@ import { clamp, DEG } from '../core/math.js';
 // evaluates the hand-planned traverse against the elevation data.
 // ---------------------------------------------------------------------------
 
+// Join curves end to end into one path, parameterised by arc length (each curve needs getLength/getPointAt).
+export function joinCurves(curves) {
+  const lengths = curves.map((curve) => curve.getLength());
+  const total = lengths.reduce((a, b) => a + b, 0);
+  return {
+    curves,
+    lengths,
+    getLength: () => total,
+    getPoint(t) {
+      let d = clamp(t, 0, 1) * total;
+      for (let i = 0; i < curves.length; i++) {
+        if (d <= lengths[i] || i === curves.length - 1) return curves[i].getPointAt(clamp(d / lengths[i], 0, 1));
+        d -= lengths[i];
+      }
+      return curves[curves.length - 1].getPointAt(1);
+    },
+  };
+}
+
+// A stretch [s0, s1] of an existing route as a curve, so it can be reused as a leg.
+export function routeSegment(route, s0, s1) {
+  const length = s1 - s0;
+  return {
+    getLength: () => length,
+    getPointAt(u) {
+      const p = route.sample(s0 + clamp(u, 0, 1) * length);
+      return new THREE.Vector3(p.x, 0, p.z);
+    },
+  };
+}
+
 export class Route {
-  constructor(terrain, { points = ROUTE_POINTS, stations = STATIONS, areaHazards = AREA_HAZARDS, exact = false, approach = null } = {}) {
+  // `path`: a ready-made curve ({ getLength(), getPoint(t) }), e.g. legs joined by joinCurves().
+  constructor(terrain, { points = ROUTE_POINTS, stations = STATIONS, areaHazards = AREA_HAZARDS, exact = false, approach = null, path = null } = {}) {
     this.terrain = terrain;
     const pts = points.map(([x, z]) => new THREE.Vector3(x, 0, z));
     let curve;
-    if (exact) {
+    if (path) curve = path;
+    else if (exact) {
       curve = new THREE.CurvePath();
       for (let i = 1; i < pts.length; i++) curve.add(new THREE.LineCurve3(pts[i - 1], pts[i]));
     } else {
@@ -34,7 +67,7 @@ export class Route {
         },
       };
     }
-    this.exactPath = exact || approach ? curve : null;
+    this.exactPath = exact || approach || path ? curve : null;
     this.length = curve.getLength();
     const steps = exact ? Math.ceil(this.length / 2) * 2 : Math.ceil(this.length);
     this.step = this.length / steps;

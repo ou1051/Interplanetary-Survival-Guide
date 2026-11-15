@@ -2,6 +2,7 @@ import { renderStationChoices } from './stationChoices.js';
 import { LIFE_SUPPORT } from '../config/mission.js';
 import { fieldGuidance } from '../sim/fieldGuidance.js';
 import { forecastReturn, legOptions, temperatureAt } from '../sim/legCheck.js';
+import { legVariants, buildLoopRoute } from '../data/deltaTraverse.js';
 import { SUIT, SUIT_PRESETS, defaultSuit, predict } from '../sim/suit.js';
 import { mapWeatherLabel } from './mapRenderer.js';
 import { TraverseRelief } from './traverseRelief.js';
@@ -56,8 +57,10 @@ export class PlanningBoard {
     this.onDeploy = fn;
   }
 
-  connectTraverse(mission) {
+  connectTraverse(mission, { terrain = null, swapRoute = null } = {}) {
     this.mission = mission;
+    this.terrain = terrain;
+    this.swapRoute = swapRoute;
     this.relief = new TraverseRelief(mission.route);
   }
 
@@ -111,11 +114,13 @@ export class PlanningBoard {
                 <button type="button" class="wd-return" data-return hidden>Turn around and return ↶</button>
               </section>
               <section data-leg hidden>
-                <p class="wd-h">Leg check <span data-leg-where></span></p>
-                <p class="wd-say" data-leg-say></p>
-                <div class="wd-legs" data-leg-options role="radiogroup" aria-label="Next leg options"></div>
-                <button type="button" class="wd-return wd-confirm" data-leg-confirm>Confirm leg →</button>
-                <ul class="wd-checks" data-leg-checks></ul>
+                <p class="wd-h">Next leg <span data-leg-where></span></p>
+                <div class="wd-legmap" data-leg-mapbox><canvas data-leg-map width="560" height="105" aria-label="Paths to the next station"></canvas></div>
+                <div class="wd-paths" data-leg-paths role="radiogroup" aria-label="Path to the next station"></div>
+                <div class="wd-plans" data-leg-options role="radiogroup" aria-label="What to do at the next station"></div>
+                <p class="wd-legstatus" data-leg-say></p>
+                <ul class="wd-chips" data-leg-checks></ul>
+                <button type="button" class="wd-return wd-confirm" data-leg-confirm>Confirm →</button>
               </section>
               <section data-route-view hidden>
                 <p class="wd-h">Selected traverse <span data-route-name>Delta Front</span></p>
@@ -203,6 +208,7 @@ export class PlanningBoard {
       else if (button.hasAttribute('data-wait-weather') && this.mission?.waitForWeather()) this.updateField(true);
       else if (button.dataset.tab) this.showTab(button.dataset.tab);
       else if (button.dataset.leg) { this.legChoice = button.dataset.leg; this.renderLeg(); }
+      else if (button.dataset.path) { this.pathChoice = button.dataset.path; this.renderLeg(); }
       else if (button.hasAttribute('data-leg-confirm')) this.confirmLeg();
       else if (button.hasAttribute('data-next')) this.cycleTab();
       else if (button.dataset.preset) {
@@ -289,34 +295,144 @@ export class PlanningBoard {
     if (tab === 'topology') this.topology._scheduleDraw();
   }
 
+  // The leg ahead: which station we stand at, where the leg goes, and its three paths (Delta loop only).
+  _legContext() {
+    const route = this.mission.route;
+    const here = this.mission.currentStation;
+    const stops = route.stations.filter((station) => !station.final);
+    const index = stops.indexOf(here) + 1;
+    const next = route.stations[stops.indexOf(here) + 1];
+    const paths = route.legs && this.terrain ? legVariants(this.terrain, route.legs, index) : null;
+    return { route, here, next, index, paths };
+  }
+
   renderLeg(fresh = false) {
-    const check = legOptions(this.mission);
+    const ctx = this._legContext();
+    this.legCtx = ctx;
+    if (fresh) this.pathChoice = 'planned';
+    const path = ctx.paths?.find((p) => p.id === this.pathChoice) ?? null;
+    let previewRoute = this.mission.route;
+    if (path && path.id !== 'planned') {
+      const legs = [...previewRoute.legs];
+      legs[ctx.index] = path.curve;
+      previewRoute = buildLoopRoute(this.terrain, legs);
+    }
+    const check = legOptions(this.mission, previewRoute);
     this.legCheck = check;
     if (fresh || !check.options.some((option) => option.id === this.legChoice)) this.legChoice = check.recommended.id;
     const chosen = check.options.find((option) => option.id === this.legChoice);
-    const here = this.mission.currentStation;
-    $('[data-leg-where]', this.el).textContent = `${here ? here.id : ''} · ${check.now} · ${check.temperature} °C`;
-    $('[data-leg-say]', this.el).textContent = chosen.allowed
-      ? (chosen.id === 'home' ? `Head home now: back at the airlock by ${chosen.backAt}.`
-        : `${chosen.label}: about ${hm(chosen.legMinutes)}. Turning home after it would still get you back by ${chosen.backAt}.`)
-      : `${chosen.label} is not allowed: ${chosen.reason.toLowerCase()}.`;
+
+    $('[data-leg-where]', this.el).textContent = `${ctx.here?.id ?? ''} → ${ctx.next?.final ? 'HAB' : ctx.next?.id ?? 'HAB'} · ${check.now} · ${check.temperature} °C`.replace('-', '−');
+
+    // 1. path to the next station (map + three cards)
+    $('[data-leg-mapbox]', this.el).hidden = !ctx.paths;
+    $('[data-leg-paths]', this.el).hidden = !ctx.paths;
+    if (ctx.paths) {
+      $('[data-leg-paths]', this.el).innerHTML = ctx.paths.map((p) => `
+        <button type="button" role="radio" data-path="${p.id}" aria-checked="${p.id === this.pathChoice}" style="--path:${p.color}">
+          <b>${p.label}</b>
+          <span>${Math.round(p.distance)} m · ${p.minutes.toFixed(1)} min</span>
+          <em class="lvl-${p.difficulty.toLowerCase()}">${p.difficulty}</em>
+          <small>${p.danger ? `${p.danger} hazard stop${p.danger > 1 ? 's' : ''}` : 'No hazard stops'}</small>
+        </button>`).join('');
+      this._drawLegMap(ctx, path);
+    }
+
+    // 2. what to do at the next station
     $('[data-leg-options]', this.el).innerHTML = check.options.map((option) => `
-      <button type="button" role="radio" data-leg="${option.id}" aria-checked="${option.id === this.legChoice}"
-        class="${option.allowed ? '' : 'is-locked'}">
-        <b>${option.allowed ? '' : '✕ '}${option.label}</b>
-        <span>${option.detail}</span>
-        <small>${option.allowed ? (option.id === 'home' ? `≈ ${hm(option.minutes)} · home by ${option.backAt}` : `≈ ${hm(option.legMinutes)} · safe return by ${option.backAt}`) : `Locked: ${option.reason}`}</small>
+      <button type="button" role="radio" data-leg="${option.id}" aria-checked="${option.id === this.legChoice}" class="${option.allowed ? '' : 'is-locked'}" title="${option.detail}">
+        ${option.allowed ? '' : '✕ '}${option.short}
       </button>`).join('');
+
+    // 3. one-line verdict + check chips
+    const failed = chosen.checks.find((item) => !item.ok);
+    const why = {
+      oxygen: 'Not enough oxygen to keep the reserve',
+      daylight: 'Too late: you would be back after twilight',
+      cold: 'Too cold to work outside by then',
+      battery: 'Rover battery would run too low',
+      dust: 'Dust front coming: head home',
+    };
+    const say = $('[data-leg-say]', this.el);
+    say.className = `wd-legstatus ${chosen.allowed ? 'ok' : 'fail'}`;
+    say.textContent = chosen.allowed
+      ? `✓ Safe · ${chosen.id === 'home' ? 'home' : 'could be home'} by ${chosen.backAt}`
+      : `✕ ${why[failed.id]}`;
+    const icon = { oxygen: 'O₂', daylight: 'Light', cold: 'Temp', battery: 'Batt', dust: 'Dust' };
     $('[data-leg-checks]', this.el).innerHTML = chosen.checks.map((item) => `
-      <li class="${item.ok ? 'ok' : 'fail'}" title="${item.rule}"><i>${item.ok ? '✓' : '✕'}</i><b>${item.label}</b><span>${item.value}</span>${item.ok ? '' : `<small>${item.rule}</small>`}</li>`).join('');
+      <li class="${item.ok ? 'ok' : 'fail'}" title="${item.value} · ${item.rule}">${item.ok ? '✓' : '✕'} ${icon[item.id]}</li>`).join('');
     const confirm = $('[data-leg-confirm]', this.el);
     confirm.disabled = !chosen.allowed;
-    confirm.textContent = chosen.allowed ? `Confirm: ${chosen.label} →` : 'Choose an allowed leg';
+    confirm.textContent = chosen.allowed ? `Go: ${path ? `${path.label.toLowerCase()} path · ` : ''}${chosen.short.toLowerCase()} →` : 'Pick a green option';
+  }
+
+  // Top-down sketch of the leg: shaded terrain, the three paths, here and the next station.
+  _drawLegMap(ctx, chosen) {
+    const canvas = $('[data-leg-map]', this.el);
+    const g = canvas.getContext('2d');
+    const { width, height } = canvas;
+    const pts = ctx.paths.flatMap((p) => Array.from({ length: 41 }, (_, i) => p.curve.getPointAt(i / 40)));
+    const xs = pts.map((p) => p.x);
+    const zs = pts.map((p) => p.z);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const cz = (Math.min(...zs) + Math.max(...zs)) / 2;
+    const scale = Math.min((width - 40) / (Math.max(...xs) - Math.min(...xs) || 1), (height - 30) / (Math.max(...zs) - Math.min(...zs) || 1));
+    const at = (x, z) => [width / 2 + (x - cx) * scale, height / 2 + (z - cz) * scale];
+    const key = `${ctx.index}:${width}`;
+    if (this._legMapKey !== key) {
+      // hillshade once per leg, in the navigator's green
+      const terrain = this.terrain;
+      const img = g.createImageData(width, height);
+      for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+        const wx = cx + (x - width / 2) / scale;
+        const wz = cz + (y - height / 2) / scale;
+        const dx = terrain.heightAt(wx + 3, wz) - terrain.heightAt(wx - 3, wz);
+        const dz = terrain.heightAt(wx, wz + 3) - terrain.heightAt(wx, wz - 3);
+        const k = Math.max(0, Math.min(1, 0.55 + dx * 0.12 + dz * 0.1));
+        const o = (y * width + x) * 4;
+        img.data.set([10 + 30 * k, 26 + 60 * k, 16 + 30 * k, 255], o);
+      }
+      this._legShade = img;
+      this._legMapKey = key;
+    }
+    g.putImageData(this._legShade, 0, 0);
+    for (const p of [...ctx.paths.filter((q) => q !== chosen), chosen].filter(Boolean)) {
+      g.beginPath();
+      for (let i = 0; i <= 60; i++) {
+        const q = p.curve.getPointAt(i / 60);
+        const [x, y] = at(q.x, q.z);
+        if (i) g.lineTo(x, y); else g.moveTo(x, y);
+      }
+      g.strokeStyle = p.color;
+      g.globalAlpha = p === chosen ? 1 : 0.8;
+      g.lineWidth = p === chosen ? 4 : 2.5;
+      g.setLineDash(p === chosen ? [] : [7, 4]);
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+    g.setLineDash([]);
+    const label = (q, text) => {
+      const [x, y] = at(q.x, q.z);
+      g.fillStyle = '#e8ffd8';
+      g.beginPath(); g.arc(x, y, 5, 0, Math.PI * 2); g.fill();
+      g.font = 'bold 13px monospace';
+      g.fillText(text, x + 8, y - 6);
+    };
+    label(ctx.paths[1].curve.getPointAt(0), `${ctx.here.id} · YOU`);
+    label(ctx.paths[1].curve.getPointAt(1), ctx.next?.final ? 'HAB' : ctx.next?.id ?? 'HAB');
   }
 
   confirmLeg() {
     const chosen = this.legCheck?.options.find((option) => option.id === this.legChoice);
-    if (chosen && this.mission.chooseLeg(chosen)) this.toggle(false);
+    if (!chosen?.allowed) return;
+    const path = this.legCtx?.paths?.find((p) => p.id === this.pathChoice);
+    if (path && path.id !== 'planned' && this.swapRoute) {
+      const legs = [...this.mission.route.legs];
+      legs[this.legCtx.index] = path.curve;
+      this.swapRoute(buildLoopRoute(this.terrain, legs));
+      this.relief = new TraverseRelief(this.mission.route);
+    }
+    if (this.mission.chooseLeg(chosen)) this.toggle(false);
   }
 
   drawRoute() {

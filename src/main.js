@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Terrain, featureMasks, sampleContext } from './world/terrain.js';
 import { Route, RouteVisuals } from './world/route.js';
+import { ROVER } from './config/mission.js';
 import { createRocks, createHabitat } from './world/scenery.js';
 import { createSky, createEnvironment, DustMotes, WheelDust, SUN_DIR, HORIZON } from './world/atmosphere.js';
 import { Rover } from './rover/rover.js';
@@ -69,7 +70,7 @@ async function initSurface(plan, scenario, status) {
 
   status('PLANNING ROUTE…');
   await nextFrame();
-  const route = plan.traverse?.route ?? new Route(terrain, { points: plan.points, exact: true, areaHazards: [], stations: [{
+  let route = plan.traverse?.route ?? new Route(terrain, { points: plan.points, exact: true, areaHazards: [], stations: [{
     id: 'S1', name: 'Layered outcrop', at: worldPosition(outcrop),
     objective: 'Use the Curiosity field reference to identify two beds and collect a sample from each.',
     why: ['Compare rock textures above and below the visible contact.'],
@@ -79,12 +80,12 @@ async function initSurface(plan, scenario, status) {
   route.planName = plan.name;
   route.retracesOutbound = !plan.traverse;
   route.site = plan.site;
-  const visuals = new RouteVisuals(route, terrain);
+  let visuals = new RouteVisuals(route, terrain);
   scene.add(visuals.group);
 
   status('PLACING ROCKS…');
   await nextFrame();
-  const rocks = createRocks(terrain, route);
+  let rocks = createRocks(terrain, route);
   scene.add(rocks);
   const hab = createHabitat(terrain);
   scene.add(hab);
@@ -127,7 +128,30 @@ async function initSurface(plan, scenario, status) {
   status('RENDERING DATA LAYERS…');
   await nextFrame();
   setLayer('optical');
-  planningBoard.connectTraverse(mission);
+  planningBoard.connectTraverse(mission, { terrain, swapRoute });
+
+  // A different path was picked for the leg ahead: rebuild everything drawn from the route.
+  function swapRoute(next) {
+    next.planName = route.planName;
+    next.site = route.site;
+    next.retracesOutbound = route.retracesOutbound;
+    for (const old of [visuals.group, rocks]) {
+      scene.remove(old);
+      old.traverse((o) => { o.geometry?.dispose(); });
+    }
+    route = next;
+    visuals = new RouteVisuals(route, terrain);
+    scene.add(visuals.group);
+    rocks = createRocks(terrain, route);
+    scene.add(rocks);
+    map.route = route;
+    map._buildRoutePath();
+    hud.route = route;
+    document.getElementById('markers').innerHTML = '';
+    hud._buildMarkers();
+    mission.replaceRoute(route);
+    if (window.__isg) window.__isg.route = route;
+  }
   planningBoard.setDeployHandler(({ site, pathId }) => {
     const label = pathId.charAt(0).toUpperCase() + pathId.slice(1);
     route.planName = `${site.name.split('·')[0].trim()} · ${label} to S1`;
@@ -283,7 +307,7 @@ async function initSurface(plan, scenario, status) {
       copilotLook = -rel;
     }
     rover.animate(dt, {
-      speed: mission.speed * (mission.boosting && mission.state === 'drive' ? 3 : 1),
+      speed: mission.speed * (mission.boosting && mission.state === 'drive' ? ROVER.timeBoost : 1),
       throttle: mission.state === 'drive' && (input.throttle || mission.cruise) ? 1 : 0,
       brake: input.brake ? 1 : 0,
       steer: mission.state === 'drive' ? input.steer : 0,
@@ -309,7 +333,7 @@ async function initSurface(plan, scenario, status) {
     sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, 150);
     motes.update(dt, camWorld);
 
-    const simSpeed = mission.speed * (mission.boosting ? 3 : 1);
+    const simSpeed = mission.speed * (mission.boosting ? ROVER.timeBoost : 1);
     if (simSpeed > 0.25) {
       rover.wheelContacts(contacts);
       const n = simSpeed * dt * 9;
