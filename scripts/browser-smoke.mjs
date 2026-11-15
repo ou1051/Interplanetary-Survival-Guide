@@ -200,6 +200,16 @@ try {
   });
   await mobile.getByRole('button', { name: /Turn around and return/ }).click();
   assert.equal(await mobile.evaluate(() => window.__isg.mission.aborted), true);
+  await mobile.evaluate(() => {
+    const { mission, simulate } = window.__isg;
+    for (let i = 0; i < 300 && !mission.atHome; i++) simulate(1, { boost: true });
+  });
+  await mobile.getByRole('button', { name: /End EVA at airlock/ }).click();
+  await mobile.getByRole('button', { name: /Return to mission briefing/i }).click();
+  await mobile.getByLabel('Mission site').selectOption('gale');
+  assert.equal(await mobile.getByRole('button', { name: 'Enter habitat' }).isVisible(), false);
+  await mobile.getByRole('button', { name: /Go outside/ }).click();
+  await mobile.waitForFunction(() => window.__isg?.mission?.state === 'drive');
   assert.deepEqual(errors, [], 'No runtime errors');
   console.log('Browser checks passed for forecasts, field weather, rover driving, station task holds, artifact collection, reboarding and Gale dust return.');
 } finally { await browser.close(); }

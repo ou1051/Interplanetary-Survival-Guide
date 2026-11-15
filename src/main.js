@@ -218,7 +218,12 @@ async function initSurface(plan, scenario, status) {
       if (isNew) newThisEva.push(p.artifact);
       collection.announce(p.artifact, isNew);
     }
-    if (type === 'state' && p.state === 'complete') setTimeout(() => hud.showDebrief(() => location.reload(), debriefSummary()), 1400);
+    if (type === 'state' && p.state === 'complete') {
+      setTimeout(() => hud.showDebrief(() => {
+        history.replaceState({ screen: 'briefing' }, '');
+        location.reload();
+      }, debriefSummary()), 1400);
+    }
     // finished a station with more ahead: the wrist navigator opens on the leg check
     if (type === 'legcheck') planningBoard.toggle(true);
   });
