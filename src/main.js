@@ -22,6 +22,7 @@ import { Hud } from './ui/hud.js';
 import { PlanningBoard } from './ui/planningBoard.js';
 import { mountHabitat } from './ui/habitat.js';
 import { heightGrid, missionHeight, outcrop, worldPosition, sampleMinutes, imagery, observationSource } from './data/galeSite.js';
+import { buildSiteSandboxPlan } from './data/siteDatasets.js';
 import { clamp, damp, smoothstep, wrapAngle, DEG, formatDist } from './core/math.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
@@ -171,13 +172,22 @@ async function initSurface(plan, scenario, status) {
   status('RENDERING DATA LAYERS…');
   await nextFrame();
   setLayer('optical');
-  planningBoard.connectTraverse(mission, { terrain, swapRoute });
+  // Live crew/rover pose in sandbox world metres for the wrist navigator's site map.
+  const getLiveState = () => {
+    const onFoot = mission.state === 'walk';
+    const x = onFoot ? mission.walker.x : mission.rover.x;
+    const z = onFoot ? mission.walker.z : mission.rover.z;
+    const yaw = onFoot ? mission.walker.yaw : mission.rover.heading;
+    return { x, z, hx: -Math.sin(yaw), hz: -Math.cos(yaw), route, s: mission.s, onFoot };
+  };
+  planningBoard.connectTraverse(mission, { terrain, swapRoute, getLiveState });
+  planningBoard.setActiveSite(plan.siteId ?? (plan.traverse ? 'jezero' : 'vrr'), plan.policyId ?? null);
 
   // A different path was picked for the leg ahead: rebuild everything drawn from the route.
   function swapRoute(next) {
-    next.planName = route.planName;
-    next.site = route.site;
-    next.retracesOutbound = route.retracesOutbound;
+    next.planName = next.planName ?? route.planName;
+    next.site = next.site ?? route.site;
+    next.retracesOutbound = next.retracesOutbound ?? route.retracesOutbound;
     for (const old of [visuals.group, rocks]) {
       scene.remove(old);
       old.traverse((o) => { o.geometry?.dispose(); });
@@ -195,14 +205,25 @@ async function initSurface(plan, scenario, status) {
     mission.replaceRoute(route);
     if (window.__isg) window.__isg.route = route;
   }
-  planningBoard.setDeployHandler(({ site, pathId }) => {
+  planningBoard.setDeployHandler(({ site, pathId, selectedPolicyId, path, sandboxPlan }) => {
+    const nextPlan = (path ? buildSiteSandboxPlan(site, path, terrain) : null) || sandboxPlan;
     const label = pathId.charAt(0).toUpperCase() + pathId.slice(1);
-    route.planName = `${site.name.split('·')[0].trim()} · ${label} to S1`;
-    route.site = { ...route.site, name: site.name };
+    const planName = nextPlan?.name ?? `${site.name.split('·')[0].trim()} · ${label} to S1`;
+    if (nextPlan?.traverse?.route) {
+      const nextRoute = nextPlan.traverse.route;
+      nextRoute.planName = planName;
+      nextRoute.site = nextPlan.site ?? { ...route.site, name: site.name };
+      nextRoute.retracesOutbound = false;
+      swapRoute(nextRoute);
+    } else {
+      route.planName = planName;
+      route.site = { ...route.site, name: site.name };
+    }
     const siteEl = document.getElementById('siteName');
     if (siteEl) siteEl.textContent = site.name.toUpperCase();
     // The rover drives freely: only the plan's name and target change, the crew stays where it is.
-    planningBoard.updateField();
+    planningBoard.setActiveSite(site.id, selectedPolicyId ?? nextPlan?.policyId ?? null);
+    planningBoard.updateField(true);
     hud.log(`Survey target updated: ${route.planName}`, 'ok');
   });
   hud.onLayerClick((id) => {

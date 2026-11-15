@@ -447,3 +447,39 @@
 .wd-suit-sliders { display: grid; gap: 6px; margin-top: 8px; }
 .wd-suit-slider { display: grid; gap: 2px; font-size: 0.85em; }
 .wd-suit-slider input[type="range"] { width: 100%; accent-color: var(--signal); }
+
+/* Site Topology tab: fit briefing + map cleanly inside the navigator without page/window scrolling */
+.pb[data-tab="topology"] {
+  padding: clamp(8px, 2vmin, 22px) clamp(10px, 3vw, 44px);
+}
+.pb[data-tab="topology"] .wd {
+  width: min(100%, 1080px);
+}
+.pb[data-tab="topology"] .wd-case {
+  padding: clamp(10px, 1.8vw, 22px) clamp(9px, 2vw, 26px) 14px;
+}
+.pb[data-tab="topology"] .wd-bezel {
+  padding: clamp(8px, 1.4vw, 16px);
+}
+.pb[data-tab="topology"] .wd-screen {
+  height: clamp(360px, calc(100dvh - 185px), 600px);
+  padding: clamp(10px, 1.5vw, 18px);
+}
+.pb[data-tab="topology"] .wd-page {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 2px 2px;
+  overflow: hidden;
+}
+.pb[data-tab="topology"] [data-topology-view] {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+@media (max-width: 650px) {
+  .pb[data-tab="topology"] .wd-screen {
+    height: clamp(320px, calc(100dvh - 150px), 620px);
+  }
+}

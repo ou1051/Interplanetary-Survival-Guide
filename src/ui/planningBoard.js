@@ -26,6 +26,9 @@ export class PlanningBoard {
   constructor(options = {}) {
     this.tab = 'guide';
     this.onDeploy = options.onDeploy || null;
+    this.getLiveState = options.getLiveState || null;
+    this.lockedSiteId = null;
+    this.lockedPolicyId = null;
     this.preset = 'standard';
     this.suit = defaultSuit();
     this.siteMinutes = 60;
@@ -40,6 +43,7 @@ export class PlanningBoard {
     const topoHost = $('[data-topology-host]', this.el);
     this.topology = new SiteTopologyWidget(topoHost, {
       actionLabel: 'Set target',
+      getLiveState: () => (this.getLiveState ? this.getLiveState() : null),
       onDeploy: (selection) => {
         this.toggle(false);
         if (this.onDeploy) this.onDeploy(selection);
@@ -58,10 +62,26 @@ export class PlanningBoard {
     this.onDeploy = fn;
   }
 
-  connectTraverse(mission, { terrain = null, swapRoute = null } = {}) {
+  setActiveSite(siteId, policyId = null) {
+    this.lockedSiteId = siteId || null;
+    this.lockedPolicyId = policyId || null;
+    this._applySiteLock();
+  }
+
+  _applySiteLock() {
+    if (!this.topology || !this.lockedSiteId) return;
+    this.topology.lockToSite(this.lockedSiteId, {
+      policyId: this.lockedPolicyId,
+      actionLabel: 'Apply route · Update target',
+      getLiveState: () => (this.getLiveState ? this.getLiveState() : null),
+    });
+  }
+
+  connectTraverse(mission, { terrain = null, swapRoute = null, getLiveState = null } = {}) {
     this.mission = mission;
     this.terrain = terrain;
     this.swapRoute = swapRoute;
+    this.getLiveState = getLiveState;
     this.relief = new TraverseRelief(mission.route);
   }
 
@@ -175,10 +195,10 @@ export class PlanningBoard {
       <p class="wd-h">Astronaut Suit &amp; Crew Data <span>Verdict: ${p.verdict}</span></p>
       <div class="wd-suit-presets">
         ${SUIT_PRESETS.map(
-          (s) => `<button type="button" class="wd-preset-btn ${this.preset === s.id ? 'on' : ''}" data-preset="${s.id}">
+      (s) => `<button type="button" class="wd-preset-btn ${this.preset === s.id ? 'on' : ''}" data-preset="${s.id}">
             <b>${s.name}</b><small>${s.tagline}</small>
           </button>`
-        ).join('')}
+    ).join('')}
       </div>
       <div class="wd-field-metrics" style="margin-top:8px">
         <div><span>Total Suit Mass</span><b>${p.massKg.toFixed(1)} kg</b></div>
@@ -188,13 +208,13 @@ export class PlanningBoard {
       </div>
       <div class="wd-suit-sliders">
         ${SUIT.materials
-          .map(
-            (m) => `<label class="wd-suit-slider">
+        .map(
+          (m) => `<label class="wd-suit-slider">
               <span>${m.name} (<b>${this.suit[m.id]} ${m.unit}</b>)</span>
               <input type="range" data-suit-mat="${m.id}" min="${m.min}" max="${m.max}" step="${m.step}" value="${this.suit[m.id]}" />
             </label>`
-          )
-          .join('')}
+        )
+        .join('')}
       </div>
     `;
   }
@@ -278,6 +298,7 @@ export class PlanningBoard {
   showTab(tab) {
     if (!this.tabs.includes(tab)) tab = this.tabs[0];
     this.tab = tab;
+    this.el.dataset.tab = tab;
     $('[data-guide]', this.el).hidden = tab !== 'guide';
     $('[data-route-view]', this.el).hidden = tab !== 'map';
     $('[data-leg]', this.el).hidden = tab !== 'leg';
@@ -292,7 +313,11 @@ export class PlanningBoard {
 
     this.updateField(true);
     if (tab === 'leg') this.renderLeg(true);
-    if (tab === 'topology') this.topology._scheduleDraw();
+    if (tab === 'topology') {
+      this._applySiteLock();
+      this.topology.refreshLive();
+      this.topology._scheduleDraw();
+    }
   }
 
   // The leg ahead: which station we stand at, where the leg goes, and its three paths (Delta loop only).
@@ -444,6 +469,7 @@ export class PlanningBoard {
   updateField(force = false) {
     if (!this.mission) return;
     const mission = this.mission;
+    if (this.tab === 'topology') this.topology?.refreshLive();
     // Simulation is paused in the navigator until the crew takes an action.
     if (!force && this.lastFieldTime === mission.met && this.lastFieldState === mission.state) return;
     this.lastFieldTime = mission.met;

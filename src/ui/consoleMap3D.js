@@ -8,7 +8,7 @@
 // the real surface around Vera Rubin Ridge, the assignment area on the globe.
 // ---------------------------------------------------------------------------
 
-const ANCHOR = { lat: -4.714, lon: 137.357 };
+let anchor = { lat: -4.714, lon: 137.357 };
 const MARS_R = 3396190;
 const DEG = 180 / Math.PI;
 const LIFT = 8; // metres above ground for lines and markers, so they sit together
@@ -72,8 +72,8 @@ export async function mountConsoleMap3D(container, { onReady, onError } = {}) {
   let origin = { x: 0, z: 0 };
 
   const toLonLat = (x, z) => [
-    ANCHOR.lon + ((x - origin.x) / (MARS_R * Math.cos(ANCHOR.lat / DEG))) * DEG,
-    ANCHOR.lat - ((z - origin.z) / MARS_R) * DEG,
+    anchor.lon + ((x - origin.x) / (MARS_R * Math.cos(anchor.lat / DEG))) * DEG,
+    anchor.lat - ((z - origin.z) / MARS_R) * DEG,
   ];
   const groundHeight = (lon, lat) => scene.globe.getHeight(C.Cartographic.fromDegrees(lon, lat));
   function frameCamera() {
@@ -148,12 +148,15 @@ export async function mountConsoleMap3D(container, { onReady, onError } = {}) {
     lastPlan = plan;
     const previous = entities;
     entities = [];
+    const nextAnchor = plan.anchor || { lat: -4.714, lon: 137.357 };
+    const anchorChanged = Math.abs(nextAnchor.lat - anchor.lat) > 0.001 || Math.abs(nextAnchor.lon - anchor.lon) > 0.001;
+    anchor = { lat: nextAnchor.lat, lon: nextAnchor.lon };
     const all = plan.lines.flatMap((l) => l.points).concat(plan.markers.map((m) => m.at));
     const xs = all.map((p) => p[0]);
     const zs = all.map((p) => p[1]);
     const newOrigin = { x: (Math.min(...xs) + Math.max(...xs)) / 2, z: (Math.min(...zs) + Math.max(...zs)) / 2 };
     const extent = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs), 120);
-    const reframe = !center || Math.abs(newOrigin.x - origin.x) > 1 || Math.abs(newOrigin.z - origin.z) > 1 || Math.abs(range - extent * 1.9) > 1;
+    const reframe = !center || anchorChanged || Math.abs(newOrigin.x - origin.x) > 1 || Math.abs(newOrigin.z - origin.z) > 1 || Math.abs(range - extent * 1.9) > 1;
     origin = newOrigin;
     center = toLonLat(origin.x, origin.z);
     range = extent * 1.9;

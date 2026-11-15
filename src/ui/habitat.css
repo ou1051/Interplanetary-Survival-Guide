@@ -633,13 +633,37 @@
   box-sizing: border-box;
 }
 #habitat:not(.hab-zoomed).hab-topology-mode .hab-topology-panel {
-  padding: 4px 8px 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+#habitat:not(.hab-zoomed).hab-topology-mode .st-globe-viewport {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 #habitat:not(.hab-zoomed).hab-topology-mode .st-preview-card,
 #habitat:not(.hab-zoomed).hab-topology-mode .st-site-strip,
+#habitat:not(.hab-zoomed).hab-topology-mode .st-briefing-left,
 #habitat:not(.hab-zoomed).hab-topology-mode .st-topo-sidebar,
-#habitat:not(.hab-zoomed).hab-topology-mode .st-topo-legend {
+#habitat:not(.hab-zoomed).hab-topology-mode .st-topo-legend,
+#habitat:not(.hab-zoomed) .hab-scenario-nav {
   display: none;
+}
+#habitat .hab-scenario-nav {
+  display: inline-flex;
+  align-items: center;
+}
+#habitat .hab-scenario-nav select {
+  border: 1px solid var(--ops-line);
+  border-radius: 3px;
+  background: var(--ops-panel);
+  color: var(--ops-text);
+  font: 600 11px var(--ops-font);
+  padding: 5px 8px;
+  min-block-size: 28px;
+  cursor: pointer;
 }
 
 @media (min-width: 801px) {
