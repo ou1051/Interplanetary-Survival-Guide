@@ -46,7 +46,7 @@ async function initSurface(plan, scenario, status) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap; // soft edges via sun.shadow.radius
   viewport.appendChild(renderer.domElement);
 
   const input = new Input(viewport);
@@ -54,16 +54,17 @@ async function initSurface(plan, scenario, status) {
   scene.fog = new THREE.FogExp2(HORIZON.clone(), 0.00042);
   const env = createEnvironment(renderer);
   scene.environment = env;
-  scene.environmentIntensity = 0.55;
+  scene.environmentIntensity = 0.38;
 
-  const hemi = new THREE.HemisphereLight(0xe0b48c, 0x5a3020, 0.75);
+  const hemi = new THREE.HemisphereLight(0xe0b48c, 0x4a2618, 0.42);
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xfff0dc, 2.6);
+  const sun = new THREE.DirectionalLight(0xfff0dc, 3.3);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(4096, 4096);
   const sc = sun.shadow.camera;
-  sc.left = -32; sc.right = 32; sc.top = 32; sc.bottom = -32; sc.near = 1; sc.far = 400;
-  sun.shadow.bias = -0.0003;
+  sc.left = -40; sc.right = 40; sc.top = 40; sc.bottom = -40; sc.near = 1; sc.far = 400;
+  sun.shadow.bias = -0.0002;
+  sun.shadow.radius = 3;
   sun.shadow.normalBias = 0.035;
   scene.add(sun, sun.target);
 
