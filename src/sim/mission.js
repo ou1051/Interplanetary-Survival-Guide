@@ -35,12 +35,14 @@ function hiddenSurprises(route, random) {
     };
   });
 }
-const BOOST = 3;
+const BOOST = ROVER.timeBoost ?? 3;
 
 export class Mission {
   constructor(route, terrain, habAntenna, { random = Math.random, surprises = true, legCheck = true } = {}) {
     this.route = route;
     this.legCheck = legCheck;
+    this.random = random;
+    this.surprisesOn = surprises;
     // This drive's stops: the planned ones plus whatever the unsurveyed ground hides (not on any map).
     this.stops = [...(route.stops ?? []), ...(surprises ? hiddenSurprises(route, random) : [])].sort((a, b) => a.s - b.s);
     this.terrain = terrain;
@@ -64,6 +66,8 @@ export class Mission {
     this.limitReason = '';
     this.governed = false;
     this.boosting = false;
+    this.boostCharge = 1; // 0–1; drains while Shift is held, refills slowly
+    this.boostBlocked = ''; // why Shift does nothing right now
     this.offRoute = false;
     this.taskFlash = null;
     this._zoneIds = new Set();
@@ -165,6 +169,28 @@ export class Mission {
     return false;
   }
 
+  // Take over a new route while parked at a station (a different path for the leg ahead).
+  // Everything behind the rover is identical, so its position, finished work and time carry over.
+  replaceRoute(route) {
+    const here = this.nextStop;
+    for (const station of route.stations) {
+      const before = this.route.stations.find((old) => old.id === station.id);
+      if (!before) continue;
+      station.done = before.done;
+      station.skipped = before.skipped;
+      station.tasks.forEach((task, i) => Object.assign(task, {
+        done: before.tasks[i]?.done ?? false, skipped: before.tasks[i]?.skipped, progress: before.tasks[i]?.progress ?? 0,
+      }));
+    }
+    this.route = route;
+    const ahead = route.stops.filter((stop) => stop.s > this.s + 0.5 && !stop.ref.skipped);
+    const hidden = this.surprisesOn ? hiddenSurprises(route, this.random).filter((stop) => stop.s > this.s + 0.5) : [];
+    const current = route.stops.find((stop) => stop.kind === 'station' && stop.ref.id === here?.ref.id) ?? here;
+    this.stops = [current, ...[...ahead, ...hidden].sort((a, b) => a.s - b.s)].filter(Boolean);
+    this.stopIndex = 0;
+    this._zoneIds = new Set();
+  }
+
   // Apply the leg the crew picked at a station (see sim/legCheck.js), then drive on.
   //   continue: full tasks at the next station · quick: first task only
   //   skip: drive past the next station · home: no more stations
@@ -212,7 +238,15 @@ export class Mission {
 
   _drive(dt, input, pitchDeg) {
     const R = this.route;
-    this.boosting = input.boost;
+    // Shift speeds up time, but only on easy ground and only for a short while
+    const marked = R.zonesAt(this.s + 3).length > 0;
+    const stopNear = this.nextStop && this.nextStop.s - this.s < 25;
+    const empty = this.boostCharge <= 0.02 || (this._boostEmpty && this.boostCharge < 0.3);
+    this._boostEmpty = empty;
+    this.boostBlocked = !input.boost ? '' : marked ? 'HAZARD STRETCH' : stopNear ? 'STOP AHEAD' : empty ? 'RECHARGING' : '';
+    this.boosting = input.boost && !this.boostBlocked;
+    if (this.boosting) this.boostCharge = Math.max(0, this.boostCharge - dt / ROVER.boostSeconds);
+    else this.boostCharge = Math.min(1, this.boostCharge + dt / ROVER.boostRechargeSeconds);
     const k = this.boosting ? BOOST : 1;
     const sdt = dt * k;
     const throttle = !this.dustWarning && (input.throttle || this.cruise);

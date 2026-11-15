@@ -419,21 +419,28 @@
 .station-observation { display:block; color:var(--hud); font-size:11px; margin-top:8px; }
 .station-observation img { display:block; width:100%; max-height:70px; object-fit:cover; }
 
-/* Leg check: choose how to do the next leg; options that fail a check are locked */
-.wd-legs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; }
-.wd-screen .wd-legs button { display: block; text-align: left; border: 1px solid var(--trace); padding: 5px 7px; line-height: 1.25; }
-.wd-screen .wd-legs button b { display: block; }
-.wd-screen .wd-legs button span { display: block; color: var(--dim); font-size: .85em; }
-.wd-screen .wd-legs button small { display: block; font-size: .8em; margin-top: 2px; }
-.wd-screen .wd-legs button[aria-checked="true"] { border-color: var(--phosphor); box-shadow: inset 0 0 0 1px var(--phosphor); background: #a4f67c14; }
-.wd-screen .wd-legs button.is-locked { opacity: .55; border-style: dashed; }
-.wd-screen .wd-legs button.is-locked small { color: #ffb36b; }
-.wd-checks { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 12px; }
-.wd-checks li { display: grid; grid-template-columns: 1.1em auto 1fr; gap: 0 5px; align-items: baseline; font-size: .86em; }
-.wd-checks li span { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wd-checks li i { font-style: normal; }
-.wd-checks li small { grid-column: 2 / -1; color: var(--dim); font-size: .82em; }
-.wd-checks li.fail, .wd-checks li.fail i { color: #ffb36b; }
+/* Next leg: map of the three paths, path cards, plan buttons, one-line verdict, check chips */
+.wd-legmap canvas { display: block; width: 100%; height: auto; border: 1px solid var(--trace); background: #0a190e; margin-bottom: 5px; }
+.wd-page [data-leg] .wd-h { margin-bottom: 4px; }
+.wd-paths { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 6px; }
+.wd-screen .wd-paths button { position: relative; text-align: left; border: 1px solid var(--trace); border-top: 3px solid var(--path); padding: 3px 6px; line-height: 1.2; }
+.wd-screen .wd-paths button b { display: block; color: var(--path); }
+.wd-screen .wd-paths button span, .wd-screen .wd-paths button small { display: block; font-size: .82em; color: var(--dim); }
+.wd-screen .wd-paths button em { position: absolute; top: 4px; right: 6px; font-style: normal; font-size: .72em; padding: 0 4px; border: 1px solid currentColor; }
+.wd-paths .lvl-easy { color: #8ff07a; }
+.wd-paths .lvl-moderate { color: #ffd36b; }
+.wd-paths .lvl-hard { color: #ff8a6b; }
+.wd-screen .wd-paths button[aria-checked="true"] { box-shadow: inset 0 0 0 1px var(--path); background: #a4f67c10; }
+.wd-plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin-bottom: 6px; }
+.wd-screen .wd-plans button { border: 1px solid var(--trace); padding: 4px 2px; text-align: center; font-size: .9em; }
+.wd-screen .wd-plans button[aria-checked="true"] { border-color: var(--phosphor); background: var(--phosphor); color: var(--tube); text-shadow: none; }
+.wd-screen .wd-plans button.is-locked { opacity: .5; border-style: dashed; }
+.wd-screen .wd-plans button.is-locked[aria-checked="true"] { background: #ffb36b; border-color: #ffb36b; }
+.wd-legstatus { margin: 0 0 4px; font-weight: 700; }
+.wd-legstatus.fail { color: #ffb36b; }
+.wd-chips { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.wd-chips li { border: 1px solid var(--trace); padding: 0 6px; font-size: .82em; }
+.wd-chips li.fail { color: #ffb36b; border-color: #ffb36b; }
 .wd-screen .wd-confirm { display: block; width: 100%; text-align: center; }
 .wd-screen .wd-confirm:disabled { opacity: .45; cursor: not-allowed; }
 .wd-screen .wd-confirm:disabled:hover { background: none; color: inherit; }

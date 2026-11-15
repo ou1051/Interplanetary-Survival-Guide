@@ -39,15 +39,19 @@ const clock = (minutes) => {
 };
 
 // What each option would cost, given where the crew stands now.
-function plan(mission, { target, work, label, id, detail }) {
+// `path` (optional): the path picked for the leg to the next station ({ minutes, distance }); it
+// replaces that stretch of the current route in every estimate.
+function plan(mission, { target, work, label, short, id, detail, next, path }) {
   const { route, s } = mission;
   const now = mission.lmst;
-  const legDrive = target ? driveMinutes(route, s, target.s) : 0;
-  const homeDrive = driveMinutes(route, target ? target.s : s, route.length);
+  const firstLeg = next ? (path ? path.minutes : driveMinutes(route, s, next.s)) : 0;
+  const fromNext = (to) => (next ? driveMinutes(route, next.s, to) : driveMinutes(route, s, to));
+  const legDrive = target ? firstLeg + fromNext(target.s) : 0;
+  const homeDrive = target ? driveMinutes(route, target.s, route.length) : firstLeg + fromNext(route.length);
   const drive = legDrive + homeDrive;
   const oxygen = consumptionEstimate((drive) * 60).oxygenMinutes
     + consumptionEstimate((work + ingressMinutes) * 60, { work: true }).oxygenMinutes;
-  const distance = route.length - s;
+  const distance = route.length - s + (path && next ? path.distance - (next.s - s) : 0);
   const hours = (drive + work + ingressMinutes) / 60;
   const batteryWh = consumptionEstimate(hours * 3600, { moving: distance }).batteryWh;
   const backAt = now + drive + work;
@@ -90,7 +94,7 @@ function plan(mission, { target, work, label, id, detail }) {
   ];
   const failed = checks.filter((check) => !check.ok);
   return {
-    id, label, detail, target, quick: id === 'quick',
+    id, label, short, detail, target, quick: id === 'quick',
     minutes: Math.round(drive + work), legMinutes: Math.round(legDrive + work), backAt: clock(backAt),
     checks, allowed: id === 'home' || failed.length === 0,
     reason: id === 'home' && failed.length ? 'Always allowed: getting home comes first'
@@ -98,17 +102,17 @@ function plan(mission, { target, work, label, id, detail }) {
   };
 }
 
-export function legOptions(mission) {
+export function legOptions(mission, path = null) {
   const remaining = mission.route.stations.filter((station) => !station.final && !station.done && !station.skipped
     && station !== mission.currentStation);
   const [next, after] = remaining;
   const options = [];
   if (next) {
-    options.push(plan(mission, { id: 'continue', label: `Continue to ${next.id}`, detail: `${next.name} · all ${next.tasks.length} tasks`, target: next, work: workMinutes(next) }));
-    if (next.tasks.length > 1) options.push(plan(mission, { id: 'quick', label: `Quick stop at ${next.id}`, detail: `${next.tasks[0].label} only`, target: next, work: workMinutes(next, true) }));
-    if (after) options.push(plan(mission, { id: 'skip', label: `Skip ${next.id} → ${after.id}`, detail: `Drive past ${next.name} to ${after.name}`, target: after, work: workMinutes(after) }));
+    options.push(plan(mission, { id: 'continue', label: `Full stop at ${next.id}`, short: 'Full stop', detail: `All ${next.tasks.length} tasks`, target: next, next, path, work: workMinutes(next) }));
+    if (next.tasks.length > 1) options.push(plan(mission, { id: 'quick', label: `Quick stop at ${next.id}`, short: 'Quick stop', detail: next.tasks[0].label, target: next, next, path, work: workMinutes(next, true) }));
+    if (after) options.push(plan(mission, { id: 'skip', label: `Skip ${next.id}`, short: `Skip ${next.id}`, detail: `On to ${after.id}`, target: after, next, path, work: workMinutes(after) }));
   }
-  options.push(plan(mission, { id: 'home', label: 'Head home now', detail: 'Drive the rest of the loop with no more stops', target: null, work: 0 }));
+  options.push(plan(mission, { id: 'home', label: 'Head home now', short: 'Go home', detail: 'No more stops', target: null, next, path, work: 0 }));
   return {
     now: clock(mission.lmst),
     temperature: Math.round(temperatureAt(mission.lmst)),

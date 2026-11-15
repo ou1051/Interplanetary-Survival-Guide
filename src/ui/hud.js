@@ -399,9 +399,12 @@ export class Hud {
     const el = $('prompt');
     let html = '';
     if (M.state === 'drive') {
-      if (M.cruise) html = `CRUISE ON · <kbd>S</kbd> to cancel${M.boosting ? ' · TIME ×3' : ''}`;
+      const charge = `${Math.round(M.boostCharge * 100)}%`;
+      const boost = M.boosting ? `TIME ×${ROVER.timeBoost} · BOOST ${charge}`
+        : M.boostBlocked ? `<span class="boost-off">⇧ BOOST OFF · ${M.boostBlocked}${M.boostBlocked === 'RECHARGING' ? ` ${charge}` : ''}</span>` : '';
+      if (M.cruise) html = `CRUISE ON · <kbd>S</kbd> to cancel${boost ? ` · ${boost}` : ''}`;
       else if (M.speed < 0.15 && !this.input.throttle) html = `<span class="pulse">HOLD <kbd>W</kbd> TO DRIVE THE SURVIVAL ROUTE</span>`;
-      else if (M.boosting) html = 'TIME ×3';
+      else if (boost) html = boost;
     } else if (M.state === 'gate') html = `<span class="pulse">HAZARD BRIEFING — PRESS <kbd>ENTER</kbd> TO ACKNOWLEDGE</span>`;
     else if (M.state === 'station') {
       const t = M.nextStop.ref.tasks.find((x) => !x.done && !x.skipped);
