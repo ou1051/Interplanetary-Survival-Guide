@@ -1,0 +1,17 @@
+{
+  "width": 1024,
+  "height": 1024,
+  "extent": 1600.0,
+  "mPerPx": 1.5625,
+  "minElev": 0.0,
+  "maxElev": 288.14208984375,
+  "source": "mars_dem.tif",
+  "bounds": {
+    "west": 4579400.0,
+    "east": 4581000.0,
+    "north": 1099300.0,
+    "south": 1097700.0
+  },
+  "crs": "PROJCS[\"Equirectangular Mars 2000 Sphere IAU\",GEOGCS[\"D_Mars_2000_Sphere\",DATUM[\"Mars_2000_(Sphere)\",SPHEROID[\"Mars_2000_Sphere_IAU\",3396190,0],AUTHORITY[\"ESRI\",\"106971\"]],PRIMEM[\"Reference_Meridian\",0],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]]],PROJECTION[\"Equirectangular\"],PARAMETER[\"standard_parallel_1\",0],PARAMETER[\"central_meridian\",0],PARAMETER[\"false_easting\",0],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH]]",
+  "layers": {}
+}
