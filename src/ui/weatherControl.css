@@ -33,7 +33,10 @@ button.weather-control { cursor: pointer; }
 button.weather-control:hover { border-color: var(--weather-accent); }
 button.weather-control:focus-visible { outline: 2px solid var(--weather-accent); outline-offset: 3px; }
 .map-weather { max-inline-size: 100%; margin-block-start: 5px; }
-@media (max-width: 600px) {
-  .field-controls { max-inline-size: calc(100% - 20px); right: 10px; bottom: 10px; }
-  .field-controls .ghost { padding-inline: 8px; }
+@media (max-width: 760px) {
+  #hud .field-controls { max-inline-size: calc(100% - 20px); inset: 164px 10px auto auto; }
+  .field-controls .ghost { background: #101e24; padding-inline: 8px; }
+}
+@media (pointer: coarse) {
+  #hud .field-alert { bottom: 220px; margin: 0; pointer-events: none; }
 }

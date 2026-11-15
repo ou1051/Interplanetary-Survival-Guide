@@ -229,7 +229,7 @@ async function initSurface(plan, scenario, status) {
   input.pressed.clear();
   const fieldAlert = document.getElementById('fieldAlert');
   const dustAt = route.length * 0.29;
-  let lastWeather, lastFront;
+  let lastWeather;
 
   // debug / automated testing hook: advance the simulation with a fixed step
   const simulate = (seconds, o = {}) => {
@@ -280,14 +280,11 @@ async function initSurface(plan, scenario, status) {
     const weather = mission.weather;
     scene.fog.density = weather.fogDensity;
     if (planningBoard.open) planningBoard.updateField();
-    const frontAhead = mission.activeFront && mission.s < mission.activeFront.to;
-    if (weather !== lastWeather || frontAhead !== lastFront || mission.state === 'complete') {
-      if (weather !== lastWeather || frontAhead !== lastFront) {
-        const dustAhead = frontAhead && weather.label === 'Clear';
-        const tone = weather.limitsVisibility || dustAhead ? 'dust' : Number.isFinite(weather.exposureMinutes) ? 'cold' : 'clear';
+    if (weather !== lastWeather || mission.state === 'complete') {
+      if (weather !== lastWeather) {
+        const tone = weather.limitsVisibility ? 'dust' : Number.isFinite(weather.exposureMinutes) ? 'cold' : 'clear';
         for (const button of weatherButtons) button.dataset.tone = tone;
-        document.getElementById('fieldWeather').textContent = dustAhead ? 'Dust ahead' : weather.label;
-        lastFront = frontAhead;
+        document.getElementById('fieldWeather').textContent = weather.label;
       }
       let message = '';
       if (mission.state !== 'complete' && weather.label !== 'Clear') {

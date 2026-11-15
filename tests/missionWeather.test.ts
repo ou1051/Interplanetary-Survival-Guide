@@ -77,17 +77,21 @@ describe('variable mission weather', () => {
     expect(durations[2]).toBeGreaterThan(10 * 60);
   });
 
-  it('advances at stations and coalesces long work intervals into one transition', () => {
+  it('follows the same weather timeline during long station work and short driving updates', () => {
     const m = mission();
+    const drivingMission = mission();
     const messages: string[] = [];
     m.on((type, p) => { if (type === 'log') messages.push(p.text); });
     m.start();
+    drivingMission.start();
     m.state = 'stationDone';
     m.update(15, parked, 0);
     expect(m.weather.label).toBe('Dust gust');
     const before = messages.length;
     m._consume(3600, { work: true });
-    expect(m.weather.label).toBe('Clear');
+    for (let t = 0; t < m.met; t++) drivingMission.update(1, parked, 0);
+    expect(m.weather).toBe(drivingMission.weather);
+    expect(m._weatherAt).toBe(drivingMission._weatherAt);
     expect(messages.length - before).toBe(1);
   });
 

@@ -711,3 +711,21 @@
     gap: 0;
   }
 }
+
+#habitat .hab-cabin-weather { margin-block: 14px; min-inline-size: 0; }
+#habitat .hab-cabin-weather > summary {
+  position: relative; inline-size: 100%; min-block-size: 76px; padding: 12px 30px 12px 10px;
+  align-items: start; cursor: pointer; list-style: none;
+}
+#habitat .hab-cabin-weather > summary::-webkit-details-marker { display: none; }
+#habitat .hab-cabin-weather[open] > summary::after { transform: rotate(225deg); }
+#habitat .hab-cabin-weather > summary:focus-visible,
+#habitat .hab-rehearsal-settings > summary:focus-visible { outline: 2px solid #9af4ff; outline-offset: 3px; }
+#habitat .hab-cabin-weather .weather-reading { min-inline-size: 0; gap: 5px; overflow-wrap: anywhere; }
+#habitat .hab-cabin-weather .weather-reading strong { font-size: 13px; line-height: 1.4; }
+#habitat .hab-cabin-weather .weather-reading > span { color: #c7d4df; font-size: 12px; line-height: 1.5; font-weight: 400; }
+#habitat .hab-forecast-details { padding: 8px 12px; border: 1px solid #52666b; border-block-start: 0; }
+#habitat .hab-forecast-details p, #habitat .hab-rehearsal-settings p { margin-block: 8px; font-size: 12px; line-height: 1.6; }
+#habitat .hab-rehearsal-settings { margin-block: 14px; }
+#habitat .hab-rehearsal-settings > summary { min-block-size: 36px; padding-block: 8px; color: #a8bcc4; cursor: pointer; font-size: 12px; }
+#habitat .hab-rehearsal-settings .hab-scenario { margin-block-start: 8px; }

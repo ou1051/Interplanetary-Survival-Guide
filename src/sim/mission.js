@@ -348,13 +348,14 @@ export class Mission {
     this.dose += LIFE_SUPPORT.doseRateUsvH * (seconds / 3600);
     this.batteryWh = Math.max(0, this.batteryWh - consumed.batteryWh);
     if (!this.dustWarning && this.met >= this._weatherAt) {
-      const clearing = this._weather !== CLEAR_WEATHER;
-      this._weather = clearing ? CLEAR_WEATHER : PASSING_WEATHER[Math.floor(this.random() * PASSING_WEATHER.length)];
-      // Work can jump the clock by minutes; report the current transition once, then reschedule.
-      const longEvent = !clearing && this._weather !== PASSING_WEATHER[0];
-      const duration = clearing ? 45 + this.random() * 45
-        : longEvent ? 12 * 60 + this.random() * 8 * 60 : 25 + this.random() * 15;
-      this._weatherAt = this.met + duration;
+      // A long science task crosses the same weather events as driving minute by minute.
+      do {
+        this._weather = this._weather === CLEAR_WEATHER
+          ? PASSING_WEATHER[Math.floor(this.random() * PASSING_WEATHER.length)] : CLEAR_WEATHER;
+        this._weatherAt += this._weather === CLEAR_WEATHER ? 45 + this.random() * 45
+          : this._weather === PASSING_WEATHER[0] ? 25 + this.random() * 15 : 12 * 60 + this.random() * 8 * 60;
+      } while (this.met >= this._weatherAt);
+      const clearing = this._weather === CLEAR_WEATHER;
       this.emit('log', {
         text: clearing ? 'Weather cleared · normal operations resumed'
           : Number.isFinite(this._weather.exposureMinutes) ? `Cold spell · outside work limited to ${this._weather.exposureMinutes} min`

@@ -14,7 +14,7 @@ export function mapWeatherLabel(weather, front, obstacles) {
   const condition = Number.isFinite(weather.exposureMinutes) ? `${weather.exposureMinutes} min outdoor limit`
     : `${weather.limitsVisibility ? 'visibility ring' : 'visibility'} ≈ ${formatDist(weather.visibilityM)}`;
   const latest = obstacles?.at(-1);
-  return [`Simulated weather · ${weather.label} · ${condition}`,
+  return [`Weather now · ${weather.label} · ${condition}`,
     front && `Dust front · amber route ${Math.round(front.from)}–${Math.round(front.to)} m`,
     latest && `Mast camera · ${latest.ref.type.toLowerCase()} at ${Math.round(latest.s)} m`,
   ].filter(Boolean).join(' · ');

@@ -3,6 +3,7 @@ import { makeDeltaOverview } from './deltaOverview.js';
 import { AREA_HAZARDS } from '../config/mission.js';
 import { Mission } from '../sim/mission.js';
 import { forecastReturn } from '../sim/legCheck.js';
+import { CLEAR_WEATHER, SHORTCUT_FRONT } from '../sim/weather.js';
 import { ICON } from '../map/icons.ts';
 import { mountHabitatRoom } from './habitatRoom.js';
 import { mountHabitatExterior } from './habitatExterior.js';
@@ -95,6 +96,20 @@ export function mountHabitat(root, launch) {
             <label class="hab-scenario">Mission site
               <select data-site-select><option value="delta">Original Delta Traverse</option><option value="gale"${plans.length ? '' : ' disabled'}>Gale Crater · Vera Rubin Ridge</option></select>
             </label>
+            <details class="hab-cabin-weather" data-cabin-weather>
+              <summary class="weather-control" data-tone="variable">
+                <span class="weather-symbol" aria-hidden="true">${ICON.wind}</span>
+                <span class="weather-reading"><small>Departure forecast · simulated</small>
+                  <strong data-cabin-conditions></strong><span data-cabin-outlook></span>
+                </span>
+              </summary>
+              <div class="hab-forecast-details">
+                <p data-cabin-visibility></p>
+                <p><b>Outdoor work:</b> cold spells reduce the work window to 10 minutes. Short readings may fit; longer tasks may need a wait.</p>
+                <p><b>Return reserve:</b> keep 30 minutes of oxygen and 10% rover battery. Route estimates include work and habitat ingress; return by twilight.</p>
+                <p>Plan here, then adapt in the field. Gusts and cold spells can develop after launch; their timing is uncertain. Check your wrist map as conditions change.</p>
+              </div>
+            </details>
             <section data-delta-brief>
               <h3 class="hab-objective">Original Delta Traverse</h3>
               <p data-delta-summary></p>
@@ -132,16 +147,17 @@ export function mountHabitat(root, launch) {
             </div>
             <p class="hab-reason" data-reason></p>
             </div>
-            <label class="hab-scenario">Simulation conditions
-              <span class="weather-control" data-tone="variable">
-                <span class="weather-symbol" aria-hidden="true">${ICON.wind}</span>
+            <details class="hab-rehearsal-settings" data-rehearsal-settings>
+              <summary>Rehearsal settings</summary>
+              <label class="hab-scenario">Simulation conditions
                 <select data-scenario>
                   <option value="variable">Variable weather</option>
                   <option value="clear">Nominal conditions</option>
                   <option value="dust" data-gale-only>Dust front ahead</option>
                 </select>
-              </span>
-            </label>
+              </label>
+              <p>Choose a training mode before launch. Variable weather is the default; nominal conditions stay clear, and the dust-front exercise practices an early return.</p>
+            </details>
             <button type="button" data-launch class="hab-launch">Go outside <span>→</span></button>
             <p class="hab-note" data-status role="status">Oxygen and weather are simulated.</p>
           </section>
@@ -277,7 +293,22 @@ export function mountHabitat(root, launch) {
     }
     const conditions = query('[data-scenario]');
     if (delta && conditions.value === 'dust') conditions.value = 'variable';
-    conditions.closest('.weather-control').dataset.tone = conditions.value;
+    const nominal = conditions.value === 'clear';
+    const dustExercise = conditions.value === 'dust';
+    const cabin = query('[data-cabin-weather]');
+    cabin.querySelector('summary').dataset.tone = dustExercise ? 'dust' : nominal ? 'clear' : 'variable';
+    query('[data-cabin-conditions]').textContent = `${dustExercise ? 'Dust-front rehearsal' : 'Clear at habitat'} · ${delta ? 'Delta Front' : 'Gale Crater'}`;
+    query('[data-cabin-outlook]').textContent = nominal ? 'Nominal rehearsal · clear conditions held for this run.'
+      : dustExercise ? 'Practice an early return when the simulated front arrives.'
+        : delta ? (!approachChoice || approachChoice.id === 'shortest'
+          ? 'Shortcut dust may ease in 6–10 min; later gusts and cold spells are uncertain.'
+          : `${approachChoice.label} approach avoids forecast dust; later gusts and cold spells are uncertain.`)
+          : `${routeName(selected.id)} route · gusts or cold spells possible; timing uncertain.`;
+    query('[data-cabin-visibility]').textContent = dustExercise
+      ? 'Visibility: starts clear, then falls in the scripted dust-front exercise. Prepare to return on the same track.'
+      : `Visibility: about ${(CLEAR_WEATHER.visibilityM / 1000).toFixed(1)} km at departure.` + (!nominal && delta && (!approachChoice || approachChoice.id === 'shortest')
+        ? ` Dust over the shortcut may reduce this to about ${Math.round(SHORTCUT_FRONT.visibilityM)} m and slow the rover; mapped approaches avoid that stretch.`
+        : !nominal ? ' Dust gusts may reduce visibility later; follow the reduced speed limit.' : ' No weather events in this nominal rehearsal.');
     const variable = conditions.value === 'variable';
     query('[data-departure-weather]').hidden = !delta || !s1Focused || !variable;
     query('[data-delta-brief]').hidden = !delta;
@@ -328,7 +359,7 @@ export function mountHabitat(root, launch) {
         const span = shortcut.traverse.route.weatherExposure;
         const preview = new Mission(shortcut.traverse.route, shortcut.traverse.terrain, {}, { surprises: false, frontSeconds });
         const weather = preview.weatherAt((span.from + span.to) / 2, 0);
-        query('[data-weather-forecast]').textContent = `Dust forecast on the amber shortcut stretch, ${fmt(span.from)}–${fmt(span.to)} m from habitat. Clears in ${(frontSeconds / 60).toFixed(1)} min. Visibility ≈ ${Math.round(weather.visibilityM)} m; speed ≤ ${(weather.speedLimit * 3.6).toFixed(1)} km/h while inside. Mapped routes avoid this stretch. Unsurveyed obstacles remain unknown.`;
+        query('[data-weather-forecast]').textContent = `Dust forecast on the amber shortcut stretch, ${fmt(span.from)}–${fmt(span.to)} m from habitat. Expected to ease in 6–10 min; timing remains uncertain. Visibility ≈ ${Math.round(weather.visibilityM)} m; speed ≤ ${(weather.speedLimit * 3.6).toFixed(1)} km/h while inside. Mapped routes avoid this stretch. Unsurveyed obstacles remain unknown.`;
         query('[data-wait-label]').textContent = `Wait ${(frontSeconds / 60).toFixed(1)} min, then shortcut`;
         query('[data-weather-proceed]').textContent = summary(forecast(shortcut));
         query('[data-weather-wait]').textContent = summary(forecast(shortcut, frontSeconds));

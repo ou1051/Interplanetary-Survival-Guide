@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mountHabitat } from '../src/ui/habitat.js';
+import { Mission } from '../src/sim/mission.js';
 
 vi.mock('../src/ui/habitatRoom.js', () => ({ mountHabitatRoom: () => null }));
 vi.mock('../src/ui/habitatExterior.js', () => ({ mountHabitatExterior: () => null }));
@@ -10,7 +11,7 @@ vi.mock('../src/ui/deltaOverview.js', () => ({ makeDeltaOverview: () => ({ draw:
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); document.body.innerHTML = ''; });
 
-function setup() {
+function setup(focusS1 = true) {
   vi.stubGlobal('matchMedia', () => ({ matches: true }));
   vi.stubGlobal('Path2D', class { moveTo() {} lineTo() {} });
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(new Proxy({}, {
@@ -21,7 +22,7 @@ function setup() {
   const launch = vi.fn().mockResolvedValue(undefined);
   mountHabitat(root, launch);
   const click = (selector: string) => root.querySelector<HTMLButtonElement>(selector)!.click();
-  click('[data-s1]');
+  if (focusS1) click('[data-s1]');
   return { root, launch, click };
 }
 
@@ -56,4 +57,44 @@ describe('habitat weather departure decision', () => {
     expect(launch.mock.calls[0][0].frontSeconds).toBe(0);
     expect(launch.mock.calls[0][0].departureWaitSeconds).toBe(0);
   });
+
+  it('shows an informative uncertain departure forecast before choosing S1', () => {
+    const { root } = setup(false);
+    const details = root.querySelector<HTMLDetailsElement>('[data-cabin-weather]')!;
+    expect(details.open).toBe(false);
+    expect(details.closest('[data-s1-picker]')).toBeNull();
+    expect(details.querySelector('summary')!.textContent).toMatch(/Departure forecast.*Clear at habitat.*6–10 min.*uncertain/s);
+    expect(details.textContent).toMatch(/visibility.*work.*reserve/is);
+    expect(root.querySelector<HTMLDetailsElement>('[data-rehearsal-settings]')!.open).toBe(false);
+  });
+
+  it('updates the read-only forecast for the site, approach and deliberate training mode', () => {
+    const { root, click } = setup();
+    click('[data-departure="detour"]');
+    expect(root.querySelector('[data-cabin-outlook]')!.textContent).toContain('avoids');
+    const site = root.querySelector<HTMLSelectElement>('[data-site-select]')!;
+    site.value = 'gale'; site.dispatchEvent(new Event('change'));
+    expect(root.querySelector('[data-cabin-conditions]')!.textContent).toContain('Gale');
+    expect(root.querySelector('[data-cabin-outlook]')!.textContent).toContain('uncertain');
+    const scenario = root.querySelector<HTMLSelectElement>('[data-scenario]')!;
+    scenario.value = 'dust'; scenario.dispatchEvent(new Event('change'));
+    expect(root.querySelector('[data-cabin-conditions]')!.textContent).toContain('Dust-front rehearsal');
+    scenario.value = 'clear'; scenario.dispatchEvent(new Event('change'));
+    expect(root.querySelector('[data-cabin-outlook]')!.textContent).toContain('Nominal');
+    expect(root.querySelector('[data-cabin-outlook]')!.textContent).not.toContain('6–10');
+  });
+
+  it('opening forecast details does not change the training mode, wait or simulation', () => {
+    const wait = vi.spyOn(Mission.prototype, 'waitForWeather');
+    const start = vi.spyOn(Mission.prototype, 'start');
+    const { root, launch } = setup(false);
+    wait.mockClear(); start.mockClear();
+    root.querySelector<HTMLElement>('[data-cabin-weather] summary')!.click();
+    expect(root.querySelector<HTMLDetailsElement>('[data-cabin-weather]')!.open).toBe(true);
+    expect(root.querySelector<HTMLSelectElement>('[data-scenario]')!.value).toBe('variable');
+    expect(wait).not.toHaveBeenCalled(); expect(start).not.toHaveBeenCalled();
+    expect(launch).not.toHaveBeenCalled();
+    expect(root.querySelector('[data-departure="wait"]')!.getAttribute('aria-pressed')).not.toBe('true');
+  });
+
 });
