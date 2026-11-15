@@ -85,7 +85,7 @@ export function createRocks(terrain, route) {
     place(255 + Math.cos(a) * rr, -675 + Math.sin(a) * rr, 0.25 + r() ** 2.5 * 1.9);
   }
   // 2b) Unsurveyed ground: obstacles the coarse map could not show (boulders, small blocks).
-  for (const hz of route.zones?.filter((z) => z.unsurveyed) ?? []) {
+  for (const hz of (route.areaHazards ?? route.zones ?? []).filter((z) => z.unsurveyed)) {
     for (let i = 0; i < 420; i++) {
       const a = r() * Math.PI * 2;
       const rr = hz.radius * Math.sqrt(r()) * 1.15;

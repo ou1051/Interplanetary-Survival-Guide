@@ -179,3 +179,16 @@ export function createSeatedAstronaut(mats, { seatX, upperBody = true }) {
   group.add(toThree(root, mats, new Map()));
   return { group, head: helmet ? helmet.object : null };
 }
+
+/**
+ * The suit as a three.js object in any pose buildSuitGraph() accepts. Every graph node keeps its
+ * three.js object as `node.object`, so the joints in `graph.parts` can be posed afterwards.
+ * Frame as in suitGeometry.js: the figure faces +Z, feet near y = 0.
+ * @param {Record<string, THREE.Material>} mats from createSuitMaterials()
+ * @param {Parameters<typeof buildSuitGraph>[0]} [options]
+ */
+export function createSuitObject(mats, options = {}) {
+  const graph = buildSuitGraph(options);
+  const object = toThree(graph.root, mats, new Map());
+  return { object, graph };
+}

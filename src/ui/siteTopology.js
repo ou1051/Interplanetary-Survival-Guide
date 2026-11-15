@@ -1,5 +1,6 @@
 import './siteTopology.css';
 import { createMarsGlobeRenderer, GLOBE_PAD } from './marsGlobeGL.js';
+import { siteAssetUrl, loadTopographyGrid } from './siteAssets.js';
 
 // ---------------------------------------------------------------------------
 // Site Topology Module:
@@ -193,8 +194,7 @@ export class SiteTopologyWidget {
   }
 
   _loadAssets() {
-    fetch('./jezero/topography_grid.json')
-      .then((r) => (r.ok ? r.json() : null))
+    loadTopographyGrid()
       .then((data) => {
         if (data) {
           this.gridData = data;
@@ -220,11 +220,11 @@ export class SiteTopologyWidget {
         this.marsTex = null; // keep the painted fallback
       }
     };
-    marsImg.src = './mars/mars_color_2048.jpg';
+    marsImg.src = siteAssetUrl('./mars/mars_color_2048.jpg');
 
     // 3D relief-lit globe (WebGL). Until it is ready, or without WebGL, the 2D render is used.
     this.marsGL = null;
-    createMarsGlobeRenderer({ color: './mars/mars_color_2048.jpg', height: './mars/mars_mola_height_2048.png' })
+    createMarsGlobeRenderer({ color: siteAssetUrl('./mars/mars_color_2048.jpg'), height: siteAssetUrl('./mars/mars_mola_height_2048.png') })
       .then((r) => {
         this.marsGL = r;
         this._scheduleDraw();
@@ -244,7 +244,7 @@ export class SiteTopologyWidget {
     for (const src of files) {
       const img = new Image();
       img.onload = () => this._scheduleDraw();
-      img.src = src;
+      img.src = siteAssetUrl(src);
       this.images.set(src, img);
     }
   }
@@ -260,7 +260,7 @@ export class SiteTopologyWidget {
             <!-- Top-Left Site Preview Card -->
             <aside class="st-preview-card" data-preview-card aria-live="polite">
               <div class="st-preview-thumb-wrap">
-                <img class="st-preview-img" data-preview-img src="./jezero/combined.png" alt="Topography preview of selected Mars site" />
+                <img class="st-preview-img" data-preview-img src="${siteAssetUrl('./jezero/combined.png')}" alt="Topography preview of selected Mars site" />
                 <span class="st-preview-badge" data-preview-code>SITE 01 / 05</span>
               </div>
               <div class="st-preview-meta">

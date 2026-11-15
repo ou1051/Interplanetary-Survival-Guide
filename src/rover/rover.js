@@ -401,8 +401,15 @@ export class Rover {
       body.add(foot);
     }
 
-    // Driver's own suited legs (seen when looking down).
-    body.add(createSeatedAstronaut(this.suitM, { seatX: -0.42, upperBody: false }).group);
+    // Driver's own suited legs (seen when looking down). Hidden when the driver is
+    // out of the rover or drawn whole for the outside views.
+    this.driverLegs = createSeatedAstronaut(this.suitM, { seatX: -0.42, upperBody: false }).group;
+    body.add(this.driverLegs);
+    // The whole driver, for the third-person and overhead views (hidden in first person).
+    this.driver = createSeatedAstronaut(this.suitM, { seatX: -0.42 }).group;
+    this.driver.visible = false;
+    body.add(this.driver);
+
 
     // Co-pilot astronaut in the right seat; the helmet turns to look at things.
     const copilot = createSeatedAstronaut(this.suitM, { seatX: 0.42 });

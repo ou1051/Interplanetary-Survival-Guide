@@ -1,25 +1,38 @@
-import { LIFE_SUPPORT, ROVER } from '../config/mission.js';
+import { LIFE_SUPPORT, ROVER, HAB } from '../config/mission.js';
 import { consumptionEstimate } from '../physics/traverse.js';
 
-// Conservative rover forecast at the slowest governed speed, allowing for ingress.
+// Conservative forecast home at the slowest governed speed, allowing for ingress.
+// The crew can leave the planned route, so distances are measured from where
+// they actually are: home over the ground (straight line × 1.3 for detours).
 export const ingressMinutes = 20;
+const DETOUR = 1.3;
 const returnCost = (metres) => metres / ROVER.dangerSlopeSpeed / 60 +
   consumptionEstimate(ingressMinutes * 60, { work: true }).oxygenMinutes;
+const compass = (degrees) => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(degrees / 45) % 8];
 
 export function fieldGuidance(mission) {
-  const { route, s, nextKnownStop: nextStop, state, o2Remaining } = mission;
-  const turn = route.length / 2;
+  const { route, s, state, o2Remaining } = mission;
+  const pos = mission.pos ?? { x: HAB.x, z: HAB.z };
   const retraces = route.retracesOutbound !== false;
-  const outbound = retraces && s < turn && !mission.aborted;
-  const homeDistance = outbound ? s : route.length - s;
+  const outbound = retraces && s < route.length / 2 && !mission.aborted;
+  const homeDistance = Math.hypot(pos.x - HAB.x, pos.z - HAB.z) * DETOUR;
   const returnOxygen = o2Remaining - returnCost(homeDistance);
-  const workCost = route.stations.filter(stop => !stop.final && !stop.done).flatMap(stop => stop.tasks)
+  const open = route.stations.filter((stop) => !stop.final && !stop.done);
+  const workCost = open.flatMap((stop) => stop.tasks)
     .reduce((sum, task) => sum + (task.done ? 0 : consumptionEstimate(task.minutes * 60, { work: true }).oxygenMinutes), 0);
-  const plannedReturnOxygen = o2Remaining - returnCost(route.length - s) - workCost;
-  const zone = route.zones.find(hazard => !hazard.acknowledged && hazard.s1 >= s && hazard.s0 - s <= 55);
+  // Remaining plan: on to the open stations in order, then home.
+  let planned = 0;
+  let from = pos;
+  for (const stop of open) {
+    planned += Math.hypot(stop.x - from.x, stop.z - from.z);
+    from = stop;
+  }
+  planned = (planned + Math.hypot(from.x - HAB.x, from.z - HAB.z)) * DETOUR;
+  const plannedReturnOxygen = o2Remaining - returnCost(planned) - workCost;
+  const zone = mission.activeZones?.find((hazard) => hazard.severity === 'danger');
   const dust = mission.dustWarning;
-  const canReturn = ['drive', 'gate'].includes(state) && outbound && s > 1;
-  const reachedBase = state === 'complete' || (!outbound && nextStop?.ref.final && state !== 'drive' && state !== 'gate');
+  const canReturn = ['drive', 'walk'].includes(state) && outbound && s > 1;
+  const reachedBase = state === 'complete' || (mission.atHome && !open.length);
   const belowReserve = plannedReturnOxygen < LIFE_SUPPORT.reserveMinutes;
   let advice = 'Continue', reason = 'Planned return preserves your oxygen reserve.';
   if (reachedBase) { advice = 'At habitat'; reason = 'The traverse is complete or ready for ingress.'; }
@@ -28,17 +41,15 @@ export function fieldGuidance(mission) {
     advice = outbound ? 'Return to habitat' : retraces ? 'Proceed to habitat' : 'Oxygen caution';
     reason = dust ? 'Simulated dust front ahead. Turn back along your outbound track.' : 'Continuing the plan would use your return reserve.';
     if (!outbound && dust) reason = 'Follow the route back to the airlock.';
-  } else if (zone) { advice = 'Caution'; reason = `${zone.type.toLowerCase()} ahead. Follow the marked speed limit.`; }
-  else if (!outbound && (retraces || nextStop?.ref.final)) { advice = 'Proceed to habitat'; reason = 'Follow the return leg to the airlock.'; }
-  const returning = advice === 'Return to habitat';
-  const guideS = returning ? route.length - s : s;
-  const heading = route.sample(Math.min(guideS + 2, route.length));
-  const degrees = (Math.round(Math.atan2(heading.tx, -heading.tz) * 180 / Math.PI) + 360) % 360;
-  const direction = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(degrees / 45) % 8];
+  } else if (zone) { advice = 'Caution'; reason = `${zone.type.toLowerCase()} here. Follow the marked speed limit.`; }
+  else if (!open.length || mission.aborted) { advice = 'Proceed to habitat'; reason = 'Head back to the airlock and end the EVA.'; }
+  const returning = advice === 'Return to habitat' || advice === 'Proceed to habitat' || mission.aborted;
+  const target = returning ? { x: HAB.x, z: HAB.z, name: 'Habitat' } : open[0] ?? { x: HAB.x, z: HAB.z, name: 'Habitat' };
+  const degrees = (Math.round(Math.atan2(target.x - pos.x, -(target.z - pos.z)) * 180 / Math.PI) + 360) % 360;
   return {
-    advice, reason, canReturn, degrees, direction, returnOxygen,
-    next: returning ? 'Habitat' : nextStop?.kind === 'gate' ? 'Hazard gate' : nextStop?.ref.name ?? 'Habitat',
-    distance: Math.max(0, Math.round(returning ? homeDistance : (nextStop?.s ?? route.length) - s)),
-    hazard: dust ? 'Dust front · simulated' : zone?.type.toLowerCase() ?? 'None reported ahead',
+    advice, reason, canReturn, degrees, direction: compass(degrees), returnOxygen,
+    next: target.name,
+    distance: Math.max(0, Math.round(Math.hypot(target.x - pos.x, target.z - pos.z))),
+    hazard: dust ? 'Dust front · simulated' : zone?.type.toLowerCase() ?? 'None reported here',
   };
 }

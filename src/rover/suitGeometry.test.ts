@@ -44,4 +44,22 @@ describe('procedural EVA suit', () => {
     expect(legs.helmet).toBeNull();
     expect(graphStats(legs.root).tris).toBeLessThan(full.tris / 2);
   });
+
+  it('exposes the joints a renderer poses at runtime (the walking crew member)', () => {
+    const contains = (root: SuitNode, target: SuitNode) => { let found = false; walk(root, (n) => { if (n === target) found = true; }); return found; };
+    const { root, hips, parts } = buildSuitGraph();
+    expect(parts.upper).not.toBeNull();
+    for (const side of ['1', '-1']) {
+      const hip = hips.find((h) => Math.sign(h.p[0]) === Number(side))!;
+      // the knee hangs from its hip and the boot from its knee, so posing a hip carries the whole leg
+      expect(hip.kids).toContain(parts.knees[side]);
+      expect(parts.knees[side].kids).toContain(parts.boots[side]);
+      expect(parts.shoulders[side].kids).toContain(parts.elbows[side]);
+      expect(parts.upper!.kids).toContain(parts.shoulders[side]);
+      expect(contains(root, parts.boots[side])).toBe(true);
+    }
+    const legs = buildSuitGraph({ upperBody: false }).parts;
+    expect(legs.upper).toBeNull();
+    expect(Object.keys(legs.shoulders)).toHaveLength(0);
+  });
 });

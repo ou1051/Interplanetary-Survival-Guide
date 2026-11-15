@@ -20,5 +20,17 @@ export function buildSuitGraph(o?: {
   arms?: Record<string, ArmPose>;
   recline?: number;
   visorDown?: boolean;
-}): { root: SuitNode; helmet: SuitNode | null; hips: SuitNode[] };
+}): {
+  root: SuitNode;
+  helmet: SuitNode | null;
+  hips: SuitNode[];
+  /** Joints to pose at runtime, keyed by side (1 = right, -1 = left); upper is null without an upper body. */
+  parts: {
+    upper: SuitNode | null;
+    knees: Record<string, SuitNode>;
+    boots: Record<string, SuitNode>;
+    shoulders: Record<string, SuitNode>;
+    elbows: Record<string, SuitNode>;
+  };
+};
 export function graphStats(root: SuitNode): { meshes: number; verts: number; tris: number };

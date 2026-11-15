@@ -104,7 +104,7 @@ function plan(mission, { target, work, label, short, id, detail, next, path }) {
 
 export function legOptions(mission, path = null) {
   const remaining = mission.route.stations.filter((station) => !station.final && !station.done && !station.skipped
-    && station !== mission.currentStation);
+    && station !== (mission.legPending ?? mission.currentStation));
   const [next, after] = remaining;
   const options = [];
   if (next) {

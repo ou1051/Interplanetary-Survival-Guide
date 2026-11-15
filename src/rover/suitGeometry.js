@@ -259,7 +259,9 @@ const STAND_ARMS = { 1: { x: -0.05, z: 0.27, y: 0, e: -0.38, ez: 0 }, '-1': { x:
  * @param {object} [o.arms]   per side ({x, y, z, e, ez}) shoulder Euler + elbow pitch/yaw
  * @param {number} [o.recline=0] backward lean of the upper body about the hips (radians, negative leans back)
  * @param {boolean} [o.visorDown=true]
- * @returns {{ root: object, helmet: object|null, hips: object[] }}
+ * @returns {{ root: object, helmet: object|null, hips: object[], parts: object }}
+ *   parts: the joints a renderer can pose at runtime, per side (1 = right, -1 = left):
+ *   { upper, knees, boots, shoulders, elbows }
  */
 export function buildSuitGraph(o = {}) {
   const upperBody = o.upperBody !== false;
@@ -267,6 +269,7 @@ export function buildSuitGraph(o = {}) {
   const arms = o.arms || STAND_ARMS;
   convSeed = 0;
   const root = node(null);
+  const parts = { upper: null, knees: {}, boots: {}, shoulders: {}, elbows: {} };
 
   // pelvis / brief: wide, so the inflated suit fills out around the thighs
   { const g = lathe(splinePts([[0.0, 0.0], [0.09, 0.006], [0.16, 0.04], [0.19, 0.11], [0.198, 0.2], [0.188, 0.28], [0.17, 0.35]], 8), 64);
@@ -284,8 +287,10 @@ export function buildSuitGraph(o = {}) {
     bearing(hip, 0.136, [0, -0.1, 0]);
     add(hip, legMesh(side, B, side * 4.3 + 1.1), 'suit');
     const knee = group(hip, [0, -THIGH, 0], [B, 0, 0]);
+    parts.knees[side] = knee;
     bearing(knee, 0.106, [0, -0.315, 0]);
     const boot = group(knee, [0, -SHIN, 0], [-(a + B), 0, -side * 0.04]);
+    parts.boots[side] = boot;
     add(boot, cylinder(0.118, 0.124, 0.1, 44), 'dust', [0, -0.02, 0]);
     add(boot, pillow(rbox(0.172, 0.14, 0.34, 6, 0.06), [0.172, 0.14, 0.34], 0.006, side * 2.3), 'dust', [0, -0.1, 0.045]);
     add(boot, rbox(0.176, 0.085, 0.11, 4, 0.04), 'greyRubber', [0, -0.125, 0.165]);
@@ -299,6 +304,7 @@ export function buildSuitGraph(o = {}) {
   let helmet = null;
   if (upperBody) {
     const upper = group(root, [0, 0.95, 0], [o.recline || 0, 0, 0]);
+    parts.upper = upper;
     const U = (y) => y - 0.95; // standing height -> upper-body local
     const torsoProfile = splinePts([[0.175, 0], [0.19, 0.04], [0.215, 0.12], [0.235, 0.22], [0.24, 0.29], [0.228, 0.35], [0.2, 0.395], [0.165, 0.43], [0.138, 0.448]], 8);
     { const g = lathe(torsoProfile, 72);
@@ -334,12 +340,14 @@ export function buildSuitGraph(o = {}) {
     for (const side of [1, -1]) {
       const P = arms[side];
       const sh = group(upper, [side * 0.315, U(1.44), 0], [P.x, P.y || 0, side * P.z]);
+      parts.shoulders[side] = sh;
       bearing(sh, 0.104, [-side * 0.014, 0, 0], [0, 0, Math.PI / 2 + side * 0.1]);
       add(sh, sphere(0.1, 40, 28), 'suit', [0, -0.02, 0]);
       add(sh, fabricLimb(0.088, 0.096, 0.17, { seed: side * 7 + 0.5, bunch: -1, amp: 0.0072, comp: [0, 1] }), 'suit', [0, -0.14, 0]);
       bearing(sh, 0.097, [0, -0.07, 0]);
       if (side > 0) { const tc = Math.PI / 2 - 0.15; add(sh, cylinder(0.1, 0.1, 0.075, 24, true, tc - 0.4, 0.8), 'patch', [0, -0.125, 0]); }
       const elbow = group(sh, [0, -0.28, 0], [P.e, 0, -side * (P.ez || 0)]);
+      parts.elbows[side] = elbow;
       convolute(elbow, 0.09, [0.03, 0.002, -0.026], 0.017);
       add(elbow, fabricLimb(0.074, 0.086, 0.15, { seed: side * 11 + 2.1, bunch: 1, amp: 0.0068, comp: [0, 1] }), 'suit', [0, -0.125, 0]);
       if (side < 0) { add(elbow, rbox(0.085, 0.1, 0.02, 2, 0.005), 'hard', [0, -0.15, 0.087], [0.05, 0, 0]); add(elbow, box(0.088, 0.008, 0.022), 'darkMetal', [0, -0.105, 0.087]); }
@@ -402,7 +410,7 @@ export function buildSuitGraph(o = {}) {
 
   bakeShading(root);
   for (const hip of hips) hip.r = [hip.pitch, hip.r[1], hip.r[2]];
-  return { root, helmet, hips };
+  return { root, helmet, hips, parts };
 }
 
 // ---------------------------------------------------------------------------
