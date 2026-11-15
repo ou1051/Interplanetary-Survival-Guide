@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { sampleContext } from '../world/terrain.js';
 import { HAB } from '../config/mission.js';
-import { clamp } from '../core/math.js';
+import { clamp, formatDist } from '../core/math.js';
 
 // ---------------------------------------------------------------------------
 // 2D cartography shared by the dashboard NAV screen and the full-screen map:
@@ -9,6 +9,30 @@ import { clamp } from '../core/math.js';
 // ---------------------------------------------------------------------------
 
 export const ZONE_COLORS = { caution: '#ffc23d', danger: '#ff5a45' };
+
+export function mapWeatherLabel(weather) {
+  const range = weather.label === 'Clear' ? 'visibility' : 'visibility ring';
+  return `Simulated weather · ${weather.label} · ${range} ≈ ${formatDist(weather.visibilityM)}`;
+}
+
+// Project the same horizontal sight range onto each map's coordinate system.
+export function drawVisibilityRing(g, weather, x, z, project) {
+  if (weather.label === 'Clear') return;
+  g.save();
+  g.strokeStyle = '#ffbf69';
+  g.lineWidth = 2;
+  g.setLineDash([6, 4]);
+  g.beginPath();
+  for (let i = 0; i < 48; i++) {
+    const angle = i * Math.PI / 24;
+    const [px, py] = project(x + weather.visibilityM * Math.cos(angle), z + weather.visibilityM * Math.sin(angle));
+    if (i === 0) g.moveTo(px, py);
+    else g.lineTo(px, py);
+  }
+  g.closePath();
+  g.stroke();
+  g.restore();
+}
 
 export class MapRenderer {
   constructor(terrain, route) {
@@ -249,6 +273,7 @@ export class MapRenderer {
       g.stroke();
       g.setLineDash([]);
     }
+    drawVisibilityRing(g, view.weather, view.x, view.z, toPx);
     this._drawRoute(g, toPx, view.s, scale, { lineWidth: 3.5, labels: true, icon: 7, labelSize: 12 });
     const [rx, ry] = toPx(view.x, view.z);
     this._rover(g, rx, ry, view.heading, 10, 70);
@@ -298,6 +323,7 @@ export class MapRenderer {
       g.arc(cx, cy, r * scale, 0, Math.PI * 2);
       g.stroke();
     }
+    drawVisibilityRing(g, view.weather, view.x, view.z, toPx);
     this._drawRoute(g, toPx, view.s, scale, { lineWidth: 5, labels: true, icon: 8, labelSize: 14 });
     this._rover(g, cx, cy, 0, 11);
     return { toPx };

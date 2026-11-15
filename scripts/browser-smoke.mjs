@@ -20,6 +20,7 @@ try {
   await page.getByRole('button', { name: 'Enter habitat' }).click();
   await page.getByRole('button', { name: /Review route/ }).click();
   await page.getByLabel('Mission site').waitFor();
+  assert.equal(await page.getByLabel('Simulation conditions').inputValue(), 'variable');
   assert.equal(await page.locator('#viewport canvas').count(), 0);
   assert.equal(await page.getByRole('link', { name: 'Explore Mars' }).getAttribute('href'), './map.html');
   await page.getByRole('button', { name: 'Mission & sources' }).click();
@@ -43,6 +44,19 @@ try {
   try { await page.waitForFunction(start => window.__isg.mission.s > start, before, { timeout: 20000 }); }
   finally { await page.keyboard.up('w'); }
   assert.ok(await page.evaluate(() => window.__isg.mission.s) > before, 'Surface rover responds to driving input');
+  const weather = await page.evaluate(() => {
+    const { mission, simulate } = window.__isg;
+    for (let i = 0; i < 35 && mission.weather.label === 'Clear'; i++) simulate(1, { throttle: false });
+    return mission.weather.label;
+  });
+  assert.notEqual(weather, 'Clear', 'Default Delta launch gets variable weather');
+  await page.keyboard.press('p');
+  await page.getByRole('button', { name: 'Route', exact: true }).click();
+  const wristWeather = await page.locator('[data-route-weather]').textContent();
+  assert.ok(wristWeather.includes(weather));
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('m');
+  await page.waitForFunction(label => document.querySelector('#mapWeather').textContent === label, wristWeather);
   await page.close();
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
   mobile.on('pageerror', e => errors.push(e.message));

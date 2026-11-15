@@ -36,9 +36,20 @@ function hiddenSurprises(route, random) {
   });
 }
 const BOOST = 3;
+const weatherProfile = (label, speedLimit, fogDensity) => ({
+  label, speedLimit, fogDensity,
+  // Three.js exponential-squared fog: distance where 5% of the scene remains visible.
+  visibilityM: Math.sqrt(-Math.log(0.05)) / fogDensity,
+});
+const CLEAR_WEATHER = weatherProfile('Clear', ROVER.maxSpeed, 0.00042);
+const PASSING_WEATHER = [
+  weatherProfile('Dust gust', 3, 0.004),
+  weatherProfile('Blowing dust', 1.5, 0.009),
+];
+const DUST_FRONT = weatherProfile('Dust front', 0, 0.008);
 
 export class Mission {
-  constructor(route, terrain, habAntenna, { random = Math.random, surprises = true, legCheck = true } = {}) {
+  constructor(route, terrain, habAntenna, { random = Math.random, surprises = true, legCheck = true, variableWeather = false } = {}) {
     this.route = route;
     this.legCheck = legCheck;
     // This drive's stops: the planned ones plus whatever the unsurveyed ground hides (not on any map).
@@ -67,6 +78,13 @@ export class Mission {
     this.offRoute = false;
     this.taskFlash = null;
     this._zoneIds = new Set();
+    this.random = random;
+    this._weather = CLEAR_WEATHER;
+    this._weatherAt = variableWeather ? 15 + random() * 20 : Infinity;
+  }
+
+  get weather() {
+    return this.dustWarning ? DUST_FRONT : this._weather;
   }
 
   on(fn) {
@@ -192,6 +210,16 @@ export class Mission {
     this.o2Used += consumed.oxygenMinutes;
     this.dose += LIFE_SUPPORT.doseRateUsvH * (seconds / 3600);
     this.batteryWh = Math.max(0, this.batteryWh - consumed.batteryWh);
+    if (!this.dustWarning && this.met >= this._weatherAt) {
+      const clearing = this._weather !== CLEAR_WEATHER;
+      this._weather = clearing ? CLEAR_WEATHER : PASSING_WEATHER[Math.floor(this.random() * PASSING_WEATHER.length)];
+      // Work can jump the clock by minutes; report the current transition once, then reschedule.
+      this._weatherAt = this.met + (clearing ? 45 + this.random() * 45 : 25 + this.random() * 15);
+      this.emit('log', {
+        text: clearing ? 'Simulated dust cleared · normal visibility restored' : `${this._weather.label} · simulated · speed limited to ${this._weather.speedLimit} m/s`,
+        tone: clearing ? 'ok' : 'warn',
+      });
+    }
   }
 
   update(dt, input, roverPitchDeg) {
@@ -233,6 +261,10 @@ export class Mission {
     if (this.offRoute && limit > 1.5) {
       limit = 1.5;
       reason = 'CORRIDOR EDGE';
+    }
+    if (this._weather.speedLimit < limit) {
+      limit = this._weather.speedLimit;
+      reason = this._weather.label;
     }
     const approach = Math.sqrt(2 * 0.9 * toStop) + 0.08;
     if (approach < limit) {

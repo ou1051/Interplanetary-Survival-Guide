@@ -29,6 +29,10 @@ export function fieldGuidance(mission) {
     reason = dust ? 'Simulated dust front ahead. Turn back along your outbound track.' : 'Continuing the plan would use your return reserve.';
     if (!outbound && dust) reason = 'Follow the route back to the airlock.';
   } else if (zone) { advice = 'Caution'; reason = `${zone.type.toLowerCase()} ahead. Follow the marked speed limit.`; }
+  else if (mission.weather.label !== 'Clear') {
+    advice = 'Reduced visibility';
+    reason = `${mission.weather.label}. Follow the marked route at the reduced speed limit.`;
+  }
   else if (!outbound && (retraces || nextStop?.ref.final)) { advice = 'Proceed to habitat'; reason = 'Follow the return leg to the airlock.'; }
   const returning = advice === 'Return to habitat';
   const guideS = returning ? route.length - s : s;

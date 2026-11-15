@@ -14,7 +14,7 @@ import { Hud } from './ui/hud.js';
 import { PlanningBoard } from './ui/planningBoard.js';
 import { mountHabitat } from './ui/habitat.js';
 import { heightGrid, missionHeight, outcrop, worldPosition, sampleMinutes, imagery, observationSource } from './data/galeSite.js';
-import { clamp, damp, DEG } from './core/math.js';
+import { clamp, damp, DEG, formatDist } from './core/math.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -101,7 +101,7 @@ async function initSurface(plan, scenario, status) {
   scene.add(wheelDust.points);
 
   const map = new MapRenderer(terrain, route);
-  const mission = new Mission(route, terrain, hab.userData.antennaTop);
+  const mission = new Mission(route, terrain, hab.userData.antennaTop, { variableWeather: scenario === 'variable' });
   const audio = new RoverAudio();
   const hud = new Hud({ route, mission, mapRenderer: map, layers: LAYERS, input });
   document.querySelectorAll('#touch button').forEach((b) => input.bindButton(b, b.dataset.v));
@@ -194,7 +194,7 @@ async function initSurface(plan, scenario, status) {
   input.pressed.clear();
   const fieldAlert = document.getElementById('fieldAlert');
   const dustAt = route.length * 0.29;
-  let dustActive = false;
+  let lastWeather;
 
   // debug / automated testing hook: advance the simulation with a fixed step
   const simulate = (seconds, o = {}) => {
@@ -239,18 +239,21 @@ async function initSurface(plan, scenario, status) {
       mission.dustWarning = true;
       mission.speed = 0;
       mission.cruise = false;
-      scene.fog.density = 0.008;
-      dustActive = true;
       hud.log('Simulated dust front ahead. Open wrist navigation [P].', 'danger');
       planningBoard.toggle(true);
     }
-    if (dustActive && mission.aborted) {
-      scene.fog.density = 0.00042;
-      dustActive = false;
-    }
+    const weather = mission.weather;
+    scene.fog.density = weather.fogDensity;
     if (planningBoard.open) planningBoard.updateField();
-    const showAlert = mission.dustWarning && !mission.aborted && mission.state !== 'complete';
-    fieldAlert.classList.toggle('hidden', !showAlert);
+    if (weather !== lastWeather || mission.state === 'complete') {
+      let message = '';
+      if (mission.state !== 'complete' && weather.label !== 'Clear') {
+        message = mission.dustWarning ? 'Dust front ahead. Open your wrist navigator to return.'
+          : `${weather.label} · Visibility ≈ ${formatDist(weather.visibilityM)} · Rover limit ${Math.round(weather.speedLimit * 3.6)} km/h`;
+      }
+      if (fieldAlert.textContent !== message) fieldAlert.textContent = message;
+      lastWeather = weather;
+    }
 
     route.sample(mission.s, p);
     const x = p.x + p.rx * mission.lateral;

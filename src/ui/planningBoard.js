@@ -2,6 +2,7 @@ import { LIFE_SUPPORT } from '../config/mission.js';
 import { fieldGuidance } from '../sim/fieldGuidance.js';
 import { legOptions, temperatureAt } from '../sim/legCheck.js';
 import { SUIT, SUIT_PRESETS, defaultSuit, predict } from '../sim/suit.js';
+import { mapWeatherLabel } from './mapRenderer.js';
 import { TraverseRelief } from './traverseRelief.js';
 import { SiteTopologyWidget } from './siteTopology.js';
 import './planningBoard.css';
@@ -115,6 +116,7 @@ export class PlanningBoard {
               </section>
               <section data-route-view hidden>
                 <p class="wd-h">Selected traverse <span data-route-name>Delta Front</span></p>
+                <p class="wd-maplegend" data-route-weather></p>
                 <canvas data-traverse width="400" height="240" aria-label="Selected route over mission terrain"></canvas>
                 <p class="wd-maplegend">◇ Science stop · ▲ Hazard gate · ■ Habitat · ● Rover</p>
               </section>
@@ -310,7 +312,7 @@ export class PlanningBoard {
 
   drawRoute() {
     if (this.relief && this.mission) {
-      this.relief.draw($('[data-traverse]', this.el), undefined, this.mission.s);
+      this.relief.draw($('[data-traverse]', this.el), undefined, this.mission.s, this.mission.weather);
     }
   }
 
@@ -325,6 +327,7 @@ export class PlanningBoard {
       oxygen: `${Math.round(percent * 100)}% · ${hm(mission.o2Remaining)}`,
       'plan-name': name,
       'route-name': name,
+      'route-weather': mapWeatherLabel(mission.weather),
       advice: guidance.advice,
       reason: guidance.reason,
       'next-stop': `${guidance.next} · ${guidance.distance} m`,
@@ -344,9 +347,10 @@ export class PlanningBoard {
     $('[data-meter]', this.el).style.width = `${percent * 100}%`;
     $('[data-lamp]', this.el).classList.toggle('caution', guidance.advice !== 'Continue');
     const position = Math.round(mission.s);
-    if (this.tab === 'map' && position !== this.mapPosition) {
+    if (this.tab === 'map' && (position !== this.mapPosition || mission.weather !== this.mapWeather)) {
       this.drawRoute();
       this.mapPosition = position;
+      this.mapWeather = mission.weather;
     }
   }
 }

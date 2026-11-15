@@ -115,10 +115,14 @@ export function mountHabitat(root, launch) {
                 <small>${plan.surfaceSlope.toFixed(1)}° max mapped slope</small></button>`).join('')}
             </div>
             <p class="hab-reason" data-reason></p>
-            <label class="hab-scenario">Simulation conditions
-              <select data-scenario><option value="clear">Nominal conditions</option><option value="dust">Dust front ahead</option></select>
-            </label>
             </div>
+            <label class="hab-scenario">Simulation conditions
+              <select data-scenario>
+                <option value="variable">Variable weather</option>
+                <option value="clear">Nominal conditions</option>
+                <option value="dust" data-gale-only>Dust front ahead</option>
+              </select>
+            </label>
             <button type="button" data-launch class="hab-launch">Go outside <span>→</span></button>
             <p class="hab-note" data-status role="status">Oxygen and weather are simulated.</p>
           </section>
@@ -252,6 +256,8 @@ export function mountHabitat(root, launch) {
     for (const element of root.querySelectorAll('[data-gale-only], .hab-mapframe > img, .hab-pin:not(.hab-s1), .hab-base, .hab-scale')) {
       element.hidden = delta;
     }
+    const conditions = query('[data-scenario]');
+    if (delta && conditions.value === 'dust') conditions.value = 'variable';
     query('[data-delta-brief]').hidden = !delta;
     root.classList.toggle('hab-s1-focused', delta && s1Focused);
     query('[data-s1-picker]').hidden = !s1Focused;
@@ -470,7 +476,7 @@ export function mountHabitat(root, launch) {
   const consoleGrid = query('[data-hab-console-grid]');
   let launching = false;
 
-  async function runLaunchSequence(planToLaunch, scenarioToLaunch = 'clear') {
+  async function runLaunchSequence(planToLaunch, scenarioToLaunch = 'variable') {
     if (launching || !planToLaunch) return;
     launching = true;
     const launchBtn = query('[data-launch]');
@@ -512,7 +518,7 @@ export function mountHabitat(root, launch) {
         name: `${site.name.split('·')[0].trim()} · ${chosenApproach.label} to S1`,
         site: { name: site.name, eva: 'EVA-01', sol: 214 },
       };
-      runLaunchSequence(customPlan, 'clear');
+      runLaunchSequence(customPlan, query('[data-scenario]').value === 'clear' ? 'clear' : 'variable');
     },
   });
 
@@ -586,7 +592,7 @@ export function mountHabitat(root, launch) {
     if (button.hasAttribute('data-launch') && selected && !button.disabled) {
       await runLaunchSequence(
         selected === original ? approachChoice : selected,
-        selected === original ? 'clear' : query('[data-scenario]').value
+        query('[data-scenario]').value
       );
       return;
     }

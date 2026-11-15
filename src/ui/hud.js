@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { consumptionEstimate } from '../physics/traverse.js';
 import { SITE, ROVER, LIFE_SUPPORT, SLOPE_CLASSES } from '../config/mission.js';
 import { formatHMS, formatHM, formatDist, clamp } from '../core/math.js';
-import { ZONE_COLORS, bearingTo } from './mapRenderer.js';
+import { ZONE_COLORS, bearingTo, mapWeatherLabel } from './mapRenderer.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -144,7 +144,7 @@ export class Hud {
     }
     $('speedVal').textContent = kmh(M.speed).toFixed(1);
     const lim = $('speedLimit');
-    const limit = this.route.speedLimitAt(M.s + 3);
+    const limit = Math.min(this.route.speedLimitAt(M.s + 3), M.weather.speedLimit);
     lim.textContent = M.governed ? `LIMITED · ${M.limitReason}` : `LIMIT ${Math.round(kmh(limit))} km/h`;
     lim.classList.toggle('gov', M.governed || limit < ROVER.maxSpeed);
 
@@ -538,10 +538,13 @@ export class Hud {
   }
 
   _drawOverlay(view) {
+    const weather = this.mission.weather;
+    const label = mapWeatherLabel(weather);
+    if ($('mapWeather').textContent !== label) $('mapWeather').textContent = label;
     const mc = $('mapCanvas');
     const r = mc.getBoundingClientRect();
     const g = fitCanvas(mc, Math.max(200, r.width), Math.max(200, r.height));
-    this.map.drawOverview(g, Math.max(200, r.width), Math.max(200, r.height), { x: view.x, z: view.z, heading: (view.headingDeg * Math.PI) / 180, s: this.mission.s });
+    this.map.drawOverview(g, Math.max(200, r.width), Math.max(200, r.height), { x: view.x, z: view.z, heading: (view.headingDeg * Math.PI) / 180, s: this.mission.s, weather });
     const pc = $('profileCanvas');
     const pr = pc.getBoundingClientRect();
     const pg = fitCanvas(pc, Math.max(200, pr.width), 170);

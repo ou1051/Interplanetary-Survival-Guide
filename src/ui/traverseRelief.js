@@ -1,3 +1,5 @@
+import { drawVisibilityRing } from './mapRenderer.js';
+
 // Orthographic relief sampled from the same terrain the rover drives over.
 export class TraverseRelief {
   constructor(route) {
@@ -38,7 +40,7 @@ export class TraverseRelief {
     });
   }
 
-  draw(canvas, selected, roverS) {
+  draw(canvas, selected, roverS, weather) {
     const width = canvas.clientWidth;
     if (!width) return;
     const height = width * 0.66;
@@ -124,7 +126,9 @@ export class TraverseRelief {
     });
     if (Number.isFinite(roverS)) {
       const { x, z } = this.route.sample(roverS);
-      const position = this.project(x, z, this.route.terrain.heightAt(x, z), 2);
+      const elevation = this.route.terrain.heightAt(x, z);
+      drawVisibilityRing(ctx, weather, x, z, (rx, rz) => toScreen(this.project(rx, rz, elevation, 2)));
+      const position = this.project(x, z, elevation, 2);
       ctx.beginPath();
       ctx.arc(...toScreen(position), 4, 0, 2 * Math.PI);
       ctx.strokeStyle = '#15210f';

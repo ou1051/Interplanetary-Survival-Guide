@@ -84,7 +84,7 @@ function plan(mission, { target, work, label, id, detail }) {
     {
       id: 'dust', label: 'Dust',
       ok: !mission.dustWarning || id === 'home',
-      value: mission.dustWarning ? 'Dust front ahead' : 'Clear',
+      value: mission.dustWarning ? 'Dust front ahead' : mission.weather.label,
       rule: 'Head home if a dust front is coming',
     },
   ];

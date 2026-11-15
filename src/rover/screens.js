@@ -49,7 +49,7 @@ export function drawNav(scr, map, mission, view) {
   const { ctx: g, canvas } = scr;
   const W = canvas.width;
   const H = canvas.height;
-  map.drawNav(g, W, H, { x: view.x, z: view.z, heading: (view.headingDeg * Math.PI) / 180, s: mission.s }, 130);
+  map.drawNav(g, W, H, { x: view.x, z: view.z, heading: (view.headingDeg * Math.PI) / 180, s: mission.s, weather: mission.weather }, 130);
   g.fillStyle = 'rgba(3,8,10,0.78)';
   g.fillRect(0, 0, W, 34);
   g.fillStyle = CYAN;
@@ -69,7 +69,7 @@ export function drawNav(scr, map, mission, view) {
   g.textAlign = 'left';
   g.fillText(`LAYER ${map.layer ? map.layer.name : ''}`, 12, H - 9);
   g.textAlign = 'right';
-  g.fillText('RINGS 50 m', W - 12, H - 9);
+  g.fillText(mission.weather.label === 'Clear' ? 'RINGS 50 m' : `VIS ≈ ${formatDist(mission.weather.visibilityM)}`, W - 12, H - 9);
   scr.tex.needsUpdate = true;
 }
 
@@ -86,7 +86,7 @@ export function drawTraverse(scr, route, mission, view) {
   g.fillStyle = DIM;
   g.font = `15px ${FONT}`;
   g.fillText('km/h', 16, 114);
-  const lim = route.speedLimitAt(mission.s + 3) * 3.6;
+  const lim = Math.min(route.speedLimitAt(mission.s + 3), mission.weather.speedLimit) * 3.6;
   g.fillStyle = mission.governed ? ZONE_COLORS.caution : DIM;
   g.fillText(`LIMIT ${Math.round(lim)}`, 16, 136);
   // attitude
