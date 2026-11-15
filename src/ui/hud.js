@@ -483,7 +483,7 @@ export class Hud {
       } else if (M.canBoard) html = `<span class="pulse">PRESS <kbd>F</kbd> TO BOARD THE ROVER</span>`;
       else if (M.atHome) html = `AT THE HABITAT · <kbd>↵</kbd> END EVA`;
       else if (M.legPending) html = `<span class="pulse">${M.legPending.id} DONE · CHOOSE THE NEXT LEG ON YOUR WRIST NAVIGATOR <kbd>P</kbd></span>`;
-      else html = `<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> WALK · <kbd>⇧</kbd> RUN · FOLLOW THE BEAMS TO ARTIFACTS`;
+      else html = 'FOLLOW THE BEAMS TO ARTIFACTS';
     }
     if (el.innerHTML !== html) el.innerHTML = html;
   }
